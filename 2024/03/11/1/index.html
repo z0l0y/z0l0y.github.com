@@ -4,8 +4,9 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="Hello World, zloy">
-    <meta name="description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hex">
+    <meta name="keywords" content="Linux服务器配置Java环境, zoloy">
+    <meta name="description" content="关于Linux服务器上Java的一些问题怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）
+下载 Java JDK：首先，你需要从官方网站下载适用于你的 Linux 发行版的 Java JDK（Java Develop">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -17,7 +18,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>Hello World | zloy</title>
+    <title>Linux服务器配置Java环境 | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -64,7 +65,7 @@
                     
                     <img src="/medias/logo.png" class="logo-img" alt="LOGO">
                     
-                    <span class="logo-span">zloy</span>
+                    <span class="logo-span">zoloy&#39;s blog</span>
                 </a>
             </div>
             
@@ -127,28 +128,6 @@
     
   </li>
   
-  <li class="hide-on-med-and-down nav-item">
-    
-    <a href="/contact" class="waves-effect waves-light">
-      
-      <i class="fas fa-comments" style="zoom: 0.6;"></i>
-      
-      <span>留言板</span>
-    </a>
-    
-  </li>
-  
-  <li class="hide-on-med-and-down nav-item">
-    
-    <a href="/friends" class="waves-effect waves-light">
-      
-      <i class="fas fa-address-book" style="zoom: 0.6;"></i>
-      
-      <span>友情链接</span>
-    </a>
-    
-  </li>
-  
   <li>
     <a href="#searchModal" class="modal-trigger waves-effect waves-light">
       <i id="searchIcon" class="fas fa-search" title="搜索" style="zoom: 0.85;"></i>
@@ -168,10 +147,10 @@
         
         <img src="/medias/logo.png" class="logo-img circle responsive-img">
         
-        <div class="logo-name">zloy</div>
+        <div class="logo-name">zoloy&#39;s blog</div>
         <div class="logo-desc">
             
-            zloy blog
+            Study notes
             
         </div>
     </div>
@@ -233,32 +212,10 @@
           
         </li>
         
-        <li class="m-nav-item">
-	  
-		<a href="/contact" class="waves-effect waves-light">
-			
-			    <i class="fa-fw fas fa-comments"></i>
-			
-			留言板
-		</a>
-          
-        </li>
-        
-        <li class="m-nav-item">
-	  
-		<a href="/friends" class="waves-effect waves-light">
-			
-			    <i class="fa-fw fas fa-address-book"></i>
-			
-			友情链接
-		</a>
-          
-        </li>
-        
         
         <li><div class="divider"></div></li>
         <li>
-            <a href="https://github.com/blinkfox/hexo-theme-matery" class="waves-effect waves-light" target="_blank">
+            <a href="https://github.com/z0l0y" class="waves-effect waves-light" target="_blank">
                 <i class="fab fa-github-square fa-fw"></i>Fork Me
             </a>
         </li>
@@ -315,7 +272,7 @@
     }
 </style>
 
-<a href="https://github.com/blinkfox/hexo-theme-matery" class="github-corner tooltipped hide-on-med-and-down" target="_blank"
+<a href="https://github.com/z0l0y" class="github-corner tooltipped hide-on-med-and-down" target="_blank"
    data-tooltip="Fork Me" data-position="left" data-delay="50">
     <svg viewBox="0 0 250 250" aria-hidden="true">
         <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
@@ -334,12 +291,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/12.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/9.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">Hello World</h1>
+                    <h1 class="description center-align post-title">Linux服务器配置Java环境</h1>
                 </div>
             </div>
         </div>
@@ -361,12 +318,29 @@
             <div class="row tag-cate">
                 <div class="col s7">
                     
-                          <div class="article-tag">
-                            <span class="chip bg-color">无标签</span>
-                          </div>
+                    <div class="article-tag">
+                        
+                            <a href="/tags/Linux/">
+                                <span class="chip bg-color">Linux</span>
+                            </a>
+                        
+                            <a href="/tags/Java/">
+                                <span class="chip bg-color">Java</span>
+                            </a>
+                        
+                    </div>
                     
                 </div>
                 <div class="col s5 right-align">
+                    
+                    <div class="post-cate">
+                        <i class="fas fa-bookmark fa-fw icon-category"></i>
+                        
+                            <a href="/categories/Linux/" class="post-category">
+                                Linux
+                            </a>
+                        
+                    </div>
                     
                 </div>
             </div>
@@ -375,40 +349,204 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-01-02
+                    2024-03-11
                 </div>
                 
 
                 
-
+                <div class="post-date info-break-policy">
+                    <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
+                    2024-03-11
+                </div>
                 
 
                 
+                <div class="info-break-policy">
+                    <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
+                    2.8k
+                </div>
+                
 
                 
+                <div class="info-break-policy">
+                    <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
+                    10 分
+                </div>
+                
+
+                
+                    <div id="busuanzi_container_page_pv" class="info-break-policy">
+                        <i class="far fa-eye fa-fw"></i>阅读次数:&nbsp;&nbsp;
+                        <span id="busuanzi_value_page_pv"></span>
+                    </div>
+				
             </div>
         </div>
         <hr class="clearfix">
 
+        
+        <!-- 是否加载使用自带的 prismjs. -->
+        <link rel="stylesheet" href="/libs/prism/prism.min.css">
         
 
         
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+                <h1 id="关于Linux服务器上Java的一些问题"><a href="#关于Linux服务器上Java的一些问题" class="headerlink" title="关于Linux服务器上Java的一些问题"></a>关于Linux服务器上Java的一些问题</h1><h2 id="怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）"><a href="#怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）" class="headerlink" title="怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）"></a>怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）</h2><ol>
+<li><p>下载 Java JDK：首先，你需要从官方网站下载适用于你的 Linux 发行版的 Java JDK（Java Development Kit）。你可以访问 Oracle 官方网站（<a target="_blank" rel="noopener" href="https://www.oracle.com/java/technologies/javase-jdk11-downloads.html%EF%BC%89%E6%88%96%E8%80%85">https://www.oracle.com/java/technologies/javase-jdk11-downloads.html）或者</a> OpenJDK 官方网站（<a target="_blank" rel="noopener" href="https://openjdk.java.net/install/%EF%BC%89%E6%9D%A5%E8%8E%B7%E5%8F%96%E9%80%82%E5%90%88%E4%BD%A0%E7%9A%84%E5%8F%91%E8%A1%8C%E7%89%88%E7%9A%84">https://openjdk.java.net/install/）来获取适合你的发行版的</a> JDK。</p>
+</li>
+<li><p>安装 Java JDK：下载完成后，打开终端，并使用以下命令安装 JDK。根据你的发行版和下载的 JDK 类型，命令可能会有所不同。</p>
+<ul>
+<li><p>对于 Ubuntu &#x2F; Debian：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo apt update</span><br><span class="line">sudo apt install openjdk-11-jdk</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>对于 CentOS &#x2F; RHEL：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo yum update</span><br><span class="line">sudo yum install java-11-openjdk-devel</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>对于其他发行版，你可以按照相应的包管理器和命令进行安装。</p>
+</li>
+</ul>
+</li>
+<li><p>配置环境变量：安装完成后，你需要配置服务器的环境变量，以便系统能够找到 Java 的安装路径。在终端中执行以下命令，打开环境变量配置文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo vim /etc/profile</span><br></pre></td></tr></table></figure>
 
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+<p>注意注意：</p>
+<p>千万不要在environment里面配置，要不然会出问题的。</p>
+<p>ps1:</p>
+<p>对于大多数 Linux 发行版，系统会自动加载某些全局环境变量配置文件，而无需手动配置。这些配置文件包含系统范围的环境变量设置，可以在用户登录时自动加载。</p>
+<p>常见的全局环境变量配置文件包括：</p>
+<ul>
+<li><code>/etc/environment</code>：这个文件是一个全局的环境变量配置文件，其中定义的变量对所有用户和系统服务都可见。</li>
+<li><code>/etc/profile</code>：这个文件是一个全局的 shell 配置文件，其中可以包含设置环境变量的语句。</li>
+<li><code>/etc/profile.d/</code> 目录：该目录包含一系列以 <code>.sh</code> 结尾的脚本文件，这些文件中可以设置特定的环境变量。</li>
+</ul>
+<p>当你登录到 Linux 系统时，系统会自动加载这些配置文件，并将其中定义的环境变量设置为全局可用的。</p>
+<p>需要注意的是，如果你希望在特定用户或特定会话下设置环境变量，可以通过修改用户的 <code>.bashrc</code> 或 <code>.bash_profile</code> 文件来实现。这些文件位于用户的主目录下，可以在登录时加载用户自定义的环境变量设置。</p>
+<p>总之，对于全局环境变量配置，Linux 系统会自动加载预定义的配置文件，无需手动配置。但如果你需要针对特定用户或会话进行环境变量设置，可以修改相应的用户配置文件。</p>
+<p>ps2:</p>
+<p>在某些 Linux 发行版中，如 Ubuntu，可能没有默认的 <code>/etc/environment</code> 文件。这是因为不同的发行版可能采用不同的方式来管理环境变量。</p>
+<p>在缺少 <code>/etc/environment</code> 文件的情况下，你可以手动创建它。请使用超级用户权限（root）执行以下步骤：</p>
+<ol>
+<li><p>打开终端，并使用文本编辑器（如 <code>vim</code> 或 <code>nano</code>）创建 <code>/etc/profile</code>文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo vi /etc/profile</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>在打开的文件中，按照以下格式添加你的环境变量：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">VARIABLE_NAME=<span class="string">&quot;variable_value&quot;</span></span><br></pre></td></tr></table></figure>
 
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+<p>例如：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> JAVA_HOME=/usr/lib/jvm/java-11-openjdk-11.0.3.7-0.el7_6.aarch64</span><br><span class="line"><span class="built_in">export</span> JRE_HOME=<span class="variable">$JAVA_HOME</span>/jre</span><br><span class="line"><span class="built_in">export</span> CLASSPATH=<span class="variable">$JAVA_HOME</span>/lib:<span class="variable">$JRE_HOME</span>/lib:<span class="variable">$CLASSPATH</span></span><br><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$JAVA_HOME</span>/bin:<span class="variable">$JRE_HOME</span>/bin:<span class="variable">$PATH</span></span><br></pre></td></tr></table></figure>
 
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+<p>注意，等号两边不要有空格，且值需要使用双引号引起来。</p>
+</li>
+<li><p>保存并关闭文件。</p>
+</li>
+<li><p>重新登录或重新加载环境变量配置，以使新的环境变量生效。</p>
+<p>或者，你可以在当前终端中执行以下命令，立即加载新的环境变量配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">source</span> /etc/profile</span><br></pre></td></tr></table></figure></li>
+</ol>
+</li>
+<li><p>在打开的文件中，添加以下行：</p>
+<p>对了，注意一下在vim里面可以用快捷键来复制，ctrl+shift+v即可</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> JAVA_HOME=/usr/lib/jvm/java-11-openjdk-11.0.3.7-0.el7_6.aarch64</span><br><span class="line"><span class="built_in">export</span> JRE_HOME=<span class="variable">$JAVA_HOME</span>/jre</span><br><span class="line"><span class="built_in">export</span> CLASSPATH=<span class="variable">$JAVA_HOME</span>/lib:<span class="variable">$JRE_HOME</span>/lib:<span class="variable">$CLASSPATH</span></span><br><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$JAVA_HOME</span>/bin:<span class="variable">$JRE_HOME</span>/bin:<span class="variable">$PATH</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>使环境变量生效：执行以下命令以使环境变量生效：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">source</span> /etc/profile</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>验证 Java 安装：执行以下命令验证 Java 是否已成功安装：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">java -version</span><br></pre></td></tr></table></figure>
 
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+<p>如果一切顺利，你将看到 Java 的版本信息。</p>
+</li>
+</ol>
+<p>现在，你已经在 Linux 服务器上成功配置了 Java 环境。你可以使用 Java 来运行和管理你的 Java 应用程序。</p>
+<h2 id="怎么切换Java版本"><a href="#怎么切换Java版本" class="headerlink" title="怎么切换Java版本"></a>怎么切换Java版本</h2><p>在 Linux 上切换 Java 的版本，可以使用 <code>update-alternatives</code> 命令来管理系统中的多个 Java 安装版本。下面是切换 Java 版本的一般步骤：</p>
+<ol>
+<li><p>查看可用的 Java 版本：执行以下命令，列出系统中已安装的 Java 版本以及其优先级：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo update-alternatives --config java</span><br></pre></td></tr></table></figure>
+
+<p>这将显示类似以下内容的选项列表：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">有 2 个候选项可用于替换 java (提供 /usr/bin/java)。</span><br><span class="line"></span><br><span class="line">  选择       路径                                   优先级  状态</span><br><span class="line">------------------------------------------------------------</span><br><span class="line"></span><br><span class="line">* 0            /usr/lib/jvm/java-11-openjdk-amd64/bin/java   1111      自动模式</span><br><span class="line">  1            /usr/lib/jvm/java-11-openjdk-amd64/bin/java   1111      手动模式</span><br><span class="line">  2            /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java   1081      手动模式</span><br><span class="line"></span><br><span class="line">按下 &lt;enter&gt; 保持当前选择[*]或者键入选择的编号：</span><br></pre></td></tr></table></figure>
+
+<p><code>*</code> 符号表示当前选择的 Java 版本。</p>
+</li>
+<li><p>选择要使用的 Java 版本：根据列表中的选项，键入对应 Java 版本的编号并按 Enter，或者直接按 Enter 保持当前选择不变。</p>
+</li>
+<li><p>验证 Java 版本：执行以下命令，验证已切换到的 Java 版本：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">java -version</span><br></pre></td></tr></table></figure>
+
+<p>这将显示当前正在使用的 Java 版本的信息。</p>
+</li>
+</ol>
+<p>通过上述步骤，你可以在 Linux 上切换系统中可用的 Java 版本，并使用 <code>update-alternatives</code> 命令来配置默认的 Java 版本。</p>
+<h2 id="怎么找到Java的安装路径"><a href="#怎么找到Java的安装路径" class="headerlink" title="怎么找到Java的安装路径"></a>怎么找到Java的安装路径</h2><p>你可以通过以下方式来找到你的 Java 安装路径：</p>
+<ol>
+<li><p>使用 <code>which</code> 命令：在终端中执行以下命令，可以查看系统当前默认的 Java 可执行文件的路径：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">which</span> java</span><br></pre></td></tr></table></figure>
+
+<p>这将输出 Java 可执行文件的完整路径，如 <code>/usr/bin/java</code>。</p>
+</li>
+<li><p>使用 <code>readlink</code> 命令：如果你想获取 Java 可执行文件的符号链接的真实路径，可以执行以下命令：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">readlink</span> -f $(<span class="built_in">which</span> java)</span><br></pre></td></tr></table></figure>
+
+<p>这将输出 Java 可执行文件的真实路径，如 <code>/usr/lib/jvm/java-11-openjdk-amd64/bin/java</code>。</p>
+</li>
+<li><p>使用 <code>update-alternatives</code> 命令：在某些 Linux 发行版中，你可以使用 <code>update-alternatives</code> 命令来管理系统中的多个 Java 安装版本。执行以下命令，可以查看当前配置的 Java 选项及其路径：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">update-alternatives --display java</span><br></pre></td></tr></table></figure>
+
+<p>这将显示 Java 的可选配置项列表，包括各个选项的路径。</p>
+</li>
+</ol>
+<p>以上方法中的任何一种都可以帮助你找到 Java 的安装路径。根据你的系统和安装方式，Java 的路径可能会有所不同。</p>
+<h2 id="JAVA-HOME是什么"><a href="#JAVA-HOME是什么" class="headerlink" title="JAVA_HOME是什么"></a>JAVA_HOME是什么</h2><p><code>JAVA_HOME</code> 是指定 Java Development Kit (JDK) 的根目录路径。JDK 是用于开发和构建 Java 应用程序的软件包，包括 Java 编译器 (<code>javac</code>)、Java 虚拟机 (<code>java</code>)、Java 类库和其他开发工具。</p>
+<p>通过设置 <code>JAVA_HOME</code> 环境变量，你可以指定 JDK 的安装路径，以便系统和应用程序能够找到所需的 Java 运行时环境和开发工具。<code>JAVA_HOME</code> 变量应该指向 JDK 安装目录的根路径，其中包含 <code>bin</code>、<code>lib</code>、<code>include</code> 等子目录。</p>
+<p>例如，如果你的 JDK 安装路径是 <code>C:\Program Files\Java\jdk1.8.0_271</code>（在 Windows 上），那么你可以将 <code>JAVA_HOME</code> 设置为 <code>C:\Program Files\Java\jdk1.8.0_271</code>。</p>
+<p>在设置了正确的 <code>JAVA_HOME</code> 后，应用程序和开发工具可以使用该环境变量来定位所需的 Java 运行时环境和工具，例如编译 Java 代码、运行 Java 程序等。</p>
+<h2 id="怎么查看JAVA-HOME在哪里"><a href="#怎么查看JAVA-HOME在哪里" class="headerlink" title="怎么查看JAVA_HOME在哪里"></a>怎么查看JAVA_HOME在哪里</h2><p>要查看 <code>JAVA_HOME</code> 环境变量的值和定义位置，可以按照以下步骤进行：</p>
+<ol>
+<li><p>打开终端。</p>
+</li>
+<li><p>运行以下命令来查看 <code>JAVA_HOME</code> 环境变量的值：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">echo</span> <span class="variable">$JAVA_HOME</span></span><br></pre></td></tr></table></figure>
+
+<p>这将在终端中显示 <code>JAVA_HOME</code> 环境变量的值。如果它已设置，你将看到 Java 的安装路径。</p>
+</li>
+<li><p>如果没有显示 <code>JAVA_HOME</code> 环境变量的值，说明它可能没有设置。在这种情况下，你可以尝试以下方法来查找定义位置：</p>
+<ul>
+<li><p><strong>查看系统级环境变量文件</strong>：某些 Linux 发行版会将环境变量设置存储在 <code>/etc/environment</code> 文件中。你可以使用文本编辑器打开该文件，并查找是否在其中定义了 <code>JAVA_HOME</code> 环境变量。</p>
+</li>
+<li><p><strong>查看用户级环境变量文件</strong>：用户级环境变量文件通常是用户主目录下的 <code>.bashrc</code> 或 <code>.bash_profile</code>。你可以使用文本编辑器打开适用于当前用户的环境变量文件，并搜索是否有关于 <code>JAVA_HOME</code> 的定义。</p>
+</li>
+<li><p><strong>查看特定的 Shell 配置文件</strong>：如果你在使用特定的 Shell（如 <code>zsh</code> 或 <code>fish</code>），可以查看该 Shell 的配置文件，例如 <code>.zshrc</code> 或 <code>config.fish</code>，以寻找 <code>JAVA_HOME</code> 的定义。</p>
+</li>
+<li><p><strong>尝试其他方法</strong>：如果以上方法都没有找到 <code>JAVA_HOME</code> 的定义，你可以尝试运行 <code>grep</code> 命令来搜索系统中的所有文件，以查找 <code>JAVA_HOME</code> 关键字。例如：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">grep -rnw <span class="string">&#x27;/&#x27;</span> -e <span class="string">&quot;JAVA_HOME&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>这将在整个文件系统中递归搜索包含 <code>JAVA_HOME</code> 的文件，并显示匹配的行及其所在文件的路径。</p>
+</li>
+</ul>
+</li>
+</ol>
+<p>通过上述步骤，你应该能够找到 <code>JAVA_HOME</code> 环境变量的值和定义位置。请注意，如果你使用的是 Windows 操作系统，查找环境变量的方法会有所不同。</p>
+<h2 id="关于环境配置的etc目录"><a href="#关于环境配置的etc目录" class="headerlink" title="关于环境配置的etc目录"></a>关于环境配置的etc目录</h2><p><code>/etc</code> 是 Linux 系统中的一个特殊目录，用于存储系统的配置文件。它是 “etcetera”（等等）的缩写，表示其中包含了各种各样的配置文件。</p>
+<p>在 <code>/etc</code> 目录下，你会找到许多与系统配置相关的文件和子目录。这些文件和目录通常需要超级用户（root）权限才能进行修改。以下是一些常见的 <code>/etc</code> 目录下的文件和目录：</p>
+<ul>
+<li><code>/etc/passwd</code>：包含系统上的用户账户信息。</li>
+<li><code>/etc/group</code>：包含系统上的用户组信息。</li>
+<li><code>/etc/hosts</code>：包含主机名与 IP 地址的映射。</li>
+<li><code>/etc/resolv.conf</code>：设置系统的 DNS 解析配置。</li>
+<li><code>/etc/fstab</code>：定义系统启动时挂载的文件系统。</li>
+<li><code>/etc/network/interfaces</code> 或 <code>/etc/sysconfig/network-scripts</code>：网络配置文件，用于设置网络接口。</li>
+<li><code>/etc/ssh/sshd_config</code>：SSH 服务器的配置文件。</li>
+<li><code>/etc/sudoers</code>：定义系统上的用户和用户组的 sudo 访问权限。</li>
+<li><code>/etc/environment</code>：全局环境变量的配置文件。</li>
+</ul>
+<p>注意一下：</p>
+<p><code>/etc/environment</code> 不是一个目录，而是一个文件。</p>
+<p><code>/etc/environment</code> 是一个系统级别的环境变量文件，用于定义系统范围的环境变量。它是一个文本文件，通常不包含目录。</p>
+<p><code>/etc</code> 目录中的文件和目录通常由系统管理员进行管理和配置。它们是系统范围的配置文件，用于设置各种系统参数、服务和应用程序的行为。因此，对 <code>/etc</code> 目录的修改和配置需要谨慎，并且可能需要超级用户权限。</p>
+<h2 id="关于-bashrc和-bash-profile文件在哪里"><a href="#关于-bashrc和-bash-profile文件在哪里" class="headerlink" title="关于.bashrc和.bash_profile文件在哪里"></a>关于.bashrc和.bash_profile文件在哪里</h2><p><img src="/2024/03/11/1/image-20240306192156882.png" alt="image-20240306192156882"></p>
+<h2 id="关于which软连接"><a href="#关于which软连接" class="headerlink" title="关于which软连接"></a>关于which软连接</h2><p><img src="/2024/03/11/1/image-20240306203316460-1710152979673.png" alt="image-20240306203316460"></p>
 
                 
             </div>
@@ -425,7 +563,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="/about" rel="external nofollow noreferrer">zloy</a>
+                    <a href="/about" rel="external nofollow noreferrer">zoloy</a>
                 </span>
             </div>
             <div class="reprint__type">
@@ -435,7 +573,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/01/02/hello-world/">http://example.com/2024/01/02/hello-world/</a>
+                    <a href="http://example.com/2024/03/11/1/">http://example.com/2024/03/11/1/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -448,7 +586,7 @@
                     本博客所有文章除特別声明外，均采用
                     <a href="https://creativecommons.org/licenses/by/4.0/deed.zh" rel="external nofollow noreferrer" target="_blank">CC BY 4.0</a>
                     许可协议。转载请注明来源
-                    <a href="/about" target="_blank">zloy</a>
+                    <a href="/about" target="_blank">zoloy</a>
                     !
                 </span>
             </div>
@@ -472,7 +610,15 @@
                 <div class="post-meta__tag-list" style="display: inline-block;">
                     
                         <div class="article-tag">
-                            <span class="chip bg-color">无标签</span>
+                            
+                                <a href="/tags/Linux/">
+                                    <span class="chip bg-color">Linux</span>
+                                </a>
+                            
+                                <a href="/tags/Java/">
+                                    <span class="chip bg-color">Java</span>
+                                </a>
+                            
                         </div>
                     
                 </div>
@@ -816,18 +962,17 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="far fa-dot-circle"></i>&nbsp;本篇
-            </div>
+                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
             <div class="card">
-                <a href="/2024/01/02/hello-world/">
+                <a href="/2024/03/11/%E7%BC%96%E8%AF%91%E9%83%A8%E7%BD%B2%E7%9A%84%E6%B5%81%E7%A8%8B/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/12.jpg" class="responsive-img" alt="Hello World">
+                        <img src="/medias/featureimages/7.jpg" class="responsive-img" alt="Linux服务器编译部署的流程">
                         
-                        <span class="card-title">Hello World</span>
+                        <span class="card-title">Linux服务器编译部署的流程</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -837,18 +982,45 @@
                         
                     </div>
                     <div class="publish-info">
-                            <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-01-02
-                            </span>
+                        <span class="publish-date">
+                            <i class="far fa-clock fa-fw icon-date"></i>2024-03-11
+                        </span>
                         <span class="publish-author">
                             
-                            <i class="fas fa-user fa-fw"></i>
-                            zloy
+                            <i class="fas fa-bookmark fa-fw icon-category"></i>
+                            
+                            <a href="/categories/Linux/" class="post-category">
+                                    Linux
+                                </a>
+                            
                             
                         </span>
                     </div>
                 </div>
-
+                
+                <div class="card-action article-tags">
+                    
+                    <a href="/tags/Java/">
+                        <span class="chip bg-color">Java</span>
+                    </a>
+                    
+                    <a href="/tags/Maven/">
+                        <span class="chip bg-color">Maven</span>
+                    </a>
+                    
+                    <a href="/tags/Ubuntu/">
+                        <span class="chip bg-color">Ubuntu</span>
+                    </a>
+                    
+                    <a href="/tags/MariaDB/">
+                        <span class="chip bg-color">MariaDB</span>
+                    </a>
+                    
+                    <a href="/tags/shell%E8%84%9A%E6%9C%AC/">
+                        <span class="chip bg-color">shell脚本</span>
+                    </a>
+                    
+                </div>
                 
             </div>
         </div>
@@ -859,13 +1031,13 @@
                 本篇&nbsp;<i class="far fa-dot-circle"></i>
             </div>
             <div class="card">
-                <a href="/2024/01/02/hello-world/">
+                <a href="/2024/03/11/1/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/12.jpg" class="responsive-img" alt="Hello World">
+                        <img src="/medias/featureimages/9.jpg" class="responsive-img" alt="Linux服务器配置Java环境">
                         
-                        <span class="card-title">Hello World</span>
+                        <span class="card-title">Linux服务器配置Java环境</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -876,17 +1048,33 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-01-02
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-03-11
                             </span>
                         <span class="publish-author">
                             
-                            <i class="fas fa-user fa-fw"></i>
-                            zloy
+                            <i class="fas fa-bookmark fa-fw icon-category"></i>
+                            
+                            <a href="/categories/Linux/" class="post-category">
+                                    Linux
+                                </a>
+                            
                             
                         </span>
                     </div>
                 </div>
 
+                
+                <div class="card-action article-tags">
+                    
+                    <a href="/tags/Linux/">
+                        <span class="chip bg-color">Linux</span>
+                    </a>
+                    
+                    <a href="/tags/Java/">
+                        <span class="chip bg-color">Java</span>
+                    </a>
+                    
+                </div>
                 
             </div>
         </div>
@@ -901,6 +1089,9 @@
 <!-- 代码块功能依赖 -->
 <script type="text/javascript" src="/libs/codeBlock/codeBlockFuction.js"></script>
 
+
+  <!-- 是否加载使用自带的 prismjs. -->
+  <script type="text/javascript" src="/libs/prism/prism.min.js"></script>
 
 
 <!-- 代码语言 -->
@@ -1071,11 +1262,14 @@
             
                 <span id="year">2019-2024</span>
             
-            <a href="/about" target="_blank">zloy</a>
+            <a href="/about" target="_blank">zoloy</a>
             |&nbsp;Powered by&nbsp;<a href="https://hexo.io/" target="_blank">Hexo</a>
             |&nbsp;Theme&nbsp;<a href="https://github.com/blinkfox/hexo-theme-matery" target="_blank">Matery</a>
             
             <br>
+            
+                &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
+                        class="white-color">6.5k</span>
             
             
             
@@ -1101,13 +1295,13 @@
             
         </div>
         <div class="col s12 m4 l4 social-link social-statis">
-    <a href="https://github.com/blinkfox" class="tooltipped" target="_blank" data-tooltip="访问我的GitHub" data-position="top" data-delay="50">
+    <a href="https://github.com/z0l0y" class="tooltipped" target="_blank" data-tooltip="访问我的GitHub" data-position="top" data-delay="50">
         <i class="fab fa-github"></i>
     </a>
 
 
 
-    <a href="mailto:1181062873@qq.com" class="tooltipped" target="_blank" data-tooltip="邮件联系我" data-position="top" data-delay="50">
+    <a href="mailto:zloy0709@outlook.com" class="tooltipped" target="_blank" data-tooltip="邮件联系我" data-position="top" data-delay="50">
         <i class="fas fa-envelope-open"></i>
     </a>
 
@@ -1117,19 +1311,19 @@
 
 
 
-    <a href="tencent://AddContact/?fromId=50&fromSubId=1&subcmd=all&uin=1181062873" class="tooltipped" target="_blank" data-tooltip="QQ联系我: 1181062873" data-position="top" data-delay="50">
+    <a href="tencent://AddContact/?fromId=50&fromSubId=1&subcmd=all&uin=807250972" class="tooltipped" target="_blank" data-tooltip="QQ联系我: 807250972" data-position="top" data-delay="50">
         <i class="fab fa-qq"></i>
     </a>
 
 
 
-
-
-
-
-    <a href="/atom.xml" class="tooltipped" target="_blank" data-tooltip="RSS 订阅" data-position="top" data-delay="50">
-        <i class="fas fa-rss"></i>
+    <a href="https://weibo.com/u/7908622014" class="tooltipped" target="_blank" data-tooltip="关注我的微博: https://weibo.com/u/7908622014" data-position="top" data-delay="50">
+        <i class="fab fa-weibo"></i>
     </a>
+
+
+
+
 
 </div>
     </div>
@@ -1286,6 +1480,15 @@ $(function () {
     
     
     
+        
+        <script type="text/javascript">
+            // 只在桌面版网页启用特效
+            var windowWidth = $(window).width();
+            if (windowWidth > 768) {
+                document.write('<script type="text/javascript" src="/libs/others/sakura.js"><\/script>');
+            }
+        </script>
+    
 
     <!-- 雪花特效 -->
     
@@ -1317,8 +1520,6 @@ $(function () {
     })();
 </script>
 
-    
-    <script src="/libs/others/clicklove.js" async="async"></script>
     
     
     <script async src="/libs/others/busuanzi.pure.mini.js"></script>

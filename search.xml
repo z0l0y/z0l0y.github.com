@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title>Linux服务器配置Java环境</title>
+    <url>/2024/03/11/1/</url>
+    <content><![CDATA[<h1 id="关于Linux服务器上Java的一些问题"><a href="#关于Linux服务器上Java的一些问题" class="headerlink" title="关于Linux服务器上Java的一些问题"></a>关于Linux服务器上Java的一些问题</h1><h2 id="怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）"><a href="#怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）" class="headerlink" title="怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）"></a>怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）</h2><ol>
+<li><p>下载 Java JDK：首先，你需要从官方网站下载适用于你的 Linux 发行版的 Java JDK（Java Development Kit）。你可以访问 Oracle 官方网站（<a href="https://www.oracle.com/java/technologies/javase-jdk11-downloads.html%EF%BC%89%E6%88%96%E8%80%85">https://www.oracle.com/java/technologies/javase-jdk11-downloads.html）或者</a> OpenJDK 官方网站（<a href="https://openjdk.java.net/install/%EF%BC%89%E6%9D%A5%E8%8E%B7%E5%8F%96%E9%80%82%E5%90%88%E4%BD%A0%E7%9A%84%E5%8F%91%E8%A1%8C%E7%89%88%E7%9A%84">https://openjdk.java.net/install/）来获取适合你的发行版的</a> JDK。</p>
+</li>
+<li><p>安装 Java JDK：下载完成后，打开终端，并使用以下命令安装 JDK。根据你的发行版和下载的 JDK 类型，命令可能会有所不同。</p>
+<ul>
+<li><p>对于 Ubuntu &#x2F; Debian：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt update</span><br><span class="line">sudo apt install openjdk-11-jdk</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>对于 CentOS &#x2F; RHEL：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo yum update</span><br><span class="line">sudo yum install java-11-openjdk-devel</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>对于其他发行版，你可以按照相应的包管理器和命令进行安装。</p>
+</li>
+</ul>
+</li>
+<li><p>配置环境变量：安装完成后，你需要配置服务器的环境变量，以便系统能够找到 Java 的安装路径。在终端中执行以下命令，打开环境变量配置文件：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo vim /etc/profile</span><br></pre></td></tr></table></figure>
+
+<p>注意注意：</p>
+<p>千万不要在environment里面配置，要不然会出问题的。</p>
+<p>ps1:</p>
+<p>对于大多数 Linux 发行版，系统会自动加载某些全局环境变量配置文件，而无需手动配置。这些配置文件包含系统范围的环境变量设置，可以在用户登录时自动加载。</p>
+<p>常见的全局环境变量配置文件包括：</p>
+<ul>
+<li><code>/etc/environment</code>：这个文件是一个全局的环境变量配置文件，其中定义的变量对所有用户和系统服务都可见。</li>
+<li><code>/etc/profile</code>：这个文件是一个全局的 shell 配置文件，其中可以包含设置环境变量的语句。</li>
+<li><code>/etc/profile.d/</code> 目录：该目录包含一系列以 <code>.sh</code> 结尾的脚本文件，这些文件中可以设置特定的环境变量。</li>
+</ul>
+<p>当你登录到 Linux 系统时，系统会自动加载这些配置文件，并将其中定义的环境变量设置为全局可用的。</p>
+<p>需要注意的是，如果你希望在特定用户或特定会话下设置环境变量，可以通过修改用户的 <code>.bashrc</code> 或 <code>.bash_profile</code> 文件来实现。这些文件位于用户的主目录下，可以在登录时加载用户自定义的环境变量设置。</p>
+<p>总之，对于全局环境变量配置，Linux 系统会自动加载预定义的配置文件，无需手动配置。但如果你需要针对特定用户或会话进行环境变量设置，可以修改相应的用户配置文件。</p>
+<p>ps2:</p>
+<p>在某些 Linux 发行版中，如 Ubuntu，可能没有默认的 <code>/etc/environment</code> 文件。这是因为不同的发行版可能采用不同的方式来管理环境变量。</p>
+<p>在缺少 <code>/etc/environment</code> 文件的情况下，你可以手动创建它。请使用超级用户权限（root）执行以下步骤：</p>
+<ol>
+<li><p>打开终端，并使用文本编辑器（如 <code>vim</code> 或 <code>nano</code>）创建 <code>/etc/profile</code>文件：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo vi /etc/profile</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>在打开的文件中，按照以下格式添加你的环境变量：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">VARIABLE_NAME=<span class="string">&quot;variable_value&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>例如：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">export</span> JAVA_HOME=/usr/lib/jvm/java-11-openjdk-11.0.3.7-0.el7_6.aarch64</span><br><span class="line"><span class="built_in">export</span> JRE_HOME=<span class="variable">$JAVA_HOME</span>/jre</span><br><span class="line"><span class="built_in">export</span> CLASSPATH=<span class="variable">$JAVA_HOME</span>/lib:<span class="variable">$JRE_HOME</span>/lib:<span class="variable">$CLASSPATH</span></span><br><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$JAVA_HOME</span>/bin:<span class="variable">$JRE_HOME</span>/bin:<span class="variable">$PATH</span></span><br></pre></td></tr></table></figure>
+
+<p>注意，等号两边不要有空格，且值需要使用双引号引起来。</p>
+</li>
+<li><p>保存并关闭文件。</p>
+</li>
+<li><p>重新登录或重新加载环境变量配置，以使新的环境变量生效。</p>
+<p>或者，你可以在当前终端中执行以下命令，立即加载新的环境变量配置：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">source</span> /etc/profile</span><br></pre></td></tr></table></figure></li>
+</ol>
+</li>
+<li><p>在打开的文件中，添加以下行：</p>
+<p>对了，注意一下在vim里面可以用快捷键来复制，ctrl+shift+v即可</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">export</span> JAVA_HOME=/usr/lib/jvm/java-11-openjdk-11.0.3.7-0.el7_6.aarch64</span><br><span class="line"><span class="built_in">export</span> JRE_HOME=<span class="variable">$JAVA_HOME</span>/jre</span><br><span class="line"><span class="built_in">export</span> CLASSPATH=<span class="variable">$JAVA_HOME</span>/lib:<span class="variable">$JRE_HOME</span>/lib:<span class="variable">$CLASSPATH</span></span><br><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$JAVA_HOME</span>/bin:<span class="variable">$JRE_HOME</span>/bin:<span class="variable">$PATH</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>使环境变量生效：执行以下命令以使环境变量生效：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">source</span> /etc/profile</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>验证 Java 安装：执行以下命令验证 Java 是否已成功安装：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">java -version</span><br></pre></td></tr></table></figure>
+
+<p>如果一切顺利，你将看到 Java 的版本信息。</p>
+</li>
+</ol>
+<p>现在，你已经在 Linux 服务器上成功配置了 Java 环境。你可以使用 Java 来运行和管理你的 Java 应用程序。</p>
+<h2 id="怎么切换Java版本"><a href="#怎么切换Java版本" class="headerlink" title="怎么切换Java版本"></a>怎么切换Java版本</h2><p>在 Linux 上切换 Java 的版本，可以使用 <code>update-alternatives</code> 命令来管理系统中的多个 Java 安装版本。下面是切换 Java 版本的一般步骤：</p>
+<ol>
+<li><p>查看可用的 Java 版本：执行以下命令，列出系统中已安装的 Java 版本以及其优先级：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo update-alternatives --config java</span><br></pre></td></tr></table></figure>
+
+<p>这将显示类似以下内容的选项列表：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">有 2 个候选项可用于替换 java (提供 /usr/bin/java)。</span><br><span class="line"></span><br><span class="line">  选择       路径                                   优先级  状态</span><br><span class="line">------------------------------------------------------------</span><br><span class="line"></span><br><span class="line">* 0            /usr/lib/jvm/java-11-openjdk-amd64/bin/java   1111      自动模式</span><br><span class="line">  1            /usr/lib/jvm/java-11-openjdk-amd64/bin/java   1111      手动模式</span><br><span class="line">  2            /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java   1081      手动模式</span><br><span class="line"></span><br><span class="line">按下 &lt;enter&gt; 保持当前选择[*]或者键入选择的编号：</span><br></pre></td></tr></table></figure>
+
+<p><code>*</code> 符号表示当前选择的 Java 版本。</p>
+</li>
+<li><p>选择要使用的 Java 版本：根据列表中的选项，键入对应 Java 版本的编号并按 Enter，或者直接按 Enter 保持当前选择不变。</p>
+</li>
+<li><p>验证 Java 版本：执行以下命令，验证已切换到的 Java 版本：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">java -version</span><br></pre></td></tr></table></figure>
+
+<p>这将显示当前正在使用的 Java 版本的信息。</p>
+</li>
+</ol>
+<p>通过上述步骤，你可以在 Linux 上切换系统中可用的 Java 版本，并使用 <code>update-alternatives</code> 命令来配置默认的 Java 版本。</p>
+<h2 id="怎么找到Java的安装路径"><a href="#怎么找到Java的安装路径" class="headerlink" title="怎么找到Java的安装路径"></a>怎么找到Java的安装路径</h2><p>你可以通过以下方式来找到你的 Java 安装路径：</p>
+<ol>
+<li><p>使用 <code>which</code> 命令：在终端中执行以下命令，可以查看系统当前默认的 Java 可执行文件的路径：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">which</span> java</span><br></pre></td></tr></table></figure>
+
+<p>这将输出 Java 可执行文件的完整路径，如 <code>/usr/bin/java</code>。</p>
+</li>
+<li><p>使用 <code>readlink</code> 命令：如果你想获取 Java 可执行文件的符号链接的真实路径，可以执行以下命令：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">readlink</span> -f $(<span class="built_in">which</span> java)</span><br></pre></td></tr></table></figure>
+
+<p>这将输出 Java 可执行文件的真实路径，如 <code>/usr/lib/jvm/java-11-openjdk-amd64/bin/java</code>。</p>
+</li>
+<li><p>使用 <code>update-alternatives</code> 命令：在某些 Linux 发行版中，你可以使用 <code>update-alternatives</code> 命令来管理系统中的多个 Java 安装版本。执行以下命令，可以查看当前配置的 Java 选项及其路径：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">update-alternatives --display java</span><br></pre></td></tr></table></figure>
+
+<p>这将显示 Java 的可选配置项列表，包括各个选项的路径。</p>
+</li>
+</ol>
+<p>以上方法中的任何一种都可以帮助你找到 Java 的安装路径。根据你的系统和安装方式，Java 的路径可能会有所不同。</p>
+<h2 id="JAVA-HOME是什么"><a href="#JAVA-HOME是什么" class="headerlink" title="JAVA_HOME是什么"></a>JAVA_HOME是什么</h2><p><code>JAVA_HOME</code> 是指定 Java Development Kit (JDK) 的根目录路径。JDK 是用于开发和构建 Java 应用程序的软件包，包括 Java 编译器 (<code>javac</code>)、Java 虚拟机 (<code>java</code>)、Java 类库和其他开发工具。</p>
+<p>通过设置 <code>JAVA_HOME</code> 环境变量，你可以指定 JDK 的安装路径，以便系统和应用程序能够找到所需的 Java 运行时环境和开发工具。<code>JAVA_HOME</code> 变量应该指向 JDK 安装目录的根路径，其中包含 <code>bin</code>、<code>lib</code>、<code>include</code> 等子目录。</p>
+<p>例如，如果你的 JDK 安装路径是 <code>C:\Program Files\Java\jdk1.8.0_271</code>（在 Windows 上），那么你可以将 <code>JAVA_HOME</code> 设置为 <code>C:\Program Files\Java\jdk1.8.0_271</code>。</p>
+<p>在设置了正确的 <code>JAVA_HOME</code> 后，应用程序和开发工具可以使用该环境变量来定位所需的 Java 运行时环境和工具，例如编译 Java 代码、运行 Java 程序等。</p>
+<h2 id="怎么查看JAVA-HOME在哪里"><a href="#怎么查看JAVA-HOME在哪里" class="headerlink" title="怎么查看JAVA_HOME在哪里"></a>怎么查看JAVA_HOME在哪里</h2><p>要查看 <code>JAVA_HOME</code> 环境变量的值和定义位置，可以按照以下步骤进行：</p>
+<ol>
+<li><p>打开终端。</p>
+</li>
+<li><p>运行以下命令来查看 <code>JAVA_HOME</code> 环境变量的值：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">echo</span> <span class="variable">$JAVA_HOME</span></span><br></pre></td></tr></table></figure>
+
+<p>这将在终端中显示 <code>JAVA_HOME</code> 环境变量的值。如果它已设置，你将看到 Java 的安装路径。</p>
+</li>
+<li><p>如果没有显示 <code>JAVA_HOME</code> 环境变量的值，说明它可能没有设置。在这种情况下，你可以尝试以下方法来查找定义位置：</p>
+<ul>
+<li><p><strong>查看系统级环境变量文件</strong>：某些 Linux 发行版会将环境变量设置存储在 <code>/etc/environment</code> 文件中。你可以使用文本编辑器打开该文件，并查找是否在其中定义了 <code>JAVA_HOME</code> 环境变量。</p>
+</li>
+<li><p><strong>查看用户级环境变量文件</strong>：用户级环境变量文件通常是用户主目录下的 <code>.bashrc</code> 或 <code>.bash_profile</code>。你可以使用文本编辑器打开适用于当前用户的环境变量文件，并搜索是否有关于 <code>JAVA_HOME</code> 的定义。</p>
+</li>
+<li><p><strong>查看特定的 Shell 配置文件</strong>：如果你在使用特定的 Shell（如 <code>zsh</code> 或 <code>fish</code>），可以查看该 Shell 的配置文件，例如 <code>.zshrc</code> 或 <code>config.fish</code>，以寻找 <code>JAVA_HOME</code> 的定义。</p>
+</li>
+<li><p><strong>尝试其他方法</strong>：如果以上方法都没有找到 <code>JAVA_HOME</code> 的定义，你可以尝试运行 <code>grep</code> 命令来搜索系统中的所有文件，以查找 <code>JAVA_HOME</code> 关键字。例如：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">grep -rnw <span class="string">&#x27;/&#x27;</span> -e <span class="string">&quot;JAVA_HOME&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>这将在整个文件系统中递归搜索包含 <code>JAVA_HOME</code> 的文件，并显示匹配的行及其所在文件的路径。</p>
+</li>
+</ul>
+</li>
+</ol>
+<p>通过上述步骤，你应该能够找到 <code>JAVA_HOME</code> 环境变量的值和定义位置。请注意，如果你使用的是 Windows 操作系统，查找环境变量的方法会有所不同。</p>
+<h2 id="关于环境配置的etc目录"><a href="#关于环境配置的etc目录" class="headerlink" title="关于环境配置的etc目录"></a>关于环境配置的etc目录</h2><p><code>/etc</code> 是 Linux 系统中的一个特殊目录，用于存储系统的配置文件。它是 “etcetera”（等等）的缩写，表示其中包含了各种各样的配置文件。</p>
+<p>在 <code>/etc</code> 目录下，你会找到许多与系统配置相关的文件和子目录。这些文件和目录通常需要超级用户（root）权限才能进行修改。以下是一些常见的 <code>/etc</code> 目录下的文件和目录：</p>
+<ul>
+<li><code>/etc/passwd</code>：包含系统上的用户账户信息。</li>
+<li><code>/etc/group</code>：包含系统上的用户组信息。</li>
+<li><code>/etc/hosts</code>：包含主机名与 IP 地址的映射。</li>
+<li><code>/etc/resolv.conf</code>：设置系统的 DNS 解析配置。</li>
+<li><code>/etc/fstab</code>：定义系统启动时挂载的文件系统。</li>
+<li><code>/etc/network/interfaces</code> 或 <code>/etc/sysconfig/network-scripts</code>：网络配置文件，用于设置网络接口。</li>
+<li><code>/etc/ssh/sshd_config</code>：SSH 服务器的配置文件。</li>
+<li><code>/etc/sudoers</code>：定义系统上的用户和用户组的 sudo 访问权限。</li>
+<li><code>/etc/environment</code>：全局环境变量的配置文件。</li>
+</ul>
+<p>注意一下：</p>
+<p><code>/etc/environment</code> 不是一个目录，而是一个文件。</p>
+<p><code>/etc/environment</code> 是一个系统级别的环境变量文件，用于定义系统范围的环境变量。它是一个文本文件，通常不包含目录。</p>
+<p><code>/etc</code> 目录中的文件和目录通常由系统管理员进行管理和配置。它们是系统范围的配置文件，用于设置各种系统参数、服务和应用程序的行为。因此，对 <code>/etc</code> 目录的修改和配置需要谨慎，并且可能需要超级用户权限。</p>
+<h2 id="关于-bashrc和-bash-profile文件在哪里"><a href="#关于-bashrc和-bash-profile文件在哪里" class="headerlink" title="关于.bashrc和.bash_profile文件在哪里"></a>关于.bashrc和.bash_profile文件在哪里</h2><p><img src="/2024/03/11/1/image-20240306192156882.png" alt="image-20240306192156882"></p>
+<h2 id="关于which软连接"><a href="#关于which软连接" class="headerlink" title="关于which软连接"></a>关于which软连接</h2><p><img src="/2024/03/11/1/image-20240306203316460-1710152979673.png" alt="image-20240306203316460"></p>
+]]></content>
+      <categories>
+        <category>Linux</category>
+      </categories>
+      <tags>
+        <tag>Linux</tag>
+        <tag>Java</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Linux服务器编译部署的流程</title>
+    <url>/2024/03/11/%E7%BC%96%E8%AF%91%E9%83%A8%E7%BD%B2%E7%9A%84%E6%B5%81%E7%A8%8B/</url>
+    <content><![CDATA[<h1 id="编译部署的流程"><a href="#编译部署的流程" class="headerlink" title="编译部署的流程"></a>编译部署的流程</h1><h2 id="1-写完后端代码，并且编译无误后，通过Maven来package项目，得到项目的jar包。"><a href="#1-写完后端代码，并且编译无误后，通过Maven来package项目，得到项目的jar包。" class="headerlink" title="1.写完后端代码，并且编译无误后，通过Maven来package项目，得到项目的jar包。"></a><strong>1.写完后端代码，并且编译无误后，通过Maven来package项目，得到项目的jar包。</strong></h2><h2 id="2-在Ubuntu服务器上部署数据库MariaDB，并且创建DB用户，设置密码。"><a href="#2-在Ubuntu服务器上部署数据库MariaDB，并且创建DB用户，设置密码。" class="headerlink" title="2.在Ubuntu服务器上部署数据库MariaDB，并且创建DB用户，设置密码。"></a><strong>2.在Ubuntu服务器上部署数据库MariaDB，并且创建DB用户，设置密码。</strong></h2><h2 id="3-安装jdk，配置好Java对应的环境，使jar包可以正常运行即可。"><a href="#3-安装jdk，配置好Java对应的环境，使jar包可以正常运行即可。" class="headerlink" title="3.安装jdk，配置好Java对应的环境，使jar包可以正常运行即可。"></a><strong>3.安装jdk，配置好Java对应的环境，使jar包可以正常运行即可。</strong></h2><h2 id="4-将本地的数据库进行dump，修改字符编码为utf8mb4-general-ci，得到data-sql文件，并上传到服务器，便于进行建表操作。进入MariaDB，建立数据库，将data-sql导入数据库，成功建表。"><a href="#4-将本地的数据库进行dump，修改字符编码为utf8mb4-general-ci，得到data-sql文件，并上传到服务器，便于进行建表操作。进入MariaDB，建立数据库，将data-sql导入数据库，成功建表。" class="headerlink" title="4.将本地的数据库进行dump，修改字符编码为utf8mb4_general_ci，得到data.sql文件，并上传到服务器，便于进行建表操作。进入MariaDB，建立数据库，将data.sql导入数据库，成功建表。"></a><strong>4.将本地的数据库进行dump，修改字符编码为utf8mb4_general_ci，得到data.sql文件，并上传到服务器，便于进行建表操作。进入MariaDB，建立数据库，将data.sql导入数据库，成功建表。</strong></h2><h2 id="5-在服务器上创建backend的文件夹，将jar包上传到服务器，并且写start-sh和stop-sh脚本，定义日志文件路径，便于查看出现的问题"><a href="#5-在服务器上创建backend的文件夹，将jar包上传到服务器，并且写start-sh和stop-sh脚本，定义日志文件路径，便于查看出现的问题" class="headerlink" title="5.在服务器上创建backend的文件夹，将jar包上传到服务器，并且写start.sh和stop.sh脚本，定义日志文件路径，便于查看出现的问题"></a><strong>5.在服务器上创建backend的文件夹，将jar包上传到服务器，并且写start.sh和stop.sh脚本，定义日志文件路径，便于查看出现的问题</strong></h2><h2 id="6-部署成功"><a href="#6-部署成功" class="headerlink" title="6.部署成功"></a><strong>6.部署成功</strong></h2>]]></content>
+      <categories>
+        <category>Linux</category>
+      </categories>
+      <tags>
+        <tag>Java</tag>
+        <tag>Maven</tag>
+        <tag>Ubuntu</tag>
+        <tag>MariaDB</tag>
+        <tag>shell脚本</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Linux服务器配置MySQL</title>
+    <url>/2024/03/11/2/</url>
+    <content><![CDATA[<h1 id="配置MySQL"><a href="#配置MySQL" class="headerlink" title="配置MySQL"></a>配置MySQL</h1><h2 id="在-Linux-上配置-MySQL-的过程如下：-注意一定要在第一次进去的时候就设置好root用户的密码，要不然后期找临时密码，再修改比较的麻烦"><a href="#在-Linux-上配置-MySQL-的过程如下：-注意一定要在第一次进去的时候就设置好root用户的密码，要不然后期找临时密码，再修改比较的麻烦" class="headerlink" title="在 Linux 上配置 MySQL 的过程如下：(注意一定要在第一次进去的时候就设置好root用户的密码，要不然后期找临时密码，再修改比较的麻烦)"></a>在 Linux 上配置 MySQL 的过程如下：(注意一定要在第一次进去的时候就设置好root用户的密码，要不然后期找临时密码，再修改比较的麻烦)</h2><ol>
+<li><p>安装 MySQL 服务器：</p>
+<p>在终端中运行以下命令以安装 MySQL 服务器：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt update</span><br><span class="line">sudo apt install mysql-server</span><br></pre></td></tr></table></figure>
+
+<p>安装过程中会提示你设置 MySQL root 用户的密码，请确保设置一个安全且易记的密码。</p>
+</li>
+<li><p>配置 MySQL 服务器：</p>
+<p>安装完成后，MySQL 服务器会自动启动，并且会在系统的服务列表中注册为 <code>mysql</code>。你可以使用以下命令来管理 MySQL 服务器：</p>
+<ul>
+<li>启动 MySQL 服务器：<code>sudo systemctl start mysql</code></li>
+<li>停止 MySQL 服务器：<code>sudo systemctl stop mysql</code></li>
+<li>重启 MySQL 服务器：<code>sudo systemctl restart mysql</code></li>
+</ul>
+</li>
+<li><h4 id="连接到-MySQL-服务器："><a href="#连接到-MySQL-服务器：" class="headerlink" title="连接到 MySQL 服务器："></a>连接到 MySQL 服务器：</h4><p>使用以下命令连接到 MySQL 服务器：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysql -u root -p</span><br></pre></td></tr></table></figure>
+
+<p>系统会提示你输入 MySQL root 用户的密码。输入密码后，你将进入 MySQL 服务器的命令行界面。</p>
+</li>
+<li><p>在 MySQL 中创建新用户和数据库：</p>
+<p>在 MySQL 命令行界面中，你可以使用 SQL 语句来创建新用户和数据库。以下是一些常用的命令示例：</p>
+<ul>
+<li><p>创建新用户：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> <span class="string">&#x27;username&#x27;</span>@<span class="string">&#x27;localhost&#x27;</span> IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;password&#x27;</span>;</span><br><span class="line">请将 `<span class="string">&#x27;username&#x27;</span>`、`<span class="string">&#x27;password&#x27;</span>` 和 `<span class="string">&#x27;database_name&#x27;</span>` 替换为你希望使用的实际值。</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>授予用户访问权限：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">GRANT</span> <span class="keyword">ALL</span> PRIVILEGES <span class="keyword">ON</span> database_name.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;username&#x27;</span>@<span class="string">&#x27;localhost&#x27;</span>;或</span><br><span class="line"><span class="keyword">grant</span> <span class="keyword">all</span> privileges <span class="keyword">on</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">to</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified <span class="keyword">by</span> <span class="string">&#x27;password&#x27;</span>;flush privileges;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>创建新数据库：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> DATABASE database_name;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>刷新权限：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">FLUSH PRIVILEGES;<span class="operator">/</span><span class="operator">/</span>让权限立即生效  </span><br></pre></td></tr></table></figure></li>
+</ul>
+<p><strong>修改my.cnf配置文件</strong> </p>
+<p>这个是mysql的配置文件，如果你无标题文章找不到在哪里的话，可以输入<code>find /* -name my.cnf </code>找到  </p>
+<p>通过vim编辑该文件，找到<code>bind-address  = 127.0.0.1</code>这一句，然后在前面加个#号注释掉，保存退出</p>
+<p><strong>重启服务（这点非常重要，不重启就不能实现远程访问数据库）</strong> </p>
+<figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line">service mysql restart</span><br></pre></td></tr></table></figure>
+
+<p><strong>在本地远程连接</strong> </p>
+<p>在终端输入：  </p>
+<figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line">mysql -h 服务器ip地址 -P <span class="number">3306</span> -u root -p</span><br></pre></td></tr></table></figure>
+
+<p>然后输入密码即可。  </p>
+</li>
+<li><p>退出 MySQL 命令行界面：</p>
+<p>在 MySQL 命令行界面中，使用 <code>exit</code> 命令退出。</p>
+</li>
+</ol>
+<p>现在你已经成功配置了 MySQL 服务器，并可以通过连接到 MySQL 命令行界面来管理数据库和用户。</p>
+<h2 id="那我该怎么远程连接到数据库？"><a href="#那我该怎么远程连接到数据库？" class="headerlink" title="那我该怎么远程连接到数据库？"></a>那我该怎么远程连接到数据库？</h2><p>要远程连接到数据库，你需要确保以下几点：</p>
+<ol>
+<li>数据库服务器已经启动并正在监听正确的端口。默认情况下，MySQL 数据库使用的是端口 3306。确保数据库服务器正在监听该端口。</li>
+<li>数据库服务器的防火墙允许远程连接。如果你的数据库服务器上有防火墙，确保防火墙规则允许来自远程客户端的连接请求通过指定的端口。这通常需要在防火墙配置中打开端口 3306。</li>
+<li>数据库服务器上的数据库用户已经配置允许远程连接。默认情况下，MySQL 数据库中的 root 用户只允许本地连接。如果你想通过远程连接使用 root 用户，你需要在数据库中修改 root 用户的权限，允许远程连接。</li>
+</ol>
+<p>在你的情况下，如果你想通过 SSH 连接到数据库服务器，你可以按照以下步骤进行：</p>
+<ol>
+<li>使用 SSH 连接到远程服务器：运行 <code>ssh root@192.168.88.131</code> 命令，连接到远程服务器。</li>
+<li>在远程服务器上，确保数据库已经启动并监听端口 3306。</li>
+<li>确认数据库服务器的防火墙规则允许来自你的客户端的连接请求通过端口 3306。你可能需要配置防火墙规则以允许这样的连接。</li>
+<li>确保你在数据库服务器上创建了允许远程连接的数据库用户。如果你想使用 root 用户进行远程连接，你需要修改 root 用户的权限以允许远程连接。</li>
+<li>使用 MySQL 客户端工具，比如 <code>mysql</code> 命令行工具，连接到远程数据库服务器。例如，运行 <code>mysql -u username -h 192.168.88.131 -p</code> 命令，其中 <code>username</code> 是你在数据库服务器上创建的允许远程连接的用户名。</li>
+</ol>
+<p>这样，你就可以通过 SSH 连接到远程服务器，并使用适当的数据库客户端工具连接到数据库服务器进行远程数据库访问。请确保在进行远程连接时遵循安全最佳实践，并采取适当的安全措施来保护数据库和服务器的安全性。</p>
+<h2 id="关于localhost"><a href="#关于localhost" class="headerlink" title="关于localhost"></a>关于localhost</h2><p>在 MySQL 中，<code>localhost</code> 是一个特殊的主机名，表示本地主机，即 MySQL 服务器所在的计算机。但是，你可以将 <code>&#39;localhost&#39;</code> 替换为其他主机名或 IP 地址，以允许远程主机连接到 MySQL 服务器。</p>
+<p>以下是一些常见的选项：</p>
+<ol>
+<li><p>允许所有主机连接：</p>
+<p>如果你希望允许任何主机连接到 MySQL 服务器，请使用 <code>%</code> 作为主机名，如下所示：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> <span class="string">&#x27;myuser&#x27;</span>@<span class="string">&#x27;%&#x27;</span> IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;mypassword&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>这将为用户 <code>&#39;myuser&#39;</code> 创建一个允许从任何主机连接的帐户。</p>
+</li>
+<li><p>允许指定的 IP 地址连接：</p>
+<p>如果你只想允许特定的 IP 地址连接到 MySQL 服务器，请将 <code>&#39;localhost&#39;</code> 替换为该 IP 地址，如下所示：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> <span class="string">&#x27;myuser&#x27;</span>@<span class="string">&#x27;192.168.0.100&#x27;</span> IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;mypassword&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>这将为用户 <code>&#39;myuser&#39;</code> 创建一个允许从 IP 地址为 <code>192.168.0.100</code> 的主机连接的帐户。</p>
+</li>
+</ol>
+<p>请根据你的需求选择适当的主机名或 IP 地址，并相应地设置 MySQL 用户。请记住，为了安全起见，最好仅允许需要访问的主机连接到 MySQL 服务器，并使用强密码保护用户帐户。</p>
+<h2 id="为什么会ERROR-1396"><a href="#为什么会ERROR-1396" class="headerlink" title="为什么会ERROR 1396"></a>为什么会ERROR 1396</h2><p>错误消息 “ERROR 1396 (HY000): Operation CREATE USER failed for ‘root‘@’localhost’” 意味着创建用户 ‘root‘@’localhost’ 失败。</p>
+<p>在 MySQL 中，‘root‘@’localhost’ 是默认的超级用户账户，并且在安装 MySQL 时已经存在。由于安全原因，MySQL 不允许通过 CREATE USER 命令创建一个已经存在的用户。</p>
+<p>如果你需要更改 ‘root‘@’localhost’ 用户的密码，可以使用以下命令：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">ALTER</span> <span class="keyword">USER</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;localhost&#x27;</span> IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;new_password&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>请将 <code>&#39;new_password&#39;</code> 替换为你希望设置的新密码。这将更改 ‘root‘@’localhost’ 用户的密码为新密码。</p>
+<p>请注意，只有具有适当权限的用户才能执行 ALTER USER 命令。如果你没有足够的权限，你可能需要使用具有适当权限的用户账户来执行此操作。</p>
+<p>另外，请确保设置强密码来保护 ‘root‘@’localhost’ 用户账户，以确保 MySQL 服务器的安全性。</p>
+<h2 id="远程访问数据库"><a href="#远程访问数据库" class="headerlink" title="远程访问数据库"></a>远程访问数据库</h2><p>要连接到远程数据库，你需要采取以下步骤：</p>
+<ol>
+<li><p>确保远程数据库服务器可访问：</p>
+<p>确保远程数据库服务器处于运行状态，并且网络上可以访问该服务器。你需要知道远程数据库服务器的 IP 地址或主机名。</p>
+</li>
+<li><p>允许远程连接到数据库服务器：</p>
+<p>默认情况下，MySQL 服务器不允许远程连接。你需要在 MySQL 服务器的配置文件中进行相应的设置，以允许远程连接。配置文件通常是 <code>my.cnf</code> 或 <code>my.ini</code>，注意是在etc的mysql目录下找。</p>
+<p><img src="/2024/03/11/2/image-20240306210605982.png" alt="image-20240306210605982"></p>
+<p>打开配置文件，并找到类似于以下行的配置：</p>
+<figure class="highlight ini"><table><tr><td class="code"><pre><span class="line"><span class="comment">#bind-address = 127.0.0.1</span></span><br></pre></td></tr></table></figure>
+
+<p>将该行的注释 <code>#</code> 去掉，并将 <code>bind-address</code> 设置为 MySQL 服务器所在的 IP 地址：</p>
+<figure class="highlight ini"><table><tr><td class="code"><pre><span class="line"><span class="attr">bind-address</span> = your_server_ip</span><br></pre></td></tr></table></figure>
+
+<p>保存并关闭配置文件，然后重新启动 MySQL 服务器，使更改生效。</p>
+</li>
+<li><p>使用远程连接参数连接到数据库：</p>
+<p>在命令行或脚本中，使用以下命令连接到远程数据库：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysql -h remote_server_ip -P port_number -u username -p</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>remote_server_ip</code>：远程数据库服务器的 IP 地址或主机名。</li>
+<li><code>port_number</code>：MySQL 服务器的端口号。默认情况下，MySQL 使用 3306 端口。</li>
+<li><code>username</code>：连接到 MySQL 的用户名。</li>
+<li><code>-p</code>：提示输入密码。在命令中不指定密码，输入该命令后会要求输入密码。</li>
+</ul>
+<p>例如，如果要使用用户名为 <code>myuser</code>，密码为 <code>mypassword</code> 连接到远程数据库服务器 <code>192.168.1.100</code>，使用默认的 3306 端口，命令如下：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysql -h 192.168.1.100 -P 3306 -u myuser -p</span><br></pre></td></tr></table></figure>
+
+<p>输入上述命令后，系统会提示输入密码。输入密码后，你将连接到远程数据库服务器。</p>
+</li>
+</ol>
+<p>确保你已经完成了上述步骤，并提供正确的远程数据库服务器的 IP 地址、端口号、用户名和密码。这样，你就可以通过远程连接访问数据库了。</p>
+<h2 id="关于ini文件"><a href="#关于ini文件" class="headerlink" title="关于ini文件"></a>关于ini文件</h2><p>INI 文件是一种普遍用于存储配置数据的文件格式。INI 是 “Initialization” 的缩写，它最初用于 Windows 操作系统的配置文件。</p>
+<p>INI 文件具有一种简单的键值对结构，由一系列的节（section）和键值对组成。每个键值对由一个键（key）和一个值（value）组成，它们通过等号（&#x3D;）或冒号（:）进行分隔。节提供了对键值对进行逻辑分组的一种方式。</p>
+<p>以下是一个简单的示例 INI 文件的结构：</p>
+<figure class="highlight ini"><table><tr><td class="code"><pre><span class="line"><span class="comment">; 这是注释</span></span><br><span class="line"><span class="section">[section1]</span></span><br><span class="line"><span class="attr">key1</span> = value1</span><br><span class="line"><span class="attr">key2</span> = value2</span><br><span class="line"></span><br><span class="line"><span class="section">[section2]</span></span><br><span class="line"><span class="attr">key3</span> = value3</span><br><span class="line"><span class="attr">key4</span> = value4</span><br></pre></td></tr></table></figure>
+
+<p>在上面的示例中，文件包含两个节（section1 和 section2）。每个节下面有一些键值对。注释以分号（;）开头，用于提供对配置的解释或说明。</p>
+<p>INI 文件在多个应用程序和操作系统中被广泛使用，用于存储程序的配置选项、用户首选项和其他相关设置。它们通常是纯文本文件，可以使用文本编辑器进行编辑。</p>
+<p>虽然 INI 文件最初是与 Windows 相关的，但现在它已经成为许多不同操作系统和编程语言的通用配置文件格式。</p>
+<h2 id="mysqld是什么？"><a href="#mysqld是什么？" class="headerlink" title="mysqld是什么？"></a>mysqld是什么？</h2><p><code>mysqld</code> 是 MySQL 数据库服务器的守护进程或服务进程。</p>
+<p><code>mysqld</code> 是 MySQL 服务器的主要组件，负责处理客户端的连接请求、执行 SQL 查询、管理数据库和数据等操作。它是一个长时间运行的进程，通过监听网络端口或套接字接受来自客户端的连接，并提供对 MySQL 数据库的访问。</p>
+<p>当你安装和启动 MySQL 数据库服务器时，实际上就是启动 <code>mysqld</code> 进程。具体启动 <code>mysqld</code> 进程的方式取决于你所使用的操作系统和安装方式。</p>
+<p>在 Linux 或 macOS 系统上，你可以使用 <code>systemctl</code> 或 <code>service</code> 命令来管理 <code>mysqld</code> 进程的启动、停止和重启。例如：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 启动 MySQL 服务</span></span><br><span class="line">sudo systemctl start mysqld</span><br><span class="line"></span><br><span class="line"><span class="comment"># 停止 MySQL 服务</span></span><br><span class="line">sudo systemctl stop mysqld</span><br><span class="line"></span><br><span class="line"><span class="comment"># 重启 MySQL 服务</span></span><br><span class="line">sudo systemctl restart mysqld</span><br></pre></td></tr></table></figure>
+
+<p>在 Windows 系统上，你可以通过服务管理界面或使用命令行来启动、停止和重启 <code>mysqld</code> 进程。</p>
+<p><code>mysqld</code> 进程的配置信息通常存储在 MySQL 的配置文件中，例如 <code>my.cnf</code> 或 <code>my.ini</code>。在配置文件中，你可以指定服务器的端口、数据存储路径、日志文件路径、内存设置等参数。这样，你可以根据需要对 <code>mysqld</code> 进程进行自定义配置。</p>
+<p>总之，<code>mysqld</code> 是 MySQL 数据库服务器的守护进程或服务进程，负责处理客户端请求、执行数据库操作，并提供对 MySQL 数据库的访问</p>
+<h2 id="查看默认用户的密码"><a href="#查看默认用户的密码" class="headerlink" title="查看默认用户的密码"></a>查看默认用户的密码</h2><p><img src="/2024/03/11/2/image-20240306212449294.png" alt="image-20240306212449294"></p>
+<p><img src="/2024/03/11/2/image-20240306212731913.png" alt="image-20240306212731913"></p>
+<h2 id="查看所有用户的信息"><a href="#查看所有用户的信息" class="headerlink" title="查看所有用户的信息"></a>查看所有用户的信息</h2><p>要查看当前 MySQL 数据库中有多少用户，你可以执行以下步骤：</p>
+<ol>
+<li><p>使用合适的 MySQL 客户端连接到 MySQL 服务器。你可以在命令行上使用 <code>mysql</code> 命令，或者使用图形化工具如 phpMyAdmin 或 MySQL Workbench。</p>
+</li>
+<li><p>连接成功后，在 MySQL 客户端中执行以下 SQL 查询语句：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="keyword">user</span> <span class="keyword">FROM</span> mysql.user;</span><br></pre></td></tr></table></figure>
+
+<p>这将返回一个结果集，其中包含了所有在 MySQL 数据库中定义的用户列表。</p>
+<p>如果你只想要返回用户的数量，可以使用 <code>COUNT(*)</code> 聚合函数：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="built_in">COUNT</span>(<span class="operator">*</span>) <span class="keyword">AS</span> user_count <span class="keyword">FROM</span> mysql.user;</span><br></pre></td></tr></table></figure>
+
+<p>这将返回一个名为 <code>user_count</code> 的列，其中显示了用户的数量。</p>
+<p>或者是</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> host,<span class="keyword">user</span> <span class="keyword">from</span> mysql.user;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h2 id="identified-by报错"><a href="#identified-by报错" class="headerlink" title="identified by报错"></a>identified by报错</h2><p>以上查询将返回 MySQL 数据库中所有用户的列表或用户数量。请注意，这些查询需要具有足够权限的用户才能执行。如果你无法执行这些查询，请确保你使用的用户具有足够的权限来查看用户列表。</p>
+<p>MySQL版本8.0.21，在给新用户授权时，执行如下语句：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">grant</span> <span class="keyword">all</span> privileges <span class="keyword">on</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">to</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified <span class="keyword">by</span> <span class="string">&#x27;123456&#x27;</span> <span class="keyword">with</span> <span class="keyword">grant</span> option;</span><br><span class="line"><span class="number">1</span></span><br></pre></td></tr></table></figure>
+
+<p>报错如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near &#x27;identified by  &#x27;password&#x27; with grant option&#x27;</span><br><span class="line">1</span><br></pre></td></tr></table></figure>
+
+<p>原因分析 ：高版本的MySQL把将创建账户和赋予权限分开了。</p>
+<p>解决方法：分开执行。</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">#创建账户</span><br><span class="line"><span class="keyword">create</span> <span class="keyword">user</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified <span class="keyword">by</span> <span class="string">&#x27;123456&#x27;</span>;</span><br><span class="line"></span><br><span class="line">#赋予权限</span><br><span class="line"><span class="keyword">grant</span> <span class="keyword">all</span> privileges <span class="keyword">on</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">to</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;%&#x27;</span> <span class="keyword">with</span> <span class="keyword">grant</span> option;</span><br><span class="line"></span><br><span class="line">#刷新</span><br><span class="line">flush privileges;</span><br></pre></td></tr></table></figure>
+
+<h2 id="查看当前用户"><a href="#查看当前用户" class="headerlink" title="查看当前用户"></a>查看当前用户</h2><figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">select</span> <span class="built_in">current_user</span>();</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2024/03/11/2/1151002-20170525190717763-60562880.png" alt="img"></p>
+<h2 id="mysql远程连接只显示部分数据库问题-叶落之秋-博客园-cnblogs-com"><a href="#mysql远程连接只显示部分数据库问题-叶落之秋-博客园-cnblogs-com" class="headerlink" title="mysql远程连接只显示部分数据库问题 - 叶落之秋 - 博客园 (cnblogs.com)"></a><a href="https://www.cnblogs.com/gengsc/p/6905536.html">mysql远程连接只显示部分数据库问题 - 叶落之秋 - 博客园 (cnblogs.com)</a></h2><h2 id="查看用户权限"><a href="#查看用户权限" class="headerlink" title="查看用户权限"></a>查看用户权限</h2><figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">show</span> grants <span class="keyword">from</span> <span class="built_in">current_user</span>();</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2024/03/11/2/1151002-20170525190835091-1440680625.png" alt="img"></p>
+<p>我们再查看huohe用户对远程主机的授权。</p>
+<p><img src="/2024/03/11/2/1151002-20170725100148656-2029272290.png" alt="img"></p>
+<h1 id="成功"><a href="#成功" class="headerlink" title="成功"></a>成功</h1>]]></content>
+      <categories>
+        <category>Linux</category>
+      </categories>
+      <tags>
+        <tag>Linux</tag>
+        <tag>MySQL</tag>
+      </tags>
+  </entry>
+</search>
