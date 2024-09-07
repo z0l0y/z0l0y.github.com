@@ -1,374 +1,406 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>Linux服务器配置Java环境</title>
-    <url>/2024/03/11/1/</url>
-    <content><![CDATA[<h1 id="关于Linux服务器上Java的一些问题"><a href="#关于Linux服务器上Java的一些问题" class="headerlink" title="关于Linux服务器上Java的一些问题"></a>关于Linux服务器上Java的一些问题</h1><h2 id="怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）"><a href="#怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）" class="headerlink" title="怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）"></a>怎么配置Java环境（千万注意是在profile里面去配置，要不然会错）</h2><ol>
-<li><p>下载 Java JDK：首先，你需要从官方网站下载适用于你的 Linux 发行版的 Java JDK（Java Development Kit）。你可以访问 Oracle 官方网站（<a href="https://www.oracle.com/java/technologies/javase-jdk11-downloads.html%EF%BC%89%E6%88%96%E8%80%85">https://www.oracle.com/java/technologies/javase-jdk11-downloads.html）或者</a> OpenJDK 官方网站（<a href="https://openjdk.java.net/install/%EF%BC%89%E6%9D%A5%E8%8E%B7%E5%8F%96%E9%80%82%E5%90%88%E4%BD%A0%E7%9A%84%E5%8F%91%E8%A1%8C%E7%89%88%E7%9A%84">https://openjdk.java.net/install/）来获取适合你的发行版的</a> JDK。</p>
-</li>
-<li><p>安装 Java JDK：下载完成后，打开终端，并使用以下命令安装 JDK。根据你的发行版和下载的 JDK 类型，命令可能会有所不同。</p>
-<ul>
-<li><p>对于 Ubuntu &#x2F; Debian：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt update</span><br><span class="line">sudo apt install openjdk-11-jdk</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>对于 CentOS &#x2F; RHEL：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo yum update</span><br><span class="line">sudo yum install java-11-openjdk-devel</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>对于其他发行版，你可以按照相应的包管理器和命令进行安装。</p>
-</li>
+    <title>My-Backend-Learning-Journey</title>
+    <url>/2024/09/07/My-Backend-Learning-Journey/</url>
+    <content><![CDATA[<h1 id="后端技术知识一览"><a href="#后端技术知识一览" class="headerlink" title="后端技术知识一览"></a>后端技术知识一览</h1><blockquote>
+<p>整理了一下自己在学习后端时的心得体会，争取可以让各位立志学习后端的朋友快速了解一下后端的技术 :horse_racing:</p>
+<p>如果觉得项目不错，或者给你带来了一些帮助，不妨点个 Star ❤️</p>
+<p>本篇文章属于本人的原创作品，如果需要转载，请保留出处，谢谢咯 😆</p>
+<p>由于本人现在的技术可能不太成熟，对于一些概念可能理解的会有问题，所以如果你在文章中发现了问题不妨指出问题，提一个issue哦 :rose:</p>
+</blockquote>
+<h2 id="为什么会创建这样一个仓库？"><a href="#为什么会创建这样一个仓库？" class="headerlink" title="为什么会创建这样一个仓库？"></a>为什么会创建这样一个仓库？</h2><p>很多教程对于后端的技术栈说明的并不全面，或者是太全面了让人不知道从哪里开始学起，这导致初入编程的我们学习的过程中没有较强的连续性，很容易让人产生不知道学了有什么用，有那么多技术框架，我该先学哪个的疑问。</p>
+<p>所以作为一名普通的在校大学生，我想在此分享一下自己学习后端的整个心路历程和经验，将整个后端要学习的技术尽量以一种启发式的方式介绍给大家，希望能为所有想学习后端的同学们提供一些帮助。</p>
+<h2 id="这个仓库包含了哪些知识的介绍？"><a href="#这个仓库包含了哪些知识的介绍？" class="headerlink" title="这个仓库包含了哪些知识的介绍？"></a>这个仓库包含了哪些知识的介绍？</h2><ul>
+<li>后端语言 — Java</li>
+<li>关系型数据库 — MySQL</li>
+<li>ORM框架 — Mybatis &#x2F; Mybatis-plus</li>
+<li>Web开发框架 — Spring，SpringMVC，SpringBoot</li>
+<li>接口管理工具 — Postman &#x2F; Apifox &#x2F; Swagger &#x2F; YAp</li>
+<li>安全管理框架 — Spring Security &#x2F; Shiro</li>
+<li>依赖管理工具 — Maven &#x2F; Gradle</li>
+<li>版本控制工具 — Git</li>
+<li>服务器 — Linux</li>
+<li>前端基础 — 前端三剑客</li>
+<li>设计模式 — 优化代码</li>
+<li>缓存 — Redis</li>
+<li>性能压测 — JMeter</li>
+<li>消息队列 — RabbitMQ</li>
+<li>反向代理服务器 — Nginx</li>
+<li>网络编程 — Netty</li>
+<li>微服务框架 — SpringCloud</li>
+<li>容器 — Docker</li>
+<li>容器编排 — Kubernetes</li>
+<li>CI &#x2F; CD — Jenkins</li>
+<li>并发编程 — JUC</li>
+<li>虚拟机 — JVM</li>
+<li>任务调度 — XXL-JOB</li>
+<li>搜索引擎 — Elasticsearch</li>
+<li>链路追踪 — SkyWalking</li>
+<li>读写分离 — ShardingSphere &#x2F; MyCat</li>
+<li>同步数据 — Canal</li>
+<li>存储图片 — OSS</li>
+<li>好用的工具包 — Hutool</li>
 </ul>
-</li>
-<li><p>配置环境变量：安装完成后，你需要配置服务器的环境变量，以便系统能够找到 Java 的安装路径。在终端中执行以下命令，打开环境变量配置文件：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo vim /etc/profile</span><br></pre></td></tr></table></figure>
-
-<p>注意注意：</p>
-<p>千万不要在environment里面配置，要不然会出问题的。</p>
-<p>ps1:</p>
-<p>对于大多数 Linux 发行版，系统会自动加载某些全局环境变量配置文件，而无需手动配置。这些配置文件包含系统范围的环境变量设置，可以在用户登录时自动加载。</p>
-<p>常见的全局环境变量配置文件包括：</p>
+<p>个人认为除了四大件和其他CS专业知识的介绍，关于纯后端知识的介绍已经非常全面了。</p>
+<p>你可能会觉得还不是很全，比如这里有一些概念笔者并没有提及：CDN内容分发网络，DDD架构，分布式的Raft，拥抱云的GraalVM，新时代GC的ZGC，服务网格Istio，提高代码质量的SonarQube等等。</p>
+<p>其实当然，后端知识浩如烟海，怎么可能仅仅只用一篇文章介绍完。倒不如说，这些后端知识应该是你在有了一定基础之后自己去看前沿文章去了解到的。</p>
+<p>写这篇文章主要是觉得现在市面上的学习路线主要有以下两个极端:</p>
 <ul>
-<li><code>/etc/environment</code>：这个文件是一个全局的环境变量配置文件，其中定义的变量对所有用户和系统服务都可见。</li>
-<li><code>/etc/profile</code>：这个文件是一个全局的 shell 配置文件，其中可以包含设置环境变量的语句。</li>
-<li><code>/etc/profile.d/</code> 目录：该目录包含一系列以 <code>.sh</code> 结尾的脚本文件，这些文件中可以设置特定的环境变量。</li>
+<li>太全。让真正的初学者难以下手，不知道学什么，只会盲目的去学习一些新框架</li>
+<li>太简单。让初学者不易于建立完整的后端知识体系，对于后端架构没有一个完整的认识</li>
 </ul>
-<p>当你登录到 Linux 系统时，系统会自动加载这些配置文件，并将其中定义的环境变量设置为全局可用的。</p>
-<p>需要注意的是，如果你希望在特定用户或特定会话下设置环境变量，可以通过修改用户的 <code>.bashrc</code> 或 <code>.bash_profile</code> 文件来实现。这些文件位于用户的主目录下，可以在登录时加载用户自定义的环境变量设置。</p>
-<p>总之，对于全局环境变量配置，Linux 系统会自动加载预定义的配置文件，无需手动配置。但如果你需要针对特定用户或会话进行环境变量设置，可以修改相应的用户配置文件。</p>
-<p>ps2:</p>
-<p>在某些 Linux 发行版中，如 Ubuntu，可能没有默认的 <code>/etc/environment</code> 文件。这是因为不同的发行版可能采用不同的方式来管理环境变量。</p>
-<p>在缺少 <code>/etc/environment</code> 文件的情况下，你可以手动创建它。请使用超级用户权限（root）执行以下步骤：</p>
-<ol>
-<li><p>打开终端，并使用文本编辑器（如 <code>vim</code> 或 <code>nano</code>）创建 <code>/etc/profile</code>文件：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo vi /etc/profile</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>在打开的文件中，按照以下格式添加你的环境变量：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">VARIABLE_NAME=<span class="string">&quot;variable_value&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>例如：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">export</span> JAVA_HOME=/usr/lib/jvm/java-11-openjdk-11.0.3.7-0.el7_6.aarch64</span><br><span class="line"><span class="built_in">export</span> JRE_HOME=<span class="variable">$JAVA_HOME</span>/jre</span><br><span class="line"><span class="built_in">export</span> CLASSPATH=<span class="variable">$JAVA_HOME</span>/lib:<span class="variable">$JRE_HOME</span>/lib:<span class="variable">$CLASSPATH</span></span><br><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$JAVA_HOME</span>/bin:<span class="variable">$JRE_HOME</span>/bin:<span class="variable">$PATH</span></span><br></pre></td></tr></table></figure>
-
-<p>注意，等号两边不要有空格，且值需要使用双引号引起来。</p>
-</li>
-<li><p>保存并关闭文件。</p>
-</li>
-<li><p>重新登录或重新加载环境变量配置，以使新的环境变量生效。</p>
-<p>或者，你可以在当前终端中执行以下命令，立即加载新的环境变量配置：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">source</span> /etc/profile</span><br></pre></td></tr></table></figure></li>
-</ol>
-</li>
-<li><p>在打开的文件中，添加以下行：</p>
-<p>对了，注意一下在vim里面可以用快捷键来复制，ctrl+shift+v即可</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">export</span> JAVA_HOME=/usr/lib/jvm/java-11-openjdk-11.0.3.7-0.el7_6.aarch64</span><br><span class="line"><span class="built_in">export</span> JRE_HOME=<span class="variable">$JAVA_HOME</span>/jre</span><br><span class="line"><span class="built_in">export</span> CLASSPATH=<span class="variable">$JAVA_HOME</span>/lib:<span class="variable">$JRE_HOME</span>/lib:<span class="variable">$CLASSPATH</span></span><br><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$JAVA_HOME</span>/bin:<span class="variable">$JRE_HOME</span>/bin:<span class="variable">$PATH</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>使环境变量生效：执行以下命令以使环境变量生效：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">source</span> /etc/profile</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>验证 Java 安装：执行以下命令验证 Java 是否已成功安装：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">java -version</span><br></pre></td></tr></table></figure>
-
-<p>如果一切顺利，你将看到 Java 的版本信息。</p>
-</li>
-</ol>
-<p>现在，你已经在 Linux 服务器上成功配置了 Java 环境。你可以使用 Java 来运行和管理你的 Java 应用程序。</p>
-<h2 id="怎么切换Java版本"><a href="#怎么切换Java版本" class="headerlink" title="怎么切换Java版本"></a>怎么切换Java版本</h2><p>在 Linux 上切换 Java 的版本，可以使用 <code>update-alternatives</code> 命令来管理系统中的多个 Java 安装版本。下面是切换 Java 版本的一般步骤：</p>
-<ol>
-<li><p>查看可用的 Java 版本：执行以下命令，列出系统中已安装的 Java 版本以及其优先级：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo update-alternatives --config java</span><br></pre></td></tr></table></figure>
-
-<p>这将显示类似以下内容的选项列表：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">有 2 个候选项可用于替换 java (提供 /usr/bin/java)。</span><br><span class="line"></span><br><span class="line">  选择       路径                                   优先级  状态</span><br><span class="line">------------------------------------------------------------</span><br><span class="line"></span><br><span class="line">* 0            /usr/lib/jvm/java-11-openjdk-amd64/bin/java   1111      自动模式</span><br><span class="line">  1            /usr/lib/jvm/java-11-openjdk-amd64/bin/java   1111      手动模式</span><br><span class="line">  2            /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java   1081      手动模式</span><br><span class="line"></span><br><span class="line">按下 &lt;enter&gt; 保持当前选择[*]或者键入选择的编号：</span><br></pre></td></tr></table></figure>
-
-<p><code>*</code> 符号表示当前选择的 Java 版本。</p>
-</li>
-<li><p>选择要使用的 Java 版本：根据列表中的选项，键入对应 Java 版本的编号并按 Enter，或者直接按 Enter 保持当前选择不变。</p>
-</li>
-<li><p>验证 Java 版本：执行以下命令，验证已切换到的 Java 版本：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">java -version</span><br></pre></td></tr></table></figure>
-
-<p>这将显示当前正在使用的 Java 版本的信息。</p>
-</li>
-</ol>
-<p>通过上述步骤，你可以在 Linux 上切换系统中可用的 Java 版本，并使用 <code>update-alternatives</code> 命令来配置默认的 Java 版本。</p>
-<h2 id="怎么找到Java的安装路径"><a href="#怎么找到Java的安装路径" class="headerlink" title="怎么找到Java的安装路径"></a>怎么找到Java的安装路径</h2><p>你可以通过以下方式来找到你的 Java 安装路径：</p>
-<ol>
-<li><p>使用 <code>which</code> 命令：在终端中执行以下命令，可以查看系统当前默认的 Java 可执行文件的路径：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">which</span> java</span><br></pre></td></tr></table></figure>
-
-<p>这将输出 Java 可执行文件的完整路径，如 <code>/usr/bin/java</code>。</p>
-</li>
-<li><p>使用 <code>readlink</code> 命令：如果你想获取 Java 可执行文件的符号链接的真实路径，可以执行以下命令：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">readlink</span> -f $(<span class="built_in">which</span> java)</span><br></pre></td></tr></table></figure>
-
-<p>这将输出 Java 可执行文件的真实路径，如 <code>/usr/lib/jvm/java-11-openjdk-amd64/bin/java</code>。</p>
-</li>
-<li><p>使用 <code>update-alternatives</code> 命令：在某些 Linux 发行版中，你可以使用 <code>update-alternatives</code> 命令来管理系统中的多个 Java 安装版本。执行以下命令，可以查看当前配置的 Java 选项及其路径：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">update-alternatives --display java</span><br></pre></td></tr></table></figure>
-
-<p>这将显示 Java 的可选配置项列表，包括各个选项的路径。</p>
-</li>
-</ol>
-<p>以上方法中的任何一种都可以帮助你找到 Java 的安装路径。根据你的系统和安装方式，Java 的路径可能会有所不同。</p>
-<h2 id="JAVA-HOME是什么"><a href="#JAVA-HOME是什么" class="headerlink" title="JAVA_HOME是什么"></a>JAVA_HOME是什么</h2><p><code>JAVA_HOME</code> 是指定 Java Development Kit (JDK) 的根目录路径。JDK 是用于开发和构建 Java 应用程序的软件包，包括 Java 编译器 (<code>javac</code>)、Java 虚拟机 (<code>java</code>)、Java 类库和其他开发工具。</p>
-<p>通过设置 <code>JAVA_HOME</code> 环境变量，你可以指定 JDK 的安装路径，以便系统和应用程序能够找到所需的 Java 运行时环境和开发工具。<code>JAVA_HOME</code> 变量应该指向 JDK 安装目录的根路径，其中包含 <code>bin</code>、<code>lib</code>、<code>include</code> 等子目录。</p>
-<p>例如，如果你的 JDK 安装路径是 <code>C:\Program Files\Java\jdk1.8.0_271</code>（在 Windows 上），那么你可以将 <code>JAVA_HOME</code> 设置为 <code>C:\Program Files\Java\jdk1.8.0_271</code>。</p>
-<p>在设置了正确的 <code>JAVA_HOME</code> 后，应用程序和开发工具可以使用该环境变量来定位所需的 Java 运行时环境和工具，例如编译 Java 代码、运行 Java 程序等。</p>
-<h2 id="怎么查看JAVA-HOME在哪里"><a href="#怎么查看JAVA-HOME在哪里" class="headerlink" title="怎么查看JAVA_HOME在哪里"></a>怎么查看JAVA_HOME在哪里</h2><p>要查看 <code>JAVA_HOME</code> 环境变量的值和定义位置，可以按照以下步骤进行：</p>
-<ol>
-<li><p>打开终端。</p>
-</li>
-<li><p>运行以下命令来查看 <code>JAVA_HOME</code> 环境变量的值：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">echo</span> <span class="variable">$JAVA_HOME</span></span><br></pre></td></tr></table></figure>
-
-<p>这将在终端中显示 <code>JAVA_HOME</code> 环境变量的值。如果它已设置，你将看到 Java 的安装路径。</p>
-</li>
-<li><p>如果没有显示 <code>JAVA_HOME</code> 环境变量的值，说明它可能没有设置。在这种情况下，你可以尝试以下方法来查找定义位置：</p>
+<p>所以这里就我在大学以来和在团队中学习的经验写一些我对于后端的看法，希望可以让朋友们拨开云雾见青天，知道自己为什么学这些技术，以及要学什么技术。</p>
+<h2 id="我该怎么学习后端的技术"><a href="#我该怎么学习后端的技术" class="headerlink" title="我该怎么学习后端的技术"></a>我该怎么学习后端的技术</h2><p>我目前学习后端的主要语言是Java，所以在这里主要介绍一下Java后端的学习路线，当然如果你是其他语言的选手，这并不影响你阅读本章内容，因为业界要解决的问题是不会变的，变的只是框架。</p>
+<p>比如你在Java中使用Mybatis-plus操作数据，在Go中使用GORM操作数据，在Java中使用SpringBoot作为基本的Web开发框架，在Go中使用Gin或Echo作为基本的Web开发框架。</p>
+<p>下面，各位朋友可以根据自己的需求来学习。</p>
+<p>这里直接总结一下最基础的后端开发需求，适合真正的初学者:</p>
 <ul>
-<li><p><strong>查看系统级环境变量文件</strong>：某些 Linux 发行版会将环境变量设置存储在 <code>/etc/environment</code> 文件中。你可以使用文本编辑器打开该文件，并查找是否在其中定义了 <code>JAVA_HOME</code> 环境变量。</p>
-</li>
-<li><p><strong>查看用户级环境变量文件</strong>：用户级环境变量文件通常是用户主目录下的 <code>.bashrc</code> 或 <code>.bash_profile</code>。你可以使用文本编辑器打开适用于当前用户的环境变量文件，并搜索是否有关于 <code>JAVA_HOME</code> 的定义。</p>
-</li>
-<li><p><strong>查看特定的 Shell 配置文件</strong>：如果你在使用特定的 Shell（如 <code>zsh</code> 或 <code>fish</code>），可以查看该 Shell 的配置文件，例如 <code>.zshrc</code> 或 <code>config.fish</code>，以寻找 <code>JAVA_HOME</code> 的定义。</p>
-</li>
-<li><p><strong>尝试其他方法</strong>：如果以上方法都没有找到 <code>JAVA_HOME</code> 的定义，你可以尝试运行 <code>grep</code> 命令来搜索系统中的所有文件，以查找 <code>JAVA_HOME</code> 关键字。例如：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">grep -rnw <span class="string">&#x27;/&#x27;</span> -e <span class="string">&quot;JAVA_HOME&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>这将在整个文件系统中递归搜索包含 <code>JAVA_HOME</code> 的文件，并显示匹配的行及其所在文件的路径。</p>
-</li>
+<li>会一门后端语言的基础语法 — 比如Java，Python，Go，Rust等</li>
+<li>会基础的关系型数据库操作 — 一般会MySQL的基础操作就行了</li>
+<li>会使用ORM框架来操作数据库 — 这个ORM框架你可以根据你选的语言去搜</li>
+<li>会使用Web开发框架做基本的项目开发 — 这个Web开发框架你可以根据你选的语言去搜</li>
+<li>会基本的接口管理工具给我们的程序发起请求 — 会使用Postman &#x2F; Apifox其中一个就行了</li>
+<li>会一个依赖管理工具来管理我们的依赖 — 这个依赖管理工具你可以根据你选的语言去搜</li>
+<li>会版本控制工具 — Git</li>
 </ul>
-</li>
-</ol>
-<p>通过上述步骤，你应该能够找到 <code>JAVA_HOME</code> 环境变量的值和定义位置。请注意，如果你使用的是 Windows 操作系统，查找环境变量的方法会有所不同。</p>
-<h2 id="关于环境配置的etc目录"><a href="#关于环境配置的etc目录" class="headerlink" title="关于环境配置的etc目录"></a>关于环境配置的etc目录</h2><p><code>/etc</code> 是 Linux 系统中的一个特殊目录，用于存储系统的配置文件。它是 “etcetera”（等等）的缩写，表示其中包含了各种各样的配置文件。</p>
-<p>在 <code>/etc</code> 目录下，你会找到许多与系统配置相关的文件和子目录。这些文件和目录通常需要超级用户（root）权限才能进行修改。以下是一些常见的 <code>/etc</code> 目录下的文件和目录：</p>
+<p>比如，我这里以Java为例:</p>
 <ul>
-<li><code>/etc/passwd</code>：包含系统上的用户账户信息。</li>
-<li><code>/etc/group</code>：包含系统上的用户组信息。</li>
-<li><code>/etc/hosts</code>：包含主机名与 IP 地址的映射。</li>
-<li><code>/etc/resolv.conf</code>：设置系统的 DNS 解析配置。</li>
-<li><code>/etc/fstab</code>：定义系统启动时挂载的文件系统。</li>
-<li><code>/etc/network/interfaces</code> 或 <code>/etc/sysconfig/network-scripts</code>：网络配置文件，用于设置网络接口。</li>
-<li><code>/etc/ssh/sshd_config</code>：SSH 服务器的配置文件。</li>
-<li><code>/etc/sudoers</code>：定义系统上的用户和用户组的 sudo 访问权限。</li>
-<li><code>/etc/environment</code>：全局环境变量的配置文件。</li>
+<li>会Java的基础语法：掌握数据类型、控制结构、面向对象编程等基本概念</li>
+<li>会关系型数据库MySQL的基础操作：能够执行基本的SQL查询、插入、更新和删除操作</li>
+<li>会Mybatis来操作数据库：了解如何使用MyBatis进行数据持久化</li>
+<li>会SpringBoot来做基本的项目开发：能够创建和配置SpringBoot应用，理解基本的注解和配置方式</li>
+<li>会使用Apifox给我们的程序发起请求：能够使用Apifox测试和管理API接口</li>
+<li>会使用Maven来管理我们的依赖：熟悉Maven的基本命令和POM文件配置</li>
+<li>会使用Git提交推送代码到GitHub上：能够使用 Git 进行版本控制，掌握基本的提交、推送和分支操作</li>
 </ul>
-<p>注意一下：</p>
-<p><code>/etc/environment</code> 不是一个目录，而是一个文件。</p>
-<p><code>/etc/environment</code> 是一个系统级别的环境变量文件，用于定义系统范围的环境变量。它是一个文本文件，通常不包含目录。</p>
-<p><code>/etc</code> 目录中的文件和目录通常由系统管理员进行管理和配置。它们是系统范围的配置文件，用于设置各种系统参数、服务和应用程序的行为。因此，对 <code>/etc</code> 目录的修改和配置需要谨慎，并且可能需要超级用户权限。</p>
-<h2 id="关于-bashrc和-bash-profile文件在哪里"><a href="#关于-bashrc和-bash-profile文件在哪里" class="headerlink" title="关于.bashrc和.bash_profile文件在哪里"></a>关于.bashrc和.bash_profile文件在哪里</h2><p><img src="/2024/03/11/1/image-20240306192156882.png" alt="image-20240306192156882"></p>
-<h2 id="关于which软连接"><a href="#关于which软连接" class="headerlink" title="关于which软连接"></a>关于which软连接</h2><p><img src="/2024/03/11/1/image-20240306203316460-1710152979673.png" alt="image-20240306203316460"></p>
+<p>又或者，以Go为例:</p>
+<ul>
+<li>会Go的基础语法：理解数据类型、控制结构、函数和并发编程等基本概念</li>
+<li>会关系型数据库MySQL的基础操作：能够执行基本的 SQL 查询、插入、更新和删除操作</li>
+<li>会GORM来操作数据库：了解如何使用GORM进行数据持久化</li>
+<li>会Echo &#x2F; Gin来做基本的项目开发：能够使用 Echo 或 Gin 框架搭建基本的 Web 应用</li>
+<li>会使用Apifox给我们的程序发起请求：能够使用 Apifox 测试和管理 API 接口</li>
+<li>会使用Go Modules来管理我们的依赖：熟悉 Go Modules 的基本用法</li>
+<li>会使用Git提交推送代码到GitHub上：能够使用 Git 进行版本控制，掌握基本的提交、推送和分支操作</li>
+</ul>
+<p>除了这些，建议你了解学习以下内容:</p>
+<ul>
+<li>如何使用Markdown规范自己的文档</li>
+<li>如何规范自己的commit信息</li>
+<li>如何遵守接口设计规范 RESTful API</li>
+</ul>
+<p>当你有了一定的基础后，你可以根据后面写的这些来查缺补漏，丰富自己的技术栈。</p>
+<h2 id="语言—Java-必学"><a href="#语言—Java-必学" class="headerlink" title="语言—Java(必学)"></a><a href="https://www.oracle.com/cn/java/technologies/downloads/">语言—Java(必学)</a></h2><p>首先我们要编程，写项目，一定要会一门语言，正所谓万丈高楼平地起，语言就是我们搭建高楼的砖块。</p>
+<p>不过初学一门编程语言的时候可能你会遇到很多问题，比如思考为什么要写OOP，为什么要有多线程，很多东西你可能暂时不太了解，不过这没有关系，当你学到后面的时候自然会体会到这样做的原因。</p>
+<p>这里介绍一下我初学Java语言时的技巧:</p>
+<ul>
+<li><strong>多敲代码</strong>(代码是手上功夫，光看不练假把式)</li>
+<li><strong>学习 Debug</strong> (当你遇到问题无法得到你预期的结果时，可以试试断点调试)</li>
+<li><strong>学习Stream流和Lambda 表达式</strong>(这两个技术可以使我们的程序更加优雅—优化数据处理和匿名函数的编写)</li>
+<li><strong>看看阿里巴巴的开发规范</strong>(这样更有利于你的程序写出更少的Bug，可读性更好，可扩展性更高)</li>
+</ul>
+<p>推荐文档和工具:</p>
+<ul>
+<li><a href="https://liaoxuefeng.com/books/java/introduction/index.html">简介 - Java教程 - 廖雪峰的官方网站 (liaoxuefeng.com)</a></li>
+<li><a href="https://docs.oracle.com/javase/8/docs/api/">Overview (Java Platform SE 8 ) (oracle.com)</a></li>
+<li><a href="https://www.matools.com/api/java8">Java 8 中文版 - 在线API手册 - 码工具 (matools.com)</a></li>
+<li><a href="https://github.com/akullpp/awesome-java">akullpp&#x2F;awesome-java: A curated list of awesome frameworks, libraries and software for the Java programming language. (github.com)</a></li>
+<li><a href="https://developer.aliyun.com/ebook/386">《阿里巴巴Java开发手册（终极版）》免费下载_在线阅读_藏经阁-阿里云开发者社区 (aliyun.com)</a></li>
+</ul>
+<h2 id="关系型数据库—MySQL-必学"><a href="#关系型数据库—MySQL-必学" class="headerlink" title="关系型数据库—MySQL(必学)"></a><a href="https://www.mysql.com/cn/">关系型数据库—MySQL(必学)</a></h2><p>当我们学完一门语言后，一般学校里面都会要求我们做一个课设(这里用贪吃蛇举例)，我们初步了解Java并上手之后，知道了可以使用文件来存储读取数据，那么一旦当数据多起来的时候，我们就不好处理了，这时我们不妨在网上搜搜看有什么东西可以帮助我们存储数据呢？</p>
+<p>于是你找到了<a href="https://zh.wikipedia.org/wiki/MySQL">MySQL</a>(这里还推荐你了解一下<a href="https://zh.wikipedia.org/zh-cn/MariaDB">MariaDB</a>和<a href="https://zh.wikipedia.org/zh-cn/PostgreSQL">PostgreSQL</a>)。</p>
+<p>那么我们学习MySQL到底要到一个什么程度才能进行开发呢？</p>
+<ul>
+<li>SQL语句编写(<strong>主要会CURD就行了</strong>，create、update、read和delete)</li>
+<li>设计数据库表，字段(这里建议<strong>看看阿里巴巴对于数据库设计的规范</strong>，帮助你更好的设计数据库)</li>
+</ul>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://dev.mysql.com/doc/">MySQL :: MySQL Documentation</a></li>
+<li><a href="https://mysql.net.cn/">MySQL 中文网</a></li>
+<li><a href="https://www.mysqlzh.com/">MySQL 中文文档 | MySQL 中文网 (mysqlzh.com)</a></li>
+<li><a href="https://developer.aliyun.com/ebook/386">《阿里巴巴Java开发手册（终极版）》免费下载_在线阅读_藏经阁-阿里云开发者社区 (aliyun.com)</a></li>
+</ul>
+<h2 id="ORM框架—MyBatis-Mybatis-plus-必学"><a href="#ORM框架—MyBatis-Mybatis-plus-必学" class="headerlink" title="ORM框架—MyBatis &#x2F; Mybatis-plus(必学)"></a><a href="https://zh.wikipedia.org/wiki/MyBatis">ORM框架—MyBatis &#x2F;</a> <a href="https://github.com/baomidou/mybatis-plus">Mybatis-plus(必学)</a></h2><p>当你写多了原生的<a href="https://zh.wikipedia.org/wiki/Java%E6%95%B0%E6%8D%AE%E5%BA%93%E8%BF%9E%E6%8E%A5"><strong>JDBC</strong></a>来操作数据库之后，会发现编码效率很低，写的过程中也比较容易出错，为了更好的和数据库进行交互，于是你又在网上看别人的博客，发现了<a href="https://zh.wikipedia.org/wiki/%E5%AF%B9%E8%B1%A1%E5%85%B3%E7%B3%BB%E6%98%A0%E5%B0%84">ORM</a>这个东西，这种框架可以帮助我们更快的写<a href="https://zh.wikipedia.org/wiki/SQL">SQL</a>，甚至有时候都不用写，而是自动生成。</p>
+<p>这里简单介绍一下我写项目时的搭配(MyBatis &#x2F; Mybatis-plus)，当然<a href="https://zh.wikipedia.org/wiki/Java%E6%8C%81%E4%B9%85%E5%8C%96API"><strong>JPA</strong></a>也是可以的:</p>
+<ul>
+<li>Mybatis在这种搭配下常常用于写复杂的SQL</li>
+<li>Mybatis-plus天生支持单表查询，不用自己手写单表查询，这里推荐写一些简单的SQL，对于复杂的SQL建议还是使用Mybatis来写</li>
+</ul>
+<p>这里简单说明一下，为什么这样搭配，因为在写复杂SQL的时候Mybatis-plus的wrapper会很复杂，可读性很低，我们写的时候犯错的几率也会更大，所以推荐这时使用Mybatis来写。</p>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://mybatis.org/mybatis-3/zh_CN/index.html">mybatis – MyBatis 3 | 简介</a></li>
+<li><a href="https://baomidou.com/">MyBatis-Plus 🚀 为简化开发而生 (baomidou.com)</a></li>
+</ul>
+<h2 id="Web开发框架—Spring，SpringMVC，Spring-Boot-必学"><a href="#Web开发框架—Spring，SpringMVC，Spring-Boot-必学" class="headerlink" title="Web开发框架—Spring，SpringMVC，Spring Boot(必学)"></a><a href="https://zh.wikipedia.org/wiki/Spring_Framework">Web开发框架—Spring，SpringMVC</a><a href="https://zh.wikipedia.org/wiki/Spring_Boot">，Spring Boot(必学)</a></h2><p>这是我们做<a href="https://zh.wikipedia.org/wiki/Web%E6%9C%8D%E5%8A%A1">Web服务</a>时常用的框架，如果不想从麻烦的原生配置开始做起，建议直接学习SpringBoot2。</p>
+<p>SpringBoot3相对于SpringBoot2就是功能更多，但是API发生了较大的变化，可能你学习的时候大部分时间都用在处理冲突上了，所以建议新手入门直接学习SpringBoot2，等有了一定基础再学Spring家族的其他框架，做一般的项目SpringBoot也够用了。</p>
+<p>还有就是不要看Spring，SpringMVC，Spring Boot有三个，其实Spring + SpringMVC ≈ SpringBoot，所以你其实可以直接学习SpringBoot。但是可能对于一些在前者(Spring，SpringMVC)中约定俗称的配置有些迷惑，所以这边还是建议有时间的话先把Spring，SpringMVC学了再学SpringBoot。</p>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://spring.io/">Spring | Home</a></li>
+<li><a href="https://springdoc.cn/docs/">spring 中文文档 - spring 中文网 (springdoc.cn)</a></li>
+<li><a href="https://docs.springframework.org.cn/spring-framework/reference/spring-projects.html">Spring 项目 :: Spring 框架 - Spring 中文 (springframework.org.cn)</a></li>
+</ul>
+<h2 id="接口管理工具—Postman-Apifox-Swagger-YApi-必学"><a href="#接口管理工具—Postman-Apifox-Swagger-YApi-必学" class="headerlink" title="接口管理工具—Postman &#x2F; Apifox &#x2F; Swagger &#x2F; YApi(必学)"></a><a href="https://www.postman.com/">接口管理工具—Postman &#x2F;</a> <a href="https://apifox.com/?utm_source=bing&utm_medium=sem&utm_campaign=%E9%AB%98%E8%BD%AC%E5%8C%96%E8%AF%8D-%E4%BA%A7%E5%93%81&utm_content=Apifox&utm_term=apifox&search_term=Apifox&msclkid=d08923251e02177742af45ff8fc17a7f">Apifox &#x2F;</a> <a href="https://swagger.io/">Swagger &#x2F;</a> <a href="https://yapi.pro/">YApi(必学)</a></h2><p>什么，你还在使用<a href="https://hc.apache.org/httpcomponents-client-4.5.x/index.html">HttpClient</a>发送请求？</p>
+<p>那么不妨试一试我上面提到的工具吧，这些工具的界面更加友好，功能更加强大，我们没有理由不去使用它。</p>
+<p>最开始我使用的是Postman，后面使用过Apifox，Swagger，YApi等工具，就我个人这么久的使用体验而言，感觉Apifox的功能更多更强大，界面是中文，而且还可以导出接口文档，很方便，不用我们自己去写。</p>
+<p>这个就不用什么文档了，建议直接<a href="https://zh.wikipedia.org/wiki/CSDN">CSDN</a>启动。</p>
+<h2 id="安全管理框架—Spring-Security-Shiro框架-选学，项目有安全需要的学"><a href="#安全管理框架—Spring-Security-Shiro框架-选学，项目有安全需要的学" class="headerlink" title="安全管理框架—Spring Security &#x2F; Shiro框架(选学，项目有安全需要的学)"></a><a href="https://springdoc.cn/spring-security/index.html">安全管理框架—Spring Security &#x2F;</a> <a href="https://zh.wikipedia.org/wiki/Apache_Shiro">Shiro框架(选学，项目有安全需要的学)</a></h2><p>当你的系统缺少安全管理部分可以使用到它，你也许还听说过Shiro框架，它也是做安全的，只不过相比于Spring Security更加轻量。</p>
+<p>当然，我们说安全管理框架可能你还不太清楚，为什么要这个东西，如果你写过登录系统，就应该明白，没有框架来管理接口访问，我们将无法对用户进行相应的验证和授权，也就无法区分管理员与普通用户的权限。</p>
+<p>除了上面那些框架，我还可以尝试什么？</p>
+<ul>
+<li>当然，如果你觉得上面提到的框架过于笨重，那么这里还建议你尝试一下<a href="https://jwt.io/">JWT</a>，它可比上面两个轻量多了</li>
+<li>同时也建议你了解一下<a href="https://zh.wikipedia.org/wiki/%E4%BB%A5%E8%A7%92%E8%89%B2%E7%82%BA%E5%9F%BA%E7%A4%8E%E7%9A%84%E5%AD%98%E5%8F%96%E6%8E%A7%E5%88%B6">RBAC理论</a>，这个在Spring Security中也有体现</li>
+<li>还有就是建议你了解一下<a href="https://zh.wikipedia.org/wiki/%E5%BC%80%E6%94%BE%E6%8E%88%E6%9D%83">OAuth2.0协议</a></li>
+</ul>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://spring.io/">Spring | Home</a></li>
+<li><a href="https://springdoc.cn/docs/">spring 中文文档 - spring 中文网 (springdoc.cn)</a></li>
+<li><a href="https://docs.springframework.org.cn/spring-framework/reference/spring-projects.html">Spring 项目 :: Spring 框架 - Spring 中文 (springframework.org.cn)</a></li>
+</ul>
+<h2 id="依赖管理工具—Maven-Gradle-必学"><a href="#依赖管理工具—Maven-Gradle-必学" class="headerlink" title="依赖管理工具—Maven &#x2F; Gradle(必学)"></a><a href="https://zh.wikipedia.org/wiki/Apache_Maven">依赖管理工具—Maven &#x2F;</a> <a href="https://zh.wikipedia.org/wiki/Gradle">Gradle(必学)</a></h2><p>相信你之前使用依赖的方式是直接将对应的<a href="https://zh.wikipedia.org/wiki/JAR_(%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)">JAR包</a>放入项目中，但是随着你项目中使用的依赖越来越多，自己管理依赖逐渐变成了一件麻烦的事情。</p>
+<p>于是你发现了Maven，这个工具可以帮助你管理你的依赖，并且你可以通过<a href="https://blog.csdn.net/qq_20236937/article/details/135893883">pom.xml</a>的形式配置jar包的版本。从我们自己在Maven仓库中找到对应依赖的jar包，自己导入项目，自己管理，到Maven的一键配置，大大减少了我们为管理依赖头疼的时间。</p>
+<p>相关建议:</p>
+<ul>
+<li><strong>当成工具用就行</strong>，重要性没有那些框架重要</li>
+<li>如果缺什么的工具包(比如处理<a href="https://zh.wikipedia.org/wiki/JSON">JSON</a>的)，<strong>建议在awesome-java中找找看有没有推荐的工具包</strong>，然后在Maven仓库中找到对应的依赖，得到对应的pom文件导入就行了</li>
+</ul>
+<p>推荐文档和仓库:</p>
+<ul>
+<li><a href="https://maven.apache.org/guides/index.html">Maven – Maven Documentation (apache.org)</a></li>
+<li><a href="https://mvnrepository.com/">Maven Repository: Search&#x2F;Browse&#x2F;Explore (mvnrepository.com)</a></li>
+<li><a href="https://central.sonatype.com/?smo=true">Maven Central (sonatype.com)</a></li>
+<li><a href="https://maven.org.cn/">Maven 中文网</a></li>
+</ul>
+<h2 id="版本控制工具—Git-必学"><a href="#版本控制工具—Git-必学" class="headerlink" title="版本控制工具—Git(必学)"></a><a href="https://zh.wikipedia.org/wiki/Git">版本控制工具—Git(必学)</a></h2><p>你可能想过：有没有一个工具记录自己做过的事情并且可以标准的区分自己各个版本的功能呢？</p>
+<p>当然有咯，那就是Git，于此相应的概念还有<a href="https://zh.wikipedia.org/wiki/GitHub">GitHub</a>，不过前者是一个版本控制工具，类似的还有<a href="https://zh.wikipedia.org/wiki/Subversion">SVN</a>，后者是一个代码托管平台，类似的还有<a href="https://zh.wikipedia.org/wiki/GitLab">GitLab</a>。</p>
+<p>我们该怎么学习Git？</p>
+<ul>
+<li>看过<a href="https://cloud.tencent.com/developer/article/1771872">Git底层设计</a>的朋友都知道，Git对于底层的抽象做的很好，比如底层基于快照的存储，以及无环图的设计，但是对于上层<a href="https://zh.wikipedia.org/wiki/%E5%BA%94%E7%94%A8%E7%A8%8B%E5%BA%8F%E6%8E%A5%E5%8F%A3">API</a>暴露的并不友好，所以推荐<strong>先看一下Git的底层设计</strong>之后，再学习一下Git的API，并结合Git底层的数据结构来思考，每次API操作的是数据的哪一部分，时间久了，你对于Git就会非常熟悉了</li>
+</ul>
+<p>以及，我们主要要学习Git的哪些API呢？</p>
+<ul>
+<li>主要是学习提交、推送、拉取、回退、重置、克隆，代码合并、解决冲突的命令。后续根据对应项目场景的需求再对应去学即可</li>
+</ul>
+<p>推荐文档和网站:</p>
+<ul>
+<li><a href="https://git-scm.com/book/zh/v2">Git - Book (git-scm.com)</a></li>
+<li><a href="https://docs.github.com/zh">GitHub Docs</a></li>
+<li><a href="https://nulab.com/zh-cn/learn/software-development/git-tutorial/">Simple Git tutorial for beginners | Nulab</a></li>
+<li><a href="https://learngitbranching.js.org/?locale=zh_CN">Learn Git Branching</a></li>
+<li><a href="https://training.github.com/downloads/zh_CN/github-git-cheat-sheet/">GitHub Git 备忘单 - GitHub Cheatsheets</a></li>
+</ul>
+<h2 id="服务器—Linux-必学"><a href="#服务器—Linux-必学" class="headerlink" title="服务器—Linux(必学)"></a><a href="https://zh.wikipedia.org/wiki/Linux">服务器—Linux(必学)</a></h2><p>你是不是有疑惑，为什么自己写的项目只能被自己的电脑访问，而不能被其他的电脑访问？</p>
+<p>其实是因为你没有自己的服务器，如果你要让别人访问你的服务，你可以去买一个属于你的域名和一个云服务器，将自己写的服务部署到服务器上，供别人访问。</p>
+<p>那么，使用Linux服务器最基本的技能是什么呢？</p>
+<p>由于现在的很多前后台项目大多都是在Linux环境下部署的，所以我们至少要了解一些常用的Linux指令。</p>
+<p>当然如果你不买现成的云服务器，你还可以使用虚拟机，这样同样可以模拟在云服务器上Linux的操作。学会了基础的Linux操作之后，你将会在之后学习微服务架构时将会如鱼得水。</p>
+<p>那么多命令我该怎么记下来呢？</p>
+<ul>
+<li>你可以<strong>使用man或者tldr</strong>，这些命令会解释每一个命令具体的含义或给出详细的示例，你可以照葫芦画瓢的去使用</li>
+<li><strong>每一个命令一般都是对应英文的缩写</strong>，你可以去网上找找看，这样便于你记忆和理解</li>
+</ul>
+<p>我该看什么了解Linux命令呢？</p>
+<ul>
+<li>你可以看看<strong>鸟哥的 Linux 私房菜</strong>，这本书对于Linux有一个较为全面的介绍</li>
+</ul>
+<p>我该怎么用Linux系统呢？</p>
+<ul>
+<li>我目前主要通过<a href="https://zh.wikipedia.org/wiki/VMware">VMware</a>，<a href="https://zh.wikipedia.org/wiki/VirtualBox">VirtualBox</a>和<a href="https://zh.wikipedia.org/wiki/%E9%80%82%E7%94%A8%E4%BA%8ELinux%E7%9A%84Windows%E5%AD%90%E7%B3%BB%E7%BB%9F#WSL_2">WSL2</a>来使用，推荐使用<a href="https://zh.wikipedia.org/wiki/Ubuntu">Ubuntu</a>，当然使用<a href="https://zh.wikipedia.org/wiki/CentOS">CentOS</a>学习也行</li>
+<li>VMware是我一开始学习Linux的时候用的工具，其实也是挺好用的</li>
+<li>VirtualBox可以结合<a href="https://zh.wikipedia.org/wiki/Vagrant">Vagrant</a>来使用，实现一键部署虚拟机，这个倒是挺方便的</li>
+<li>对了对了，如果你要使用虚拟机来进行学习的话，推荐你使用<a href="https://zh.wikipedia.org/wiki/Xshell">Xshell</a>或者<a href="https://cloud.tencent.com/developer/article/1943148">FinalShell</a>来作为<a href="https://zh.wikipedia.org/wiki/Secure_Shell">SSH</a>连接的工具，要不然你就只能使用黑黑的终端来连接了（这边建议你实在是要用最好自己配置一下<a href="https://github.com/ohmyzsh/ohmyzsh">ohmyzsh</a>，它提供了非常友好的终端界面）</li>
+<li>WSL2可以直接在Windows上运行，不用每次学习都要开虚拟机，更加方便</li>
+</ul>
+<p>这个Linux上有很多好玩的东西，下面我来介绍一下:</p>
+<ul>
+<li>脚本控制项目部署和起起停停 — <a href="https://www.runoob.com/linux/linux-shell.html">Shell</a></li>
+<li>最流行的基于命令行的编辑器 — <a href="https://zh.wikipedia.org/wiki/Vim">Vim</a></li>
+<li>最常用的构建系统之一 — <a href="https://zh.wikipedia.org/wiki/Make">make</a></li>
+</ul>
+<p>推荐网站:</p>
+<ul>
+<li><a href="https://wangchujiang.com/linux-command/">Linux命令搜索引擎 命令，Linux Linux命令搜索引擎 命令详解：最专业的Linux命令大全，内容包含Linux命令手册、详解、学习，值得收藏的Linux命令速查手册。 - Linux 命令搜索引擎 (wangchujiang.com)</a></li>
+<li><a href="https://www.linuxcool.com/">Linux命令大全(手册) – 真正好用的Linux命令在线查询网站 (linuxcool.com)</a></li>
+<li><a href="https://mirrors.tuna.tsinghua.edu.cn/">清华大学开源软件镜像站 | Tsinghua Open Source Mirror</a></li>
+</ul>
+<h2 id="前端基础—前端三剑客HTML，CSS，JavaScript-选学，这个不做要求，感兴趣可以了解一下"><a href="#前端基础—前端三剑客HTML，CSS，JavaScript-选学，这个不做要求，感兴趣可以了解一下" class="headerlink" title="前端基础—前端三剑客HTML，CSS，JavaScript(选学，这个不做要求，感兴趣可以了解一下)"></a><a href="https://zh.wikipedia.org/wiki/HTML">前端基础—前端三剑客HTML</a>，<a href="https://zh.wikipedia.org/wiki/CSS">CSS</a>，<a href="https://zh.wikipedia.org/wiki/JavaScript">JavaScript(选学，这个不做要求，感兴趣可以了解一下)</a></h2><p>作为一位想要从事后端工作的程序员来说，了解一点前端知识是很有用处的。</p>
+<p>正如你所了解的一样，后端负责给前端提供数据，前端负责在页面上展示数据。为了使我们和前端的小伙伴们配合的更好，我们可以适当了解一些关于前端的知识，知道数据怎么提交给前端，以便于前端处理，知道前端是怎么获取到后端数据的等等。</p>
+<p>那么，我们具体需要掌握到什么层次呢？</p>
+<ul>
+<li>当然，对于后端程序员来说，你<strong>不需要知道太多的前端知识</strong>，但是基础的你还是要会的，比如说：HTML，CSS， JavaScript。当然你还可以了解一点<a href="https://zh.wikipedia.org/wiki/Vue.js">Vue</a>等等前端框架，太多的我们不需要掌握，了解一下目前主流前端开发框架就行了</li>
+</ul>
+<p>好的，完成上面内容的基本学习之后，你将掌握基本的项目开发能力，但是想要做到一个合格的后端程序员是不容易的，接下来，我们还需要学会这些知识。</p>
+<h2 id="设计模式—优化代码-选学，想要项目有更好设计的学"><a href="#设计模式—优化代码-选学，想要项目有更好设计的学" class="headerlink" title="设计模式—优化代码(选学，想要项目有更好设计的学)"></a><a href="https://zh.wikipedia.org/wiki/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F_(%E8%AE%A1%E7%AE%97%E6%9C%BA)">设计模式—优化代码(选学，想要项目有更好设计的学)</a></h2><p>也许你已经写出过几千行的代码了，但是你或许会发现自己每改动一个位置的代码，很多位置都会发生变化，你常常因为这件事情焦头烂额，觉得工作量太大。</p>
+<p>其实大可不必，很多时候都是我们没有设计好类与类之间的关系，使得我们后期加需求，维护时的难度大大提升。</p>
+<p>简而言之，设计模式可以让你写出<strong>高质量的代码(Safe from bugs,Easy to understand,Ready for change)。</strong></p>
+<p>设计模式简单的说有三个模式：创建型模式，结构型模式，行为型模式。当然，你肯定不想让我在这里介绍一些枯燥的知识，所以我这里直接说说我对设计模式的看法：</p>
+<ul>
+<li>设计模式不应该一开始就强行运用上。也许你会疑惑，刚才不是说了设计模式很好很好云云之类的，为什么这里又不推荐用呢？其实是因为我们项目最开始的时候，需求并不清楚，代码并不复杂，如果直接使用设计模式会使得代码可读性降低，而且不能有的放矢(不是所有的类都需要通过设计模式来设计)，只有当后期需求逐渐完整，类与类之间的关系变得逐渐复杂，你<strong>发现可以优化的时候再推荐使用</strong>（毕竟软件开发又不是一次就结束了，而是会经历很多轮的迭代优化）</li>
+<li>最开始的时候<strong>不要为了使用设计模式而使用设计模式</strong>。学习设计模式可以让我们在读对应优秀框架源码的时候游刃有余(比如Spring就是用了很多的设计模式，如果你不学，很可能看都看不懂这是在干什么)</li>
+</ul>
+<p>推荐资料(除了设计模式本身，也包含了其他让你写出高质量代码的资料):</p>
+<ul>
+<li><a href="https://java-design-patterns.com/">Explore, Learn, and Master Industry-Standard Patterns | Java Design Patterns (java-design-patterns.com)</a></li>
+<li><a href="https://ocw.mit.edu/courses/6-005-software-construction-spring-2016/pages/readings/">Readings | Software Construction | Electrical Engineering and Computer Science | MIT OpenCourseWare</a></li>
+</ul>
+<h2 id="缓存—Redis-必学"><a href="#缓存—Redis-必学" class="headerlink" title="缓存—Redis(必学)"></a><a href="https://zh.wikipedia.org/wiki/Redis">缓存—Redis(必学)</a></h2><p>在你使用MySQL的时候不知道你有没有想到过，如果频繁的对于一些经常要访问的数据进行SQL查询是十分浪费性能的(因为数据库是从硬盘里面读取数据到内存中)。</p>
+<p>在业务处理中IO往往是导致处理请求慢的罪魁祸首，所以我们不妨使用一下缓存技术吧，将数据缓存到内存中，然后直接省去了从硬盘中读取这一步！</p>
+<p>要知道缓存经常访问的不易变化的数据对于提升系统性能是有很大帮助的！</p>
+<p>缓存其实和数据库类似，毕竟都是对数据进行存储的，所以一般而言，我们对其的操作也不会超过增删改查。</p>
+<p>但是与关系型数据库不同的是，缓存常常和业务是强耦合的，你需要根据实际的情况判断哪些需要缓存，哪些不需要缓存(对于经常变化的数据，不建议缓存，对于不经常变化的数据，建议缓存)。</p>
+<p>如果你学完之后意犹未尽，不妨看看<a href="https://github.com/ben-manes/caffeine">Caffeine</a>(这是一个很优秀的本地缓存框架)和多级缓存(可以使用<a href="https://zh.wikipedia.org/wiki/Lua">Lua脚本</a>在<a href="https://zh.wikipedia.org/wiki/Nginx">Nginx</a>里构建缓存)。</p>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://redis.io/docs/latest/commands/">Commands | Docs (redis.io)</a></li>
+<li><a href="http://redis.ac.cn/docs/latest/">文档 - Redis 中文</a></li>
+<li><a href="https://redis.com.cn/documentation.html">redis中文文档</a></li>
+</ul>
+<h2 id="性能压测—JMeter-选学，想要测试一下自己程序性能的可以试试"><a href="#性能压测—JMeter-选学，想要测试一下自己程序性能的可以试试" class="headerlink" title="性能压测—JMeter(选学，想要测试一下自己程序性能的可以试试)"></a><a href="https://en.wikipedia.org/wiki/Apache_JMeter">性能压测—JMeter(选学，想要测试一下自己程序性能的可以试试)</a></h2><p>对了，看到这里你可能会问，为什么用了缓存之后，你就知道性能提升了啊？</p>
+<p>没错，我们接下来介绍一下JMeter。</p>
+<p>JMeter就是用来做压测的，你可以多关注一下你加了缓存和没有加缓存的<a href="https://zhuanlan.zhihu.com/p/337708438">QPS</a>分别是多少，这时你就会发现缓存的厉害之处了。</p>
+<p>这个就不用专门去看文档学习了，它只是一个工具，具体的可以去CSDN上看看是怎么实现压测的。</p>
+<p>当然，这里提一下，我们这个压测仅仅只是初略的估计，因为你电脑不可能只跑你的服务，可能会打开一些Edge浏览器窗口，可能会挂着QQ，它们都会占用你电脑的系统资源。</p>
+<p>同时，JMeter发送请求的时候也会占用你电脑的资源(毕竟是你电脑的一个进程)，所以我们这里只是大概看一下自己写的程序的性能罢了。</p>
+<p>要想真正的测试你程序的性能，建议你把你的服务放在一台远程服务器上跑，然后用本地电脑发送JMeter请求，这样测试的相较于上面的就更加精确了。</p>
+<h2 id="消息队列—RabbitMQ-必学"><a href="#消息队列—RabbitMQ-必学" class="headerlink" title="消息队列—RabbitMQ(必学)"></a><a href="https://zh.wikipedia.org/wiki/RabbitMQ">消息队列—RabbitMQ(必学)</a></h2><p>消息是消息，队列是队列，两个合在一起就是消息队列(在队列里存放的是一个一个的消息对象)。</p>
+<p>这项技术主要是用于异步消息，比如说调用一个服务的链路很长，就以订单服务来说，首先创建订单，扣减库存，扣减账户余额，创建完成订单，一下子就调用到了订单服务，库存服务，用户账户服务这三个服务，如果是依次调用的话那么用户可能买完东西后会等好一会才有反应，那么如果链路变的更长呢？</p>
+<p>所以我们急需一种技术可以实现传输和保存消息，将各个服务的请求交由消息队列去处理(这里再举一个小例子，快递员是直接上楼将快递给你快，还是统一将快递交由快递柜快，答案显而易见)。</p>
+<p>消息队列也是同样的设计思想，与其将消息传递给对接的服务，不如解耦，去找一个代理的去异步处理消息。</p>
+<p>消息队列那么多，我该学习哪个呢？</p>
+<ul>
+<li>推荐学习RabbitMQ，主要是因为RabbitMQ比<a href="https://zh.wikipedia.org/wiki/Kafka">Kafka</a>更简单，当然建议感兴趣的可以学学Kafka的设计理念。还有其他的消息队列你可以适当了解，比如<a href="https://zh.wikipedia.org/wiki/Apache_RocketMQ">RocketMQ</a>和<a href="https://zh.wikipedia.org/wiki/Apache_ActiveMQ">ActiveMQ</a>，但它们的社区没有前两者活跃，资料也比较少，所以不是很推荐初学者进行学习</li>
+</ul>
+<p>什么时候使用到它呢？</p>
+<ul>
+<li>当你的<strong>调用链路过长的时候</strong>，你就可以考虑使用消息队列来处理你项目中遇到的问题了</li>
+</ul>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://www.rabbitmq.com/docs">RabbitMQ Documentation | RabbitMQ</a></li>
+<li><a href="https://rabbitmq.org.cn/">RabbitMQ：一个经纪人来管理所有队列 | RabbitMQ 中文</a></li>
+</ul>
+<h2 id="反向代理服务器—Nginx-选学，一般只要了解一下怎么用即可"><a href="#反向代理服务器—Nginx-选学，一般只要了解一下怎么用即可" class="headerlink" title="反向代理服务器—Nginx(选学，一般只要了解一下怎么用即可)"></a><a href="https://zh.wikipedia.org/wiki/Nginx">反向代理服务器—Nginx(选学，一般只要了解一下怎么用即可)</a></h2><p>你是否还在为Tomcat的性能而担忧，那么，来试试使用Nginx吧，Nginx一般使用在<a href="https://zh.wikipedia.org/wiki/Apache_Tomcat">Tomcat</a>的前面，用于抗住较高的并发量。</p>
+<p>一般用于存储前端的静态资源，实现动静分离，屏蔽后面的服务器，实现反向代理。</p>
+<p>如果你要学习Nginx的话，建议你了解一下<a href="https://zh.wikipedia.org/wiki/OpenResty">OpenResty</a>，相较于Nginx，OpenResty的功能更多，而且我们也更容易使用Lua脚本语言来改造，加上一些自己特制的功能，当然<a href="https://zh.wikipedia.org/wiki/Tengine">Tengine</a>也不错。</p>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://nginx.org/en/docs/">nginx documentation</a></li>
+<li><a href="https://nginxserver.cn/en/docs/">nginx 文档 - Nginx 中文 (nginxserver.cn)</a></li>
+<li><a href="https://openresty.org/cn/">OpenResty® - 开源官方站</a></li>
+<li><a href="https://tengine.taobao.org/documentation_cn.html">文档 - The Tengine Web Server (taobao.org)</a></li>
+</ul>
+<h2 id="网路编程—Netty-选学，除非你对于网络编程很感兴趣"><a href="#网路编程—Netty-选学，除非你对于网络编程很感兴趣" class="headerlink" title="网路编程—Netty(选学，除非你对于网络编程很感兴趣)"></a><a href="https://zh.wikipedia.org/wiki/Netty">网路编程—Netty(选学，除非你对于网络编程很感兴趣)</a></h2><p>如果你对于框架底层的网络编程很感兴趣，那么一定要学学Netty，可以说，很多框架的高性能是多亏了它。</p>
+<p>可以说Netty才是集Java并发的大成者，它才是Java真正的高并发，有兴趣的可以了解一下，个人觉得难度还是不小的。</p>
+<p>也许你觉得它和你太过遥远，其实不然，Redis客户端用过Netty，<a href="https://zh.wikipedia.org/wiki/Elasticsearch">Elasticsearch</a>底层使用的是Netty，很多微服务框架底层使用的也是Netty，比如<a href="https://zh.wikipedia.org/wiki/%E5%BE%AE%E6%9C%8D%E5%8B%99">Spring Cloud</a>、<a href="https://cn.dubbo.apache.org/zh-cn/">Dubbo</a>等，Netty的高性能使得很多框架都喜欢使用它。</p>
+<h2 id="微服务框架—SpringCloud-必学"><a href="#微服务框架—SpringCloud-必学" class="headerlink" title="微服务框架—SpringCloud(必学)"></a><a href="https://zh.wikipedia.org/wiki/%E5%BE%AE%E6%9C%8D%E5%8B%99">微服务框架—SpringCloud(必学)</a></h2><p>微服务，什么是微服务，微服务就是将原来巨大的单体服务拆分成一个个职责明确、功能独立的细小模块，然后再将这些模块分别部署到服务器上。</p>
+<p>那么，为什么会出现微服务呢？</p>
+<ul>
+<li>答案很简单，当你的项目不断的增加新的需求变的越来越大，越复杂时，总有一天会迎来被拆分的结局。就类似于大学物理，为了你更好理解，会将对应的章节拆分开，分成第几章第几节，不会说直接一大坨没有目录没有拆分的让你学。对于程序员也是一样，如果一个项目越来越庞大，那么为了使开发效率变高，必然会将一个庞大的项目拆分成一个个功能独立的小模块</li>
+</ul>
+<p>推荐学习的路线：</p>
+<ul>
+<li>先学习Dubbo，因为Dubbo对于底层的封装更少，可以使你快速的了解到<a href="https://blog.csdn.net/weixin_42046751/article/details/109510811">分布式</a>，<a href="https://zh.wikipedia.org/wiki/%E9%81%A0%E7%A8%8B%E9%81%8E%E7%A8%8B%E8%AA%BF%E7%94%A8">RPC</a>，然后再是Spring Cloud和<a href="https://github.com/alibaba/spring-cloud-alibaba">Spring Cloud Alibaba</a>，因为后两者对于底层的封装太完善了，如果直接学很有可能使你不知道一下子是怎么来的</li>
+</ul>
+<p>组件那么多，我该先学哪些？</p>
+<ul>
+<li>其实我觉得比较重要的组件是Consul &#x2F; Nacos服务注册中心，OpenFeign远程服务调用，Gateway服务网关，Sentinel熔断限流，Seata分布式事务，Micrometer Tracing服务链路追踪 + Zipkin 链路可视化</li>
+<li>可能你会了解到一些其他的组件和我这里说的不一样，比如这里的Micrometer Tracing，以前是Sleuth，不过现在有点过时了，因为微服务作为一个新兴领域发展的很快嘛，所以一些组件可能过了一段事件之后就会变化，所以我们没有必要同一种类型的技术学那么多，学好一种，到时候直接带着原有的知识迁移就行了</li>
+</ul>
+<h2 id="容器—Docker-必学"><a href="#容器—Docker-必学" class="headerlink" title="容器—Docker(必学)"></a><a href="https://zh.wikipedia.org/wiki/Docker">容器—Docker(必学)</a></h2><p>当你想要在你的服务器上运行你自己的项目时，你会发现，你要配置对应的环境，而且自己的项目没有一个统一的工具进行管理。</p>
+<p>那么为什么我们不能将这个流程自动化呢？毕竟计算机就是解放人类的，如果你想要减轻自己配置环境的负担而且不想因为自己小测试需要的环境污染整个计算机环境，那么Docker将会是你的一个不错的选择。</p>
+<p>Docker主要做的是将你的项目和你项目所需的环境进行封装，可以使我们的程序直接在Linux服务器上跑，省去了我们亲自配置环境的麻烦事(直接写好一个<a href="https://zh.wikipedia.org/wiki/Docker#Dockerfile">Dockerfile</a>就行了)，而且由于其很好的隔离性，不会使得程序之间相互影响。</p>
+<p>主要是多练练相关的命令，可以试着将自己的项目采用Docker的方式部署在虚拟机上试试，或者使用WSL2，这也是一个不错的选择。</p>
+<p>推荐文档和仓库:</p>
+<ul>
+<li><a href="https://docs.docker.com/">Docker Docs</a></li>
+<li><a href="https://docker.github.net.cn/">Docker中文网 (github.net.cn)</a></li>
+<li><a href="https://hub.docker.com/">Docker Hub Container Image Library | App Containerization</a></li>
+</ul>
+<h2 id="容器编排—Kubernetes-选学，有自动化部署集成需求的学"><a href="#容器编排—Kubernetes-选学，有自动化部署集成需求的学" class="headerlink" title="容器编排—Kubernetes(选学，有自动化部署集成需求的学)"></a><a href="https://zh.wikipedia.org/wiki/Kubernetes">容器编排—Kubernetes(选学，有自动化部署集成需求的学)</a></h2><p>当你的容器启动的越来越多时，再采用原始的手动控制容器已经不适合了，毕竟你也不想将时间浪费在容器的起起停停上吧，于是我们有了更加自动化的工具Kubernetes，帮助我们对这些容器进行管理。</p>
+<p>这里说说我一开始使用Kubernetes遇到的问题：</p>
+<ul>
+<li>不要直接在笔记本上部署完整的Kubkernetes集群，要不然你的电脑可能会承受不住直接死机，对于性能较差的笔记本电脑来说，部署<a href="https://kubernetes.io/zh-cn/docs/tutorials/hello-minikube/">Minikube</a>或<a href="https://docs.k3s.io/zh/">K3s</a>是一个更加明知的选择(比起Kubkernetes来说更加轻量)，毕竟我们只是想学习它，不是非要部署一个完整的才行</li>
+</ul>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://kubernetes.io/zh-cn/docs/home/">Kubernetes 文档 | Kubernetes</a></li>
+<li><a href="https://kubernetes.ac.cn/">Kubernetes (K8s) 中文</a></li>
+</ul>
+<h2 id="CI-CD—Jenkins-选学，有自动化部署集成需求的学"><a href="#CI-CD—Jenkins-选学，有自动化部署集成需求的学" class="headerlink" title="CI &#x2F; CD—Jenkins(选学，有自动化部署集成需求的学)"></a><a href="https://zh.wikipedia.org/zh-cn/Jenkins_(%E8%BD%AF%E4%BB%B6)">CI &#x2F; CD—Jenkins(选学，有自动化部署集成需求的学)</a></h2><p>不知道各位有没有使用过<a href="https://zh.wikipedia.org/wiki/GitHub_Pages">Github Pages</a>这个功能，每次你将最新的静态网站代码交上Github之后，再次访问自己的网站就会发现内容更新了，那么到底是谁偷偷的为我们做了哪些本该由我们做的部署呢？</p>
+<p>答案是<a href="https://docs.github.com/zh/actions">Github Actions</a>，GitHub有属于自己的一套<a href="https://zh.wikipedia.org/wiki/CI/CD">CI &#x2F;CD</a>(持续集成，持续交付，简单的理解就是持续交代码，持续帮你部署发布)。</p>
+<p>这里讲讲我在学习Jenkins时遇到的一些问题：</p>
+<ul>
+<li>其实也没有多少，但是一定要注意Jenkins插件对于你下载Jenkins的版本是有要求的，为了较为快乐的学习这个工具，建议使用最新版的Jenkins来学习，至少你不会遇见一些因为插件版本不适配导致的奇怪Bug</li>
+</ul>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://www.jenkins.io/zh/doc/">Jenkins 用户手册</a></li>
+</ul>
+<h2 id="并发编程—JUC-必学"><a href="#并发编程—JUC-必学" class="headerlink" title="并发编程—JUC(必学)"></a><a href="https://www.cnblogs.com/javastack/p/15467349.html">并发编程—JUC(必学)</a></h2><p>都说Java百万并发，千万并发的，其实说的就是Java的JUC，JUC旨在教导你使用计算机有限的资源去应对更多的请求压力，看到这里相信你也明白了，这是属于程序优化的内容。</p>
+<p>建议就是菜就多练，这部分是Java最难的部分之一，没有长时间的实践积累，学习原理，你是拿不下这块内容的。</p>
+<p>推荐网站(建议自己找书看):</p>
+<ul>
+<li><a href="https://zh.singlelogin.re/">Z-Library – 世界上最大的电子图书馆。自由访问知识和文化 (singlelogin.re)</a></li>
+</ul>
+<h2 id="虚拟机—JVM-必学"><a href="#虚拟机—JVM-必学" class="headerlink" title="虚拟机—JVM(必学)"></a><a href="https://zh.wikipedia.org/wiki/Java%E8%99%9A%E6%8B%9F%E6%9C%BA">虚拟机—JVM(必学)</a></h2><p>和上面的JUC一样，都是Java中的大头，对于JVM而言，相信你可能听过JVM调优，没错，又是对Java程序优化，在这里你将学习到如何从JVM的层面了解Java代码，会使你看待Java程序的观点产生质的变化。</p>
+<p>这边建议结合视频和书(《深入理解Java虚拟机（第3版）》)一起看，毕竟这个东西比较枯燥，可能你会看不下去书，还有就是推荐使用<a href="https://arthas.aliyun.com/doc/">Arthas</a>这个工具来帮助我们学习。</p>
+<p>推荐工具和文档(建议自己找书看):</p>
+<ul>
+<li><a href="https://arthas.aliyun.com/doc/commands.html">命令列表 | arthas (aliyun.com)</a></li>
+<li><a href="https://docs.oracle.com/javase/8/docs/technotes/tools/unix/java.html">java (oracle.com)</a></li>
+<li><a href="https://zh.singlelogin.re/">Z-Library – 世界上最大的电子图书馆。自由访问知识和文化 (singlelogin.re)</a></li>
+</ul>
+<h2 id="任务调度—XXL-JOB-选学，一般了解即可"><a href="#任务调度—XXL-JOB-选学，一般了解即可" class="headerlink" title="任务调度—XXL-JOB(选学，一般了解即可)"></a><a href="https://github.com/xuxueli/xxl-job">任务调度—XXL-JOB(选学，一般了解即可)</a></h2><p>任务交由谁来执行呢，定时任务该怎么做，如果你有这样的需求，那么XXL-JOB一定对你的胃口。</p>
+<p>个人感觉和RabbitMQ的功能比较类似，但是比起RabbitMQ，XXL-JOB在实际的项目使用中更加轻量化。</p>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://www.xuxueli.com/xxl-job/">分布式任务调度平台XXL-JOB (xuxueli.com)</a></li>
+</ul>
+<h2 id="搜索引擎—Elasticsearch-选学，等你项目需要搜索功能的时候再学"><a href="#搜索引擎—Elasticsearch-选学，等你项目需要搜索功能的时候再学" class="headerlink" title="搜索引擎—Elasticsearch(选学，等你项目需要搜索功能的时候再学)"></a><a href="https://zh.wikipedia.org/wiki/Elasticsearch">搜索引擎—Elasticsearch(选学，等你项目需要搜索功能的时候再学)</a></h2><p>这个其实也和数据库比较像，想想你平时搜索，如果匹配到了是会高亮的，或者说，不是完全匹配也可以找到数据，其实这都是它的功劳(比如你搜索笔记电脑，但是很明显，没有这个东西，可能是你打掉了一个字，但是搜索的时候依然可以搜索出来笔记本电脑)。</p>
+<p>为要搜索的数据建立索引，主要用于快速搜索。</p>
+<p>这个Elasticsearch是<a href="https://www.elastic.co/cn/elastic-stack/">ELK</a>的一部分，其中<a href="https://en.wikipedia.org/wiki/Kibana">Kibana</a>可以可视化你存在Elasticsearch中的数据，而且还提供了一个写<a href="https://zh.wikipedia.org/wiki/%E9%A2%86%E5%9F%9F%E7%89%B9%E5%AE%9A%E8%AF%AD%E8%A8%80">DSL</a>语句的页面，有点类似HttpClient。</p>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://www.elastic.co/docs">Documentation (elastic.co)</a></li>
+</ul>
+<h2 id="链路追踪—SkyWalking-选学，除非你的项目很大，链路层级很深"><a href="#链路追踪—SkyWalking-选学，除非你的项目很大，链路层级很深" class="headerlink" title="链路追踪—SkyWalking(选学，除非你的项目很大，链路层级很深)"></a><a href="https://skywalking.apache.org/">链路追踪—SkyWalking(选学，除非你的项目很大，链路层级很深)</a></h2><p>当你链路长了的时候推荐使用，主要是帮助你分析调用链路的，比如是在哪里调用出现了问题，哪里的请求处理耗时太长等等。</p>
+<p>这个你也可以不用学，因为我们之前已经学习了Micrometer Tracing服务链路追踪，已经学习了一个链路追踪的组件了，如果你学了一个的话，其实也没有必要学习太多，学好一个就行了。</p>
+<p>推荐网站:</p>
+<ul>
+<li><a href="https://skywalking.apache.org/">Apache SkyWalking</a></li>
+<li><a href="https://skywalking.apache.org/zh/2020-04-19-skywalking-quick-start/">SkyWalking 极简入门 | Apache SkyWalking</a></li>
+</ul>
+<h2 id="读写分离—ShardingSphere-MyCat-选学，除非你的项目一个数据库不够用"><a href="#读写分离—ShardingSphere-MyCat-选学，除非你的项目一个数据库不够用" class="headerlink" title="读写分离—ShardingSphere &#x2F; MyCat(选学，除非你的项目一个数据库不够用)"></a><a href="https://shardingsphere.apache.org/index_zh.html">读写分离—ShardingSphere &#x2F;</a> <a href="http://www.mycat.org.cn/">MyCat(选学，除非你的项目一个数据库不够用)</a></h2><p>可以帮助你实现读写分离，分库分表，一般是在你一个数据库不够应对现有并发量的情况下使用，否则不建议学习，建议有需要了再学习。</p>
+<p>这个建议直接看官方文档，主要是官方文档写的比较精炼，而且基本上照着文档上面说的配置一般都没有什么问题，不过要注意使用的数据库连接客户端的版本不能太低，要不然会产生不兼容的问题。</p>
+<p>至于这两个我们到底要选择哪一个，我推荐学习使用ShardingSphere，因为它的社区更活跃，功能更多，比MyCat更加完善。</p>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://shardingsphere.apache.org/document/current/cn/overview/">概览 :: ShardingSphere (apache.org)</a></li>
+</ul>
+<h2 id="同步数据—Canal-选学，建议了解即可，毕竟我们也不是要做运维人员"><a href="#同步数据—Canal-选学，建议了解即可，毕竟我们也不是要做运维人员" class="headerlink" title="同步数据—Canal(选学，建议了解即可，毕竟我们也不是要做运维人员)"></a><a href="https://github.com/alibaba/canal">同步数据—Canal(选学，建议了解即可，毕竟我们也不是要做运维人员)</a></h2><p>主要是为了解决主从数据库数据的同步问题，一般要用的话会配合MySQL使用。</p>
+<h2 id="存图片—OSS-选学，建议当你遇到存图片的需求的时候再去有针对性的学"><a href="#存图片—OSS-选学，建议当你遇到存图片的需求的时候再去有针对性的学" class="headerlink" title="存图片—OSS(选学，建议当你遇到存图片的需求的时候再去有针对性的学)"></a><a href="https://www.aliyun.com/product/oss">存图片—OSS(选学，建议当你遇到存图片的需求的时候再去有针对性的学)</a></h2><p>嗯，想想看，当你有了一个用户系统，然后每一个用户都会上传自己的头像，随着用户越来越多，你会发现这些图片好像浪费了你服务器的很多空间，那么你有没有考虑过将图片存储在其他人的服务器上以避免这种情况呢？</p>
+<p>如果你想优化一下，那么不妨试一试阿里云的OSS云存储吧，免费又实用。</p>
+<p>推荐网站:</p>
+<ul>
+<li><a href="https://www.aliyun.com/">阿里云-计算，为了无法计算的价值 (aliyun.com)</a></li>
+</ul>
+<h2 id="超好用的工具包—Hutool-必学"><a href="#超好用的工具包—Hutool-必学" class="headerlink" title="超好用的工具包—Hutool(必学)"></a><a href="https://www.hutool.cn/docs/#/">超好用的工具包—Hutool(必学)</a></h2><p>你是不是在为有时候没有好用的工具而烦恼，又或者是自己写的小工具总是有Bug，那么不妨尝试一下这款工具包吧，里面包含了对文件、流、加密解密、转码、正则、线程、XML等JDK方法的封装，用起来既方便又安全。</p>
+<p>推荐文档:</p>
+<ul>
+<li><a href="https://hutool.cn/">Hutool🍬一个功能丰富且易用的Java工具库，涵盖了字符串、数字、集合、编码、日期、文件、IO、加密、数据库JDBC、JSON、HTTP客户端等功能</a></li>
+</ul>
+<h2 id="笔者最后想说的话"><a href="#笔者最后想说的话" class="headerlink" title="笔者最后想说的话"></a>笔者最后想说的话</h2><p>什么？你竟然看到这里来了，那么不管怎么说，你一定是热爱技术的，不过我想在此提提我学了这么久的一些心得体会：</p>
+<ul>
+<li>框架是为了解决问题而出现的，我们不应该痴迷于学框架，而是应该把自己的基础搞扎实，比如多看看类似<a href="https://book.douban.com/subject/1148282/">SICP</a>这样的书籍。所以一般推荐你遇到了相应的问题再去找框架解决，而不是盲目的去找框架学习。还有就是记住一点，框架会不停的变化，但是它们底层设计的思想一般是不会变化的(所以我们没有必要每一个都学，学一个经典的其他的都差不多了，感兴趣再多了解一下就行)</li>
+<li>我们要锻炼自己看文档的能力。就以我为例吧，我之前学习的时候总是去在B站上找视频看，但是后来我发现这样学习的效率实在是太低了，于是开始慢慢尝试去看一些中文文档去学习（上面的ShardingSphere我就是照着文档学习的），你会发现，当你会通过文档学习之后，学习的速度会变的非常快</li>
+<li>善于使用搜索平台。Stack Overflow和Github是你的好帮手，前者可以搜问题，后者可以找代码</li>
+<li>不要过于依赖别人的回答。有时候，别人的回答效率还不如你自己去解决这个问题的效率高，建议是在自己的程序出现Bug之后，先自己在网上搜，用GPT问，各种Debug的方法尝试了，自己实在是解决不了了再去问，关于问问题的规范可以看看这个<a href="https://github.com/ryanhanwu/How-To-Ask-Questions-The-Smart-Way/blob/main/README-zh_CN.md">How-To-Ask-Questions-The-Smart-Way</a></li>
+</ul>
+<p>最后的最后，能帮作者点一个<a href="https://github.com/z0l0y/My-Backend-Learning-Journey">star</a>吗？举手之劳万分感谢。</p>
 ]]></content>
-      <categories>
-        <category>Linux</category>
-      </categories>
-      <tags>
-        <tag>Linux</tag>
-        <tag>Java</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Linux服务器编译部署的流程</title>
-    <url>/2024/03/11/%E7%BC%96%E8%AF%91%E9%83%A8%E7%BD%B2%E7%9A%84%E6%B5%81%E7%A8%8B/</url>
-    <content><![CDATA[<h1 id="编译部署的流程"><a href="#编译部署的流程" class="headerlink" title="编译部署的流程"></a>编译部署的流程</h1><h2 id="1-写完后端代码，并且编译无误后，通过Maven来package项目，得到项目的jar包。"><a href="#1-写完后端代码，并且编译无误后，通过Maven来package项目，得到项目的jar包。" class="headerlink" title="1.写完后端代码，并且编译无误后，通过Maven来package项目，得到项目的jar包。"></a><strong>1.写完后端代码，并且编译无误后，通过Maven来package项目，得到项目的jar包。</strong></h2><h2 id="2-在Ubuntu服务器上部署数据库MariaDB，并且创建DB用户，设置密码。"><a href="#2-在Ubuntu服务器上部署数据库MariaDB，并且创建DB用户，设置密码。" class="headerlink" title="2.在Ubuntu服务器上部署数据库MariaDB，并且创建DB用户，设置密码。"></a><strong>2.在Ubuntu服务器上部署数据库MariaDB，并且创建DB用户，设置密码。</strong></h2><h2 id="3-安装jdk，配置好Java对应的环境，使jar包可以正常运行即可。"><a href="#3-安装jdk，配置好Java对应的环境，使jar包可以正常运行即可。" class="headerlink" title="3.安装jdk，配置好Java对应的环境，使jar包可以正常运行即可。"></a><strong>3.安装jdk，配置好Java对应的环境，使jar包可以正常运行即可。</strong></h2><h2 id="4-将本地的数据库进行dump，修改字符编码为utf8mb4-general-ci，得到data-sql文件，并上传到服务器，便于进行建表操作。进入MariaDB，建立数据库，将data-sql导入数据库，成功建表。"><a href="#4-将本地的数据库进行dump，修改字符编码为utf8mb4-general-ci，得到data-sql文件，并上传到服务器，便于进行建表操作。进入MariaDB，建立数据库，将data-sql导入数据库，成功建表。" class="headerlink" title="4.将本地的数据库进行dump，修改字符编码为utf8mb4_general_ci，得到data.sql文件，并上传到服务器，便于进行建表操作。进入MariaDB，建立数据库，将data.sql导入数据库，成功建表。"></a><strong>4.将本地的数据库进行dump，修改字符编码为utf8mb4_general_ci，得到data.sql文件，并上传到服务器，便于进行建表操作。进入MariaDB，建立数据库，将data.sql导入数据库，成功建表。</strong></h2><h2 id="5-在服务器上创建backend的文件夹，将jar包上传到服务器，并且写start-sh和stop-sh脚本，定义日志文件路径，便于查看出现的问题"><a href="#5-在服务器上创建backend的文件夹，将jar包上传到服务器，并且写start-sh和stop-sh脚本，定义日志文件路径，便于查看出现的问题" class="headerlink" title="5.在服务器上创建backend的文件夹，将jar包上传到服务器，并且写start.sh和stop.sh脚本，定义日志文件路径，便于查看出现的问题"></a><strong>5.在服务器上创建backend的文件夹，将jar包上传到服务器，并且写start.sh和stop.sh脚本，定义日志文件路径，便于查看出现的问题</strong></h2><h2 id="6-部署成功"><a href="#6-部署成功" class="headerlink" title="6.部署成功"></a><strong>6.部署成功</strong></h2>]]></content>
-      <categories>
-        <category>Linux</category>
-      </categories>
-      <tags>
-        <tag>Java</tag>
-        <tag>Maven</tag>
-        <tag>Ubuntu</tag>
-        <tag>MariaDB</tag>
-        <tag>shell脚本</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Linux服务器配置MySQL</title>
-    <url>/2024/03/11/2/</url>
-    <content><![CDATA[<h1 id="配置MySQL"><a href="#配置MySQL" class="headerlink" title="配置MySQL"></a>配置MySQL</h1><h2 id="在-Linux-上配置-MySQL-的过程如下：-注意一定要在第一次进去的时候就设置好root用户的密码，要不然后期找临时密码，再修改比较的麻烦"><a href="#在-Linux-上配置-MySQL-的过程如下：-注意一定要在第一次进去的时候就设置好root用户的密码，要不然后期找临时密码，再修改比较的麻烦" class="headerlink" title="在 Linux 上配置 MySQL 的过程如下：(注意一定要在第一次进去的时候就设置好root用户的密码，要不然后期找临时密码，再修改比较的麻烦)"></a>在 Linux 上配置 MySQL 的过程如下：(注意一定要在第一次进去的时候就设置好root用户的密码，要不然后期找临时密码，再修改比较的麻烦)</h2><ol>
-<li><p>安装 MySQL 服务器：</p>
-<p>在终端中运行以下命令以安装 MySQL 服务器：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt update</span><br><span class="line">sudo apt install mysql-server</span><br></pre></td></tr></table></figure>
-
-<p>安装过程中会提示你设置 MySQL root 用户的密码，请确保设置一个安全且易记的密码。</p>
-</li>
-<li><p>配置 MySQL 服务器：</p>
-<p>安装完成后，MySQL 服务器会自动启动，并且会在系统的服务列表中注册为 <code>mysql</code>。你可以使用以下命令来管理 MySQL 服务器：</p>
-<ul>
-<li>启动 MySQL 服务器：<code>sudo systemctl start mysql</code></li>
-<li>停止 MySQL 服务器：<code>sudo systemctl stop mysql</code></li>
-<li>重启 MySQL 服务器：<code>sudo systemctl restart mysql</code></li>
-</ul>
-</li>
-<li><h4 id="连接到-MySQL-服务器："><a href="#连接到-MySQL-服务器：" class="headerlink" title="连接到 MySQL 服务器："></a>连接到 MySQL 服务器：</h4><p>使用以下命令连接到 MySQL 服务器：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysql -u root -p</span><br></pre></td></tr></table></figure>
-
-<p>系统会提示你输入 MySQL root 用户的密码。输入密码后，你将进入 MySQL 服务器的命令行界面。</p>
-</li>
-<li><p>在 MySQL 中创建新用户和数据库：</p>
-<p>在 MySQL 命令行界面中，你可以使用 SQL 语句来创建新用户和数据库。以下是一些常用的命令示例：</p>
-<ul>
-<li><p>创建新用户：</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> <span class="string">&#x27;username&#x27;</span>@<span class="string">&#x27;localhost&#x27;</span> IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;password&#x27;</span>;</span><br><span class="line">请将 `<span class="string">&#x27;username&#x27;</span>`、`<span class="string">&#x27;password&#x27;</span>` 和 `<span class="string">&#x27;database_name&#x27;</span>` 替换为你希望使用的实际值。</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>授予用户访问权限：</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">GRANT</span> <span class="keyword">ALL</span> PRIVILEGES <span class="keyword">ON</span> database_name.<span class="operator">*</span> <span class="keyword">TO</span> <span class="string">&#x27;username&#x27;</span>@<span class="string">&#x27;localhost&#x27;</span>;或</span><br><span class="line"><span class="keyword">grant</span> <span class="keyword">all</span> privileges <span class="keyword">on</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">to</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified <span class="keyword">by</span> <span class="string">&#x27;password&#x27;</span>;flush privileges;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>创建新数据库：</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> DATABASE database_name;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>刷新权限：</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">FLUSH PRIVILEGES;<span class="operator">/</span><span class="operator">/</span>让权限立即生效  </span><br></pre></td></tr></table></figure></li>
-</ul>
-<p><strong>修改my.cnf配置文件</strong> </p>
-<p>这个是mysql的配置文件，如果你无标题文章找不到在哪里的话，可以输入<code>find /* -name my.cnf </code>找到  </p>
-<p>通过vim编辑该文件，找到<code>bind-address  = 127.0.0.1</code>这一句，然后在前面加个#号注释掉，保存退出</p>
-<p><strong>重启服务（这点非常重要，不重启就不能实现远程访问数据库）</strong> </p>
-<figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line">service mysql restart</span><br></pre></td></tr></table></figure>
-
-<p><strong>在本地远程连接</strong> </p>
-<p>在终端输入：  </p>
-<figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line">mysql -h 服务器ip地址 -P <span class="number">3306</span> -u root -p</span><br></pre></td></tr></table></figure>
-
-<p>然后输入密码即可。  </p>
-</li>
-<li><p>退出 MySQL 命令行界面：</p>
-<p>在 MySQL 命令行界面中，使用 <code>exit</code> 命令退出。</p>
-</li>
-</ol>
-<p>现在你已经成功配置了 MySQL 服务器，并可以通过连接到 MySQL 命令行界面来管理数据库和用户。</p>
-<h2 id="那我该怎么远程连接到数据库？"><a href="#那我该怎么远程连接到数据库？" class="headerlink" title="那我该怎么远程连接到数据库？"></a>那我该怎么远程连接到数据库？</h2><p>要远程连接到数据库，你需要确保以下几点：</p>
-<ol>
-<li>数据库服务器已经启动并正在监听正确的端口。默认情况下，MySQL 数据库使用的是端口 3306。确保数据库服务器正在监听该端口。</li>
-<li>数据库服务器的防火墙允许远程连接。如果你的数据库服务器上有防火墙，确保防火墙规则允许来自远程客户端的连接请求通过指定的端口。这通常需要在防火墙配置中打开端口 3306。</li>
-<li>数据库服务器上的数据库用户已经配置允许远程连接。默认情况下，MySQL 数据库中的 root 用户只允许本地连接。如果你想通过远程连接使用 root 用户，你需要在数据库中修改 root 用户的权限，允许远程连接。</li>
-</ol>
-<p>在你的情况下，如果你想通过 SSH 连接到数据库服务器，你可以按照以下步骤进行：</p>
-<ol>
-<li>使用 SSH 连接到远程服务器：运行 <code>ssh root@192.168.88.131</code> 命令，连接到远程服务器。</li>
-<li>在远程服务器上，确保数据库已经启动并监听端口 3306。</li>
-<li>确认数据库服务器的防火墙规则允许来自你的客户端的连接请求通过端口 3306。你可能需要配置防火墙规则以允许这样的连接。</li>
-<li>确保你在数据库服务器上创建了允许远程连接的数据库用户。如果你想使用 root 用户进行远程连接，你需要修改 root 用户的权限以允许远程连接。</li>
-<li>使用 MySQL 客户端工具，比如 <code>mysql</code> 命令行工具，连接到远程数据库服务器。例如，运行 <code>mysql -u username -h 192.168.88.131 -p</code> 命令，其中 <code>username</code> 是你在数据库服务器上创建的允许远程连接的用户名。</li>
-</ol>
-<p>这样，你就可以通过 SSH 连接到远程服务器，并使用适当的数据库客户端工具连接到数据库服务器进行远程数据库访问。请确保在进行远程连接时遵循安全最佳实践，并采取适当的安全措施来保护数据库和服务器的安全性。</p>
-<h2 id="关于localhost"><a href="#关于localhost" class="headerlink" title="关于localhost"></a>关于localhost</h2><p>在 MySQL 中，<code>localhost</code> 是一个特殊的主机名，表示本地主机，即 MySQL 服务器所在的计算机。但是，你可以将 <code>&#39;localhost&#39;</code> 替换为其他主机名或 IP 地址，以允许远程主机连接到 MySQL 服务器。</p>
-<p>以下是一些常见的选项：</p>
-<ol>
-<li><p>允许所有主机连接：</p>
-<p>如果你希望允许任何主机连接到 MySQL 服务器，请使用 <code>%</code> 作为主机名，如下所示：</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> <span class="string">&#x27;myuser&#x27;</span>@<span class="string">&#x27;%&#x27;</span> IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;mypassword&#x27;</span>;</span><br></pre></td></tr></table></figure>
-
-<p>这将为用户 <code>&#39;myuser&#39;</code> 创建一个允许从任何主机连接的帐户。</p>
-</li>
-<li><p>允许指定的 IP 地址连接：</p>
-<p>如果你只想允许特定的 IP 地址连接到 MySQL 服务器，请将 <code>&#39;localhost&#39;</code> 替换为该 IP 地址，如下所示：</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">USER</span> <span class="string">&#x27;myuser&#x27;</span>@<span class="string">&#x27;192.168.0.100&#x27;</span> IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;mypassword&#x27;</span>;</span><br></pre></td></tr></table></figure>
-
-<p>这将为用户 <code>&#39;myuser&#39;</code> 创建一个允许从 IP 地址为 <code>192.168.0.100</code> 的主机连接的帐户。</p>
-</li>
-</ol>
-<p>请根据你的需求选择适当的主机名或 IP 地址，并相应地设置 MySQL 用户。请记住，为了安全起见，最好仅允许需要访问的主机连接到 MySQL 服务器，并使用强密码保护用户帐户。</p>
-<h2 id="为什么会ERROR-1396"><a href="#为什么会ERROR-1396" class="headerlink" title="为什么会ERROR 1396"></a>为什么会ERROR 1396</h2><p>错误消息 “ERROR 1396 (HY000): Operation CREATE USER failed for ‘root‘@’localhost’” 意味着创建用户 ‘root‘@’localhost’ 失败。</p>
-<p>在 MySQL 中，‘root‘@’localhost’ 是默认的超级用户账户，并且在安装 MySQL 时已经存在。由于安全原因，MySQL 不允许通过 CREATE USER 命令创建一个已经存在的用户。</p>
-<p>如果你需要更改 ‘root‘@’localhost’ 用户的密码，可以使用以下命令：</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">ALTER</span> <span class="keyword">USER</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;localhost&#x27;</span> IDENTIFIED <span class="keyword">BY</span> <span class="string">&#x27;new_password&#x27;</span>;</span><br></pre></td></tr></table></figure>
-
-<p>请将 <code>&#39;new_password&#39;</code> 替换为你希望设置的新密码。这将更改 ‘root‘@’localhost’ 用户的密码为新密码。</p>
-<p>请注意，只有具有适当权限的用户才能执行 ALTER USER 命令。如果你没有足够的权限，你可能需要使用具有适当权限的用户账户来执行此操作。</p>
-<p>另外，请确保设置强密码来保护 ‘root‘@’localhost’ 用户账户，以确保 MySQL 服务器的安全性。</p>
-<h2 id="远程访问数据库"><a href="#远程访问数据库" class="headerlink" title="远程访问数据库"></a>远程访问数据库</h2><p>要连接到远程数据库，你需要采取以下步骤：</p>
-<ol>
-<li><p>确保远程数据库服务器可访问：</p>
-<p>确保远程数据库服务器处于运行状态，并且网络上可以访问该服务器。你需要知道远程数据库服务器的 IP 地址或主机名。</p>
-</li>
-<li><p>允许远程连接到数据库服务器：</p>
-<p>默认情况下，MySQL 服务器不允许远程连接。你需要在 MySQL 服务器的配置文件中进行相应的设置，以允许远程连接。配置文件通常是 <code>my.cnf</code> 或 <code>my.ini</code>，注意是在etc的mysql目录下找。</p>
-<p><img src="/2024/03/11/2/image-20240306210605982.png" alt="image-20240306210605982"></p>
-<p>打开配置文件，并找到类似于以下行的配置：</p>
-<figure class="highlight ini"><table><tr><td class="code"><pre><span class="line"><span class="comment">#bind-address = 127.0.0.1</span></span><br></pre></td></tr></table></figure>
-
-<p>将该行的注释 <code>#</code> 去掉，并将 <code>bind-address</code> 设置为 MySQL 服务器所在的 IP 地址：</p>
-<figure class="highlight ini"><table><tr><td class="code"><pre><span class="line"><span class="attr">bind-address</span> = your_server_ip</span><br></pre></td></tr></table></figure>
-
-<p>保存并关闭配置文件，然后重新启动 MySQL 服务器，使更改生效。</p>
-</li>
-<li><p>使用远程连接参数连接到数据库：</p>
-<p>在命令行或脚本中，使用以下命令连接到远程数据库：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysql -h remote_server_ip -P port_number -u username -p</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li><code>remote_server_ip</code>：远程数据库服务器的 IP 地址或主机名。</li>
-<li><code>port_number</code>：MySQL 服务器的端口号。默认情况下，MySQL 使用 3306 端口。</li>
-<li><code>username</code>：连接到 MySQL 的用户名。</li>
-<li><code>-p</code>：提示输入密码。在命令中不指定密码，输入该命令后会要求输入密码。</li>
-</ul>
-<p>例如，如果要使用用户名为 <code>myuser</code>，密码为 <code>mypassword</code> 连接到远程数据库服务器 <code>192.168.1.100</code>，使用默认的 3306 端口，命令如下：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysql -h 192.168.1.100 -P 3306 -u myuser -p</span><br></pre></td></tr></table></figure>
-
-<p>输入上述命令后，系统会提示输入密码。输入密码后，你将连接到远程数据库服务器。</p>
-</li>
-</ol>
-<p>确保你已经完成了上述步骤，并提供正确的远程数据库服务器的 IP 地址、端口号、用户名和密码。这样，你就可以通过远程连接访问数据库了。</p>
-<h2 id="关于ini文件"><a href="#关于ini文件" class="headerlink" title="关于ini文件"></a>关于ini文件</h2><p>INI 文件是一种普遍用于存储配置数据的文件格式。INI 是 “Initialization” 的缩写，它最初用于 Windows 操作系统的配置文件。</p>
-<p>INI 文件具有一种简单的键值对结构，由一系列的节（section）和键值对组成。每个键值对由一个键（key）和一个值（value）组成，它们通过等号（&#x3D;）或冒号（:）进行分隔。节提供了对键值对进行逻辑分组的一种方式。</p>
-<p>以下是一个简单的示例 INI 文件的结构：</p>
-<figure class="highlight ini"><table><tr><td class="code"><pre><span class="line"><span class="comment">; 这是注释</span></span><br><span class="line"><span class="section">[section1]</span></span><br><span class="line"><span class="attr">key1</span> = value1</span><br><span class="line"><span class="attr">key2</span> = value2</span><br><span class="line"></span><br><span class="line"><span class="section">[section2]</span></span><br><span class="line"><span class="attr">key3</span> = value3</span><br><span class="line"><span class="attr">key4</span> = value4</span><br></pre></td></tr></table></figure>
-
-<p>在上面的示例中，文件包含两个节（section1 和 section2）。每个节下面有一些键值对。注释以分号（;）开头，用于提供对配置的解释或说明。</p>
-<p>INI 文件在多个应用程序和操作系统中被广泛使用，用于存储程序的配置选项、用户首选项和其他相关设置。它们通常是纯文本文件，可以使用文本编辑器进行编辑。</p>
-<p>虽然 INI 文件最初是与 Windows 相关的，但现在它已经成为许多不同操作系统和编程语言的通用配置文件格式。</p>
-<h2 id="mysqld是什么？"><a href="#mysqld是什么？" class="headerlink" title="mysqld是什么？"></a>mysqld是什么？</h2><p><code>mysqld</code> 是 MySQL 数据库服务器的守护进程或服务进程。</p>
-<p><code>mysqld</code> 是 MySQL 服务器的主要组件，负责处理客户端的连接请求、执行 SQL 查询、管理数据库和数据等操作。它是一个长时间运行的进程，通过监听网络端口或套接字接受来自客户端的连接，并提供对 MySQL 数据库的访问。</p>
-<p>当你安装和启动 MySQL 数据库服务器时，实际上就是启动 <code>mysqld</code> 进程。具体启动 <code>mysqld</code> 进程的方式取决于你所使用的操作系统和安装方式。</p>
-<p>在 Linux 或 macOS 系统上，你可以使用 <code>systemctl</code> 或 <code>service</code> 命令来管理 <code>mysqld</code> 进程的启动、停止和重启。例如：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 启动 MySQL 服务</span></span><br><span class="line">sudo systemctl start mysqld</span><br><span class="line"></span><br><span class="line"><span class="comment"># 停止 MySQL 服务</span></span><br><span class="line">sudo systemctl stop mysqld</span><br><span class="line"></span><br><span class="line"><span class="comment"># 重启 MySQL 服务</span></span><br><span class="line">sudo systemctl restart mysqld</span><br></pre></td></tr></table></figure>
-
-<p>在 Windows 系统上，你可以通过服务管理界面或使用命令行来启动、停止和重启 <code>mysqld</code> 进程。</p>
-<p><code>mysqld</code> 进程的配置信息通常存储在 MySQL 的配置文件中，例如 <code>my.cnf</code> 或 <code>my.ini</code>。在配置文件中，你可以指定服务器的端口、数据存储路径、日志文件路径、内存设置等参数。这样，你可以根据需要对 <code>mysqld</code> 进程进行自定义配置。</p>
-<p>总之，<code>mysqld</code> 是 MySQL 数据库服务器的守护进程或服务进程，负责处理客户端请求、执行数据库操作，并提供对 MySQL 数据库的访问</p>
-<h2 id="查看默认用户的密码"><a href="#查看默认用户的密码" class="headerlink" title="查看默认用户的密码"></a>查看默认用户的密码</h2><p><img src="/2024/03/11/2/image-20240306212449294.png" alt="image-20240306212449294"></p>
-<p><img src="/2024/03/11/2/image-20240306212731913.png" alt="image-20240306212731913"></p>
-<h2 id="查看所有用户的信息"><a href="#查看所有用户的信息" class="headerlink" title="查看所有用户的信息"></a>查看所有用户的信息</h2><p>要查看当前 MySQL 数据库中有多少用户，你可以执行以下步骤：</p>
-<ol>
-<li><p>使用合适的 MySQL 客户端连接到 MySQL 服务器。你可以在命令行上使用 <code>mysql</code> 命令，或者使用图形化工具如 phpMyAdmin 或 MySQL Workbench。</p>
-</li>
-<li><p>连接成功后，在 MySQL 客户端中执行以下 SQL 查询语句：</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="keyword">user</span> <span class="keyword">FROM</span> mysql.user;</span><br></pre></td></tr></table></figure>
-
-<p>这将返回一个结果集，其中包含了所有在 MySQL 数据库中定义的用户列表。</p>
-<p>如果你只想要返回用户的数量，可以使用 <code>COUNT(*)</code> 聚合函数：</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="built_in">COUNT</span>(<span class="operator">*</span>) <span class="keyword">AS</span> user_count <span class="keyword">FROM</span> mysql.user;</span><br></pre></td></tr></table></figure>
-
-<p>这将返回一个名为 <code>user_count</code> 的列，其中显示了用户的数量。</p>
-<p>或者是</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> host,<span class="keyword">user</span> <span class="keyword">from</span> mysql.user;</span><br></pre></td></tr></table></figure></li>
-</ol>
-<h2 id="identified-by报错"><a href="#identified-by报错" class="headerlink" title="identified by报错"></a>identified by报错</h2><p>以上查询将返回 MySQL 数据库中所有用户的列表或用户数量。请注意，这些查询需要具有足够权限的用户才能执行。如果你无法执行这些查询，请确保你使用的用户具有足够的权限来查看用户列表。</p>
-<p>MySQL版本8.0.21，在给新用户授权时，执行如下语句：</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">grant</span> <span class="keyword">all</span> privileges <span class="keyword">on</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">to</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified <span class="keyword">by</span> <span class="string">&#x27;123456&#x27;</span> <span class="keyword">with</span> <span class="keyword">grant</span> option;</span><br><span class="line"><span class="number">1</span></span><br></pre></td></tr></table></figure>
-
-<p>报错如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near &#x27;identified by  &#x27;password&#x27; with grant option&#x27;</span><br><span class="line">1</span><br></pre></td></tr></table></figure>
-
-<p>原因分析 ：高版本的MySQL把将创建账户和赋予权限分开了。</p>
-<p>解决方法：分开执行。</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">#创建账户</span><br><span class="line"><span class="keyword">create</span> <span class="keyword">user</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;%&#x27;</span> identified <span class="keyword">by</span> <span class="string">&#x27;123456&#x27;</span>;</span><br><span class="line"></span><br><span class="line">#赋予权限</span><br><span class="line"><span class="keyword">grant</span> <span class="keyword">all</span> privileges <span class="keyword">on</span> <span class="operator">*</span>.<span class="operator">*</span> <span class="keyword">to</span> <span class="string">&#x27;root&#x27;</span>@<span class="string">&#x27;%&#x27;</span> <span class="keyword">with</span> <span class="keyword">grant</span> option;</span><br><span class="line"></span><br><span class="line">#刷新</span><br><span class="line">flush privileges;</span><br></pre></td></tr></table></figure>
-
-<h2 id="查看当前用户"><a href="#查看当前用户" class="headerlink" title="查看当前用户"></a>查看当前用户</h2><figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">select</span> <span class="built_in">current_user</span>();</span><br></pre></td></tr></table></figure>
-
-<p><img src="/2024/03/11/2/1151002-20170525190717763-60562880.png" alt="img"></p>
-<h2 id="mysql远程连接只显示部分数据库问题-叶落之秋-博客园-cnblogs-com"><a href="#mysql远程连接只显示部分数据库问题-叶落之秋-博客园-cnblogs-com" class="headerlink" title="mysql远程连接只显示部分数据库问题 - 叶落之秋 - 博客园 (cnblogs.com)"></a><a href="https://www.cnblogs.com/gengsc/p/6905536.html">mysql远程连接只显示部分数据库问题 - 叶落之秋 - 博客园 (cnblogs.com)</a></h2><h2 id="查看用户权限"><a href="#查看用户权限" class="headerlink" title="查看用户权限"></a>查看用户权限</h2><figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">show</span> grants <span class="keyword">from</span> <span class="built_in">current_user</span>();</span><br></pre></td></tr></table></figure>
-
-<p><img src="/2024/03/11/2/1151002-20170525190835091-1440680625.png" alt="img"></p>
-<p>我们再查看huohe用户对远程主机的授权。</p>
-<p><img src="/2024/03/11/2/1151002-20170725100148656-2029272290.png" alt="img"></p>
-<h1 id="成功"><a href="#成功" class="headerlink" title="成功"></a>成功</h1>]]></content>
-      <categories>
-        <category>Linux</category>
-      </categories>
-      <tags>
-        <tag>Linux</tag>
-        <tag>MySQL</tag>
-      </tags>
   </entry>
 </search>
