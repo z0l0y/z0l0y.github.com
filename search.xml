@@ -328,6 +328,207 @@
       </tags>
   </entry>
   <entry>
+    <title>事务隔离：为什么你改了我还看不见？</title>
+    <url>/2024/09/09/MySQL03/</url>
+    <content><![CDATA[<p>提到事务，你肯定不陌生，和数据库打交道的时候，我们总是会用到事务。最经典的例子就是转账，你要给朋友小王转100块钱，而此时你的银行卡只有100块钱。</p>
+<p>转账过程具体到程序里会有一系列的操作，比如查询余额、做加减法、更新余额等，这些操作必须保证是一体的，不然等程序查完之后，还没做减法之前，你这100块钱，完全可以借着这个时间差再查一次，然后再给另外一个朋友转账，如果银行这么整，不就乱了么？这时就要用到“事务”这个概念了。</p>
+<p><strong>简单来说，事务就是要保证一组数据库操作，要么全部成功，要么全部失败。</strong>在MySQL中，<strong>事务支持是在引擎层实现的。</strong>你现在知道，MySQL是一个支持多引擎的系统，但并不是所有的引擎都支持事务。<strong>比如MySQL原生的MyISAM引擎就不支持事务，这也是MyISAM被InnoDB取代的重要原因之一。</strong></p>
+<p>今天的文章里，我将会以InnoDB为例，剖析MySQL在事务支持方面的特定实现，并基于原理给出相应的实践建议，希望这些案例能加深你对MySQL事务原理的理解。</p>
+<h3 id="隔离性与隔离级别"><a href="#隔离性与隔离级别" class="headerlink" title="隔离性与隔离级别"></a>隔离性与隔离级别</h3><p>提到事务，你肯定会想到<strong>ACID（Atomicity、Consistency、Isolation、Durability，即原子性、一致性、隔离性、持久性）</strong>，今天我们就来说说其中I，也就是“隔离性”。</p>
+<p>当数据库上有多个事务同时执行的时候，就可能出现<strong>脏读（dirty read）、不可重复读（non-repeatable read）、幻读（phantom read）的问题</strong>，为了解决这些问题，就有了“隔离级别”的概念。（简单的说，隔离级别是对于事务而言的，隔离的是事务不是其他的东西）</p>
+<p>在谈隔离级别之前，你首先要知道，你<strong>隔离得越严实，效率就会越低</strong>。因此很多时候，我们都要在二者之间寻找一个平衡点。<strong>SQL标准的事务隔离级别包括：读未提交（read uncommitted）、读提交（read committed）、可重复读（repeatable read）和串行化（serializable ）。</strong>下面我逐一为你解释：</p>
+<ul>
+<li><strong>读未提交</strong>是指：一个事务还<strong>没提交</strong>时，它做的变更<strong>就能被别的事务看到</strong>。（可以读到别人没有提交的事务，等同于考试的时候可以直接看到别人试卷的答案）</li>
+<li><strong>读提交</strong>是指：一个事务提交之后，它做的变更才会被其他事务看到。（你提交试卷之后我才能看到你的答案）</li>
+<li><strong>可重复读</strong>是指：<strong>一个事务执行过程中看到的数据，总是跟这个事务在启动时看到的数据是一致的</strong>。当然在可重复读隔离级别下，未提交变更对其他事务也是不可见的。（始终相信自己最开始见到的数据是不会变化的，可以重复读取到最开始的值）</li>
+<li><strong>串行化</strong>：顾名思义是对于同一行记录，“写”会加“写锁”，“读”会加“读锁”。<strong>当出现读写锁冲突的时候，后访问的事务必须等前一个事务执行完成，才能继续执行。</strong>（<strong>串行就是排队等待，排成一行</strong>）</li>
+</ul>
+<p>其中“读提交”和“可重复读”比较难理解，所以我用一个例子说明这几种隔离级别。假设数据表T中只有一列，其中一行的值为1，下面是按照时间顺序执行两个事务的行为。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; create table T(c int) engine=InnoDB;</span><br><span class="line">insert into T(c) values(1);</span><br></pre></td></tr></table></figure>
+
+<p>我们来看看在不同的隔离级别下，事务A会有哪些不同的返回结果，也就是图里面V1、V2、V3的返回值分别是什么。</p>
+<p><img src="/2024/09/09/MySQL03/image-20240909200825360.png" alt="image-20240909200825360"></p>
+<ul>
+<li><strong>若隔离级别是“读未提交”， 则V1的值就是2。这时候事务B虽然还没有提交，但是结果已经被A看到了。</strong>因此，V2、V3也都是2。</li>
+<li>若隔离级别是“读提交”，则V1是1，V2的值是2。<strong>事务B的更新在提交后才能被A看到。</strong>所以， V3的值也是2。</li>
+<li>若隔离级别是“可重复读”，则V1、V2是1，V3是2。之所以V2还是1，遵循的就是这个要求：<strong>事务在执行期间看到的数据前后必须是一致的。</strong></li>
+<li>若隔离级别是“串行化”，<strong>则在事务B执行“将1改成2”的时候，会被锁住。直到事务A提交后，事务B才可以继续执行。</strong>所以从A的角度看， V1、V2值是1，V3的值是2。</li>
+</ul>
+<p>在实现上，数据库里面会<strong>创建一个视图</strong>，访问的时候<strong>以视图的逻辑结果为准</strong>。（视图的作用体现在这里了）</p>
+<ul>
+<li>在“可重复读”隔离级别下，<strong>这个视图是在事务启动时创建的，整个事务存在期间都用这个视图。</strong></li>
+<li>在“读提交”隔离级别下，<strong>这个视图是在每个SQL语句开始执行的时候创建的。</strong></li>
+<li>这里需要注意的是，<strong>“读未提交”隔离级别下直接返回记录上的最新值，没有视图概念。</strong></li>
+<li>而“串行化”隔离级别下<strong>直接用加锁的方式来避免并行访问。</strong></li>
+</ul>
+<p>我们可以看到在不同的隔离级别下，数据库行为是有所不同的。<strong>Oracle数据库的默认隔离级别其实就是“读提交”，因此对于一些从Oracle迁移到MySQL的应用，为保证数据库隔离级别的一致，你一定要记得将MySQL的隔离级别设置为“读提交”。（MySQL 的默认事务隔离级别是 <strong>REPEATABLE READ</strong>（可重复读））</strong></p>
+<p>配置的方式是，<strong>将启动参数transaction-isolation的值设置成READ-COMMITTED</strong>。你可以用show variables来查看当前的值。（这个输出的东西很多，你可以指定输出流输入到一个文件中看看）</p>
+<p><img src="/2024/09/09/MySQL03/image-20240909201622812.png" alt="image-20240909201622812"></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; show variables like &#x27;transaction_isolation&#x27;;</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br><span class="line"></span><br><span class="line">| Variable_name | Value |</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br><span class="line"></span><br><span class="line">| transaction_isolation | READ-COMMITTED |</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br></pre></td></tr></table></figure>
+
+<p>总结来说，存在即合理，哪个隔离级别都有它自己的使用场景，你要根据自己的业务情况来定。我想<strong>你可能会问那什么时候需要“可重复读”的场景呢</strong>？我们来看一个数据校对逻辑的案例。</p>
+<p>假设你在管理一个个人银行账户表。一个表存了每个月月底的余额，一个表存了账单明细。<strong>这时候你要做数据校对，也就是判断上个月的余额和当前余额的差额，是否与本月的账单明细一致。你一定希望在校对过程中，即使有用户发生了一笔新的交易，也不影响你的校对结果。</strong></p>
+<p><strong>这时候使用“可重复读”隔离级别就很方便。事务启动时的视图可以认为是静态的，不受其他事务更新的影响。</strong></p>
+<h3 id="事务隔离的实现"><a href="#事务隔离的实现" class="headerlink" title="事务隔离的实现"></a>事务隔离的实现</h3><p>理解了事务的隔离级别，我们再来看看事务隔离具体是怎么实现的。这里我们展开说明“可重复读”。</p>
+<p><strong>在MySQL中，实际上每条记录在更新的时候都会同时记录一条回滚操作。记录上的最新值，通过回滚操作，都可以得到前一个状态的值。（这就是Undo log用于回滚的。Undo Log（撤销日志）在数据库管理系统中用于实现回滚操作，确保数据的完整性和一致性）</strong></p>
+<p>建议先看完这篇博客再看下面的内容</p>
+<p><a href="https://blog.csdn.net/Weixiaohuai/article/details/117867353">MySQL回滚日志（undo log）总结_mysql undo log-CSDN博客</a></p>
+<p>下面是这篇文章比较重要的部分：</p>
+<p>MVCC（Multi-Version Concurrency Control，<strong>多版本并发控制</strong>）是一种用于数据库管理系统的并发控制机制，旨在允许<strong>多个事务同时读取和写入数据，而不互相阻塞</strong>。</p>
+<p>在MySQL数据库InnoDB存储引擎中，用undo Log来实现多版本并发控制(MVCC)。</p>
+<p><strong>当读取的某一行被其他事务锁定时，它可以从undo log中分析出该行记录以前的数据版本是怎样的，从而让用户能够读取到当前事务操作之前的数据【快照读】。</strong></p>
+<p>下面解释一下什么是快照读，与之对应的还有一个是—当前读。</p>
+<ul>
+<li>快照读：<br>SQL读取的数据是快照版本【可见版本】，<strong>也就是历史版本</strong>，不用加锁，普通的SELECT就是快照读。</li>
+<li>当前读：<br><strong>SQL读取的数据是最新版本。</strong>通过锁机制来保证读取的数据无法通过其他事务进行修改UPDATE、DELETE、INSERT、SELECT … LOCK IN SHARE MODE、SELECT … FOR UPDATE都是当前读。</li>
+</ul>
+<p>说实话，这个玩意的底层实现很类似于Git的底层实现</p>
+<p>undo log的存储机制</p>
+<p>undo log的存储<strong>由InnoDB存储引擎</strong>实现，<strong>数据保存在InnoDB的数据文件中</strong>。</p>
+<p>在InnoDB存储引擎中，undo log是<strong>采用分段(segment)的方式进行存储的</strong>。<strong>rollback segment称为回滚段，每个回滚段中有1024个undo log segment。</strong></p>
+<p>在MySQL5.5之前，只支持1个rollback segment，也就是<strong>只能记录1024个undo操作</strong>。（这个记录的方式和Redis的AOF很类似）</p>
+<p><strong>在MySQL5.5之后，可以支持128个rollback segment，分别从resg slot0 - resg slot127，每一个resg slot，也就是每一个回滚段，内部由1024个undo segment 组成，即总共可以记录128 * 1024个undo操作。（这个又有一点像Redis分片集群的slot槽）</strong></p>
+<p><img src="/2024/09/09/MySQL03/image-20240909210933285.png" alt="image-20240909210933285"></p>
+<p><strong>undo log日志里面不仅存放着数据更新前的记录，还记录着RowID、事务ID、回滚指针。（这个玩意和Git底层很类似）</strong>其中事务ID每次递增，回滚指针第一次如果是insert语句的话，回滚指针为NULL，第二次update之后的undo log的回滚指针就会指向刚刚那一条undo log日志，依次类推，就会形成一条undo log的回滚链，方便找到该条记录的历史版本。</p>
+<p>undo log的工作原理</p>
+<p>在更新数据之前，MySQL会<strong>提前</strong>生成undo log日志，当<strong>事务提交</strong>的时候，并<strong>不会立即删除undo log</strong>，要执行回滚（rollback）操作时，从缓存中读取数据。<strong>undo log日志的删除是通过通过后台purge线程进行回收处理的。</strong></p>
+<p><img src="/2024/09/09/MySQL03/image-20240909211811977.png" alt="image-20240909211811977"></p>
+<p>如上图：</p>
+<ul>
+<li>1、事务A执行update操作，此时事务还没提交，<strong>会将数据进行备份到对应的undo buffer，然后由undo buffer持久化到磁盘中的undo log文件中，此时undo log保存了未提交之前的操作日志</strong>，接着将操作的数据，也就是Teacher表的数据持久保存到<strong>InnoDB的数据文件IBD。</strong>（注意是先在缓存中记录到undo buffer再持久化到undo log日志中，最后才是将数据持久化到存储引擎的IBD文件中）</li>
+<li>2、此时事务B进行查询操作，直接从undo buffer缓存中进行读取，这时事务A还没提交事务。如果要回滚（rollback）事务，是不读磁盘的，<strong>先直接从undo buffer缓存读取。</strong></li>
+</ul>
+<p>用undo log实现原子性和持久化的事务的简化过程：</p>
+<p>假设有A、B两个数据，值分别为1,2。</p>
+<ul>
+<li>A. 事务开始</li>
+<li>B. 记录A&#x3D;1到undo log中</li>
+<li>C. 修改A&#x3D;3</li>
+<li>D. 记录B&#x3D;2到undo log中</li>
+<li>E. 修改B&#x3D;4</li>
+<li>F. 将undo log写到磁盘 ——-<strong>undo log持久化</strong></li>
+<li>G. 将数据写到磁盘 ——-<strong>数据持久化</strong></li>
+<li>H. 事务提交 ——-<strong>提交事务</strong></li>
+</ul>
+<p>之所以能同时保证原子性和持久化，是因为以下特点：</p>
+<ul>
+<li><strong>更新数据前</strong>记录undo log。</li>
+<li>为了保证持久性，<strong>必须将数据在事务提交前写到磁盘，只要事务成功提交，数据必然已经持久化到磁盘。</strong></li>
+<li><strong>undo log必须先于数据持久化到磁盘。</strong>如果在G,H之间发生<strong>系统崩溃</strong>，undo log是完整的，<strong>可以用来回滚。</strong></li>
+<li>如果在A - F之间发生系统崩溃，因为数据没有持久化到磁盘，所以磁盘上的数据还是保持在事务开始前的状态。</li>
+</ul>
+<p>缺陷：每个事务提交前将数据和undo log写入磁盘，这样会导致大量的磁盘IO，因此性能较差。 <strong>如果能够将数据缓存一段时间，就能减少IO提高性能，但是这样就会失去事务的持久性。</strong></p>
+<blockquote>
+<p><strong>undo日志属于逻辑日志，redo（recovery）是物理日志</strong>，所谓逻辑日志是undo log<strong>是记录一个操作过程</strong>，不会物理删除</p>
+<p><strong>binlog也是逻辑日志，AOF也是逻辑日志</strong></p>
+<p>undo log，sql执行delete或者update操作都会记录一条undo日志</p>
+<p><strong>undo是应对数据库回滚的情况，redo是应对数据库执行到一半故障继续执行的情况，binlog是应对恢复数据库的情况</strong></p>
+</blockquote>
+<p>再看一篇试试</p>
+<p><a href="https://cloud.tencent.com/developer/article/2220871">图文结合带你搞定MySQL日志之Undo log(回滚日志)-腾讯云开发者社区-腾讯云 (tencent.com)</a></p>
+<p>下面提取了部分重点内容：</p>
+<p><strong>如何理解Undo Log</strong></p>
+<p>事务需要保证<strong>原子性</strong>，也就是事务中的操作要么全部完成，要么什么也不做。但有时候事务执行到一半会出现一些情况，比如：</p>
+<ul>
+<li>情况一：事务执行过程中可能遇到<strong>各种错误</strong>，比如<a href="https://cloud.tencent.com/act/pro/promotion-cvm?from_column=20065&from=20065">服务器</a>本身的错误，操作系统错误，甚至是突然断电导致的错误。</li>
+<li>情况二：DBA可以在事务执行过程中手动输入ROLLBACK语句结束当前事务的执行。以上情况出现，我们需要把数据改回原先的样子，这个过程称之为回滚。</li>
+</ul>
+<p>每当我们要对一条记录做改动时**(这里的改动可以指<code>INSERT、DELETE、UPDATE</code>)，都需要把回滚时所需的东西记下来。**比如:</p>
+<ul>
+<li>你插入一条记录时，至少要把这条记录的主键值记下来，之后回滚的时候只需要把这个主键值对应的记录删掉就好了。**(对于每个<code>INSERT</code>, InnoDB存储引擎会完成一个<code>DELETE</code>)**</li>
+<li>你删除了一条记录，至少要把这条记录中的内容都记下来，这样之后回滚时再把由这些内容组成的记录插入到表中就好了。**(对于每个<code>DELETE</code>,InnoDB存储引擎会执行一个<code>INSERT</code>)**</li>
+<li>你修改了一条记录，至少要把修改这条记录前的旧值都记录下来，这样之后回滚时再把这条记录更新为旧值就好了。**(对于每个<code>UPDATE</code>，InnoDB存储引擎会执行一个<code>相反的UPDATE</code>，将修改前的行放回去)**</li>
+</ul>
+<p><a href="https://cloud.tencent.com/product/cdb?from_column=20065&from=20065">MySQL</a>把这些为了回滚而记录的这些内容称之为<code>撤销日志</code>或者<code>回滚日志</code>(即Undo Log)。<strong>注意，由于查询操作(SELECT）并不会修改任何用户记录，所以在杳询操作行时，并不需要记录相应的Undo日志</strong></p>
+<p><strong>此外，Undo Log会产生<code>Redo Log</code>，也就是Undo Log的产生会伴随着Redo Log的产生，这是因为Undo Log也需要持久性的保护。</strong></p>
+<p>这里解释一下，为什么它们是相辅相成的，这里简单的说一下，本来我们执行到一半挂了，undo是回到开始，redo是继续执行完</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在数据库管理系统中，Undo Log 和 Redo Log 是用于实现数据一致性和事务管理的两种重要日志，它们通常会一起生成，以确保在事务过程中能够安全地恢复数据。以下是详细解释：</span><br><span class="line"></span><br><span class="line">### 1. **Undo Log 的作用**</span><br><span class="line"></span><br><span class="line">- **回滚功能**: Undo Log 记录了事务对数据的修改前状态，允许在事务失败或被中断时将数据恢复到修改之前的状态。</span><br><span class="line">- **持久性保护**: 为了确保在系统崩溃或故障后仍能进行数据恢复，Undo Log 必须被持久化到磁盘。</span><br><span class="line"></span><br><span class="line">### 2. **Redo Log 的作用**</span><br><span class="line"></span><br><span class="line">- **恢复功能**: Redo Log 记录了已提交事务的修改操作，用于在系统崩溃后重放这些操作，从而恢复数据到最新状态。</span><br><span class="line">- **事务的完整性**: Redo Log 确保即使在故障发生时，已提交的事务也不会丢失。</span><br><span class="line"></span><br><span class="line">### 3. **二者的关系**</span><br><span class="line"></span><br><span class="line">- **同时生成**: 在事务执行过程中，每当数据库修改数据时，系统会同时生成 Undo Log 和 Redo Log。</span><br><span class="line">  - **Undo Log**: 记录修改前的状态，以便在需要回滚时使用。</span><br><span class="line">  - **Redo Log**: 记录修改后的状态，以便在系统重启时重放已提交的事务。</span><br><span class="line">- **持久性需求**:</span><br><span class="line">  - Undo Log 需要被持久化，以确保在崩溃后能够恢复未完成的事务或回滚操作。</span><br><span class="line">  - Redo Log 则确保已完成的事务能够在故障后恢复。</span><br><span class="line"></span><br><span class="line">### 4. **总结**</span><br><span class="line"></span><br><span class="line">因此，Undo Log 和 Redo Log 的产生是相辅相成的。Undo Log 提供了回滚的能力，而 Redo Log 确保了已提交事务的持久性。两者的结合使得数据库能够在发生故障时，既能恢复到一致的状态，又能保证数据的完整性和安全性。</span><br></pre></td></tr></table></figure>
+
+<p><strong>Undo Log的存储结构</strong></p>
+<p>InnoDB对Undo Log的管理采用段的方式，也就是<code>回滚段（rollback segment）</code>。每个回滚段记录了<code>1024 个Undo Log segment</code>，而在每个Undo Log segment段中进行<code>Undo页</code>的申请。</p>
+<p>在<code>InnoDB1.1版本</code>之前（不包括1.1版本），只有一个<code>rollback segment</code>，因此支持<strong>同时在线</strong>的事务限制为 <strong>1024</strong>。虽然对绝大多数的应用来说都已经够用。</p>
+<p>从1.1版本开始InnoDB支持最大<code>128个rollback segment</code>，故其支持<strong>同时在线的事务</strong>限制提高到了<code>128*1024</code>。</p>
+<p>虽然InnoDB1.1版本支持了128个<code>rollback segment</code>，但是这些<code>rollback segment</code>都存储于共享表空间<strong>ibdata（上面提到的IBD文件）</strong>中。从lnnoDB1.2版本开始，可通过参数对<code>rollback segment</code>做进一步的设置。这些参数包括:</p>
+<ul>
+<li><code>innodb_undo_directory:</code>设置rollback segment文件所在的路径。这意味着rollback segment可以存放在共享表空间以外的位置，即可以设置为独立表空间。该参数的默认值为“.&#x2F;”，表示当前InnoDB存储引擎的目录。</li>
+<li><code>innodb_undo_logs:</code>设置rollback segment的个数，默认值为128。在InnoDB1.2版本中，该参数用来替换之前版本的参数innodb_rollback_segments。</li>
+<li><code>innodb_undo_tablespaces:</code>设置构成rollback segment文件的数量，这样rollback segment可以较为平均地分布在多个文件中。设置该参数后，会在路径innodb_undo_directory看到undo为前缀的文件，该文件就代表rollback segment文件。</li>
+</ul>
+<p>当事务提交时，InnoDB存储引擎会做以下两件事情：    </p>
+<ul>
+<li>1.将Undo Log放入列表中，<strong>以供之后的purge(清洗、清除)操作</strong>    </li>
+<li>2.判断Undo Log所在的页是否可以重用(低于3&#x2F;4可以重用)，若可以分配给下个事务使用</li>
+</ul>
+<p><strong>Undo页的重用</strong></p>
+<p>当我们开启一个事务需要写Undo log的时候，就得先去<code>Undo Log segment</code>中去找到一个空闲的位置，当有空位的时候，就去申请Undo页，在这个申请到的Undo页中进行Undo Log的写入。<strong>我们知道MySQL默认一页的大小是<code>16k</code>。</strong></p>
+<p>为每一个事务分配一个页，<strong>是非常浪费的</strong>(除非你的事务非常长)，假设你的应用的TPS(每秒处理的事务数目)为1000，那么1s就需要1000个页，大概需要16M的存储，1分钟大概需要1G的存储。<strong>如果照这样下去除非MySQL清理的非常勤快，否则随着时间的推移，磁盘空间会增长的非常快</strong>，而且很多空间都是浪费的。</p>
+<p><strong>于是Undo页就被设计的可以重用了</strong>，当事务提交时，并<strong>不会立刻删除</strong>Undo页。因为重用，所以这个Undo页可能混杂着其他事务的Undo Log。<strong>Undo Log在commit后，会被放到一个链表中，然后判断Undo页的使用空间是否小于3&#x2F;4，如果小于3&#x2F;4的话，则表示当前的Undo页可以被重用，那么它就不会被回收，其他事务的Undo Log可以记录在当前Undo页的后面。</strong>由于Undo Log是离散的，所以清理对应的磁盘空间时，效率不高。</p>
+<p><strong>Undo Log的类型</strong></p>
+<p>在InnoDB存储引擎中，Undo Log分为：</p>
+<ul>
+<li><p><strong>insert Undo Log</strong> </p>
+<p>insert Undo Log是指在insert操作中产生的Undo Log。<strong>因为insert操作的记录，只对事务本身可见，对其他事务不可见(这是事务隔离性的要求)，故该Undo Log可以在事务提交后直接删除。不需要进行purge操作。</strong></p>
+</li>
+<li><p><strong>update Undo Log</strong></p>
+<p>update Undo Log记录的是对delete和update操作产生的Undo Log。该Undo Log可能需要提供MVCC机制，因此<strong>不能在事务提交时就进行删除</strong>。提交时放入Undo Log链表，等待purge线程进行最后的删除。</p>
+</li>
+</ul>
+<p><strong>Undo Log的生命周期</strong></p>
+<p>以下是Undo+Redo事务的简化过程: 假设有2个数值，分别为 A&#x3D;1 和 B&#x3D;2 ，然后将A修改为3，B修改为4</p>
+<figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="number">1.</span> start transaction;</span><br><span class="line"><span class="number">2</span>．记录A=<span class="number">1</span>到<span class="title class_">Undo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">3.</span> update A = <span class="number">3</span>;</span><br><span class="line"><span class="number">4</span>．记录A=<span class="number">3</span> 到<span class="title class_">Redo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">5</span>．记录B=<span class="number">2</span>到<span class="title class_">Undo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">6.</span> update B = <span class="number">4</span>;</span><br><span class="line"><span class="number">7</span>．记录B=<span class="number">4</span>到<span class="title class_">Redo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">8</span>．将<span class="title class_">Redo</span> <span class="title class_">Log</span>刷新到磁盘;</span><br><span class="line"><span class="number">9.</span> commit</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>在1-8步骤的任意一步系统宕机，<strong>事务未提交，该事务就不会对磁盘上的数据做任何影响</strong>。</li>
+<li>如果在8-9之间宕机。<ul>
+<li>Redo Log 进行恢复</li>
+<li>Undo Log 发现有事务没完成进行回滚。</li>
+</ul>
+</li>
+<li>若在9之后系统宕机，内存映射中变更的数据<strong>还来不及刷回磁盘</strong>，那么系统恢复之后，<strong>可以根据Redo Log把数据刷回磁盘。</strong></li>
+</ul>
+<p>流程图：</p>
+<p><strong>这里还有一个binlog没有画，突然想起来之前使用Seata的时候好像就出现过这个redo，undo，binlog了</strong></p>
+<p><strong>又想起来了，之前使用ShardingSphere的时候就是使用的它的binlog来实现主从复制的</strong></p>
+<p><img src="/2024/09/09/MySQL03/image-20240909220208902.png" alt="image-20240909220208902"></p>
+<p>接下来再继续看</p>
+<p>假设一个值从1被按顺序改成了2、3、4，在回滚日志里面就会有类似下面的记录。</p>
+<p>当前值是4，但是在查询这条记录的时候，不同时刻启动的事务会有不同的read-view。如图中看到的，在视图A、B、C里面，这一个记录的值分别是1、2、4，<strong>同一条记录在系统中可以存在多个版本，就是数据库的多版本并发控制（MVCC）</strong>。对于read-view A，要得到1，就必须将当前值依次执行图中所有的回滚操作得到。</p>
+<p><img src="/2024/09/09/MySQL03/image-20240909204425101.png" alt="image-20240909204425101"></p>
+<p>同时你会发现，即使现在有另外一个事务正在将4改成5，这个事务跟read-view A、B、C对应的事务是不会冲突的，因为只要是修改没有commit，看的都是undo log中的备份数据。</p>
+<p><strong>你一定会问，回滚日志总不能一直保留吧，什么时候删除呢？答案是，在不需要的时候才删除。也就是说，系统会判断，当没有事务再需要用到这些回滚日志时，回滚日志会被删除。</strong></p>
+<p>什么时候才不需要了呢？<strong>就是当系统里没有比这个回滚日志更早的read-view的时候。（这里的回收机制有点类似GCRoot）</strong></p>
+<p>基于上面的说明，我们来讨论一下为什么建议你尽量不要使用长事务。</p>
+<p>长事务意味着<strong>系统里面会存在很老的事务视图</strong>。由于这些事务随时可能访问数据库里面的任何数据，所以这个事务提交之前，数据库里面它可能用到的回滚记录都必须保留，这就会<strong>导致大量占用存储空间</strong>。</p>
+<p>这里简单提一下为什么会有那么长的事务</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 业务逻辑复杂</span><br><span class="line">复杂的处理流程: 某些业务逻辑涉及多个步骤，可能需要长时间才能完成。例如，涉及审批、审核或多方协作的事务。</span><br><span class="line">2. 用户交互</span><br><span class="line">等待用户输入: 在许多应用中，事务可能需要等待用户的输入或确认。例如，在线购物中的支付过程，用户可能需要时间来确认付款。</span><br><span class="line">3. 网络延迟</span><br><span class="line">网络问题: 在分布式系统中，网络延迟可能导致事务处理时间延长。如果事务需要访问多个服务或数据库，网络问题可能导致长时间未提交。</span><br><span class="line">4. 锁竞争</span><br><span class="line">资源争用: 长事务可能会持有锁，导致其他事务无法执行。为了避免死锁，开发者可能选择不立即提交事务，而是等待某个条件满足。</span><br><span class="line">5. 性能问题</span><br><span class="line">数据库性能瓶颈: 如果数据库性能较差，查询或写入操作可能会耗时较长，导致事务延迟提交。</span><br><span class="line">6. 故障恢复</span><br><span class="line">故障处理: 如果系统或应用在处理事务时遇到故障，可能会导致事务未能及时提交，处于挂起状态。</span><br><span class="line">7. 设计缺陷</span><br><span class="line">系统设计不当: 如果系统设计没有考虑到事务的合理管理，可能会导致长时间持有未提交的事务。</span><br><span class="line">8. 长时间运行的报告或查询</span><br><span class="line">复杂查询: 某些查询可能需要长时间执行，尤其是在大数据集上进行复杂的分析和报告时，可能会导致事务维持较长时间。</span><br><span class="line">总结</span><br><span class="line">长事务未提交的原因可能涉及业务逻辑、用户交互、网络延迟、锁竞争等多种因素。长时间存在的事务视图会导致存储空间占用增加，影响数据库性能，因此在设计时应该尽量避免长事务，及时提交或回滚事务，以提高系统的效率和稳定性。</span><br></pre></td></tr></table></figure>
+
+<p>在MySQL 5.5及以前的版本，<strong>回滚日志是跟数据字典一起放在ibdata文件里的</strong>，即使<strong>长事务最终提交，回滚段被清理，文件也不会变小</strong>。我见过数据只有20GB，而回滚段有200GB的库。最终只好为了清理回滚段，重建整个库。</p>
+<p>除了对回滚段的影响，长事务还占用锁资源，也可能拖垮整个库，这个我们会在后面讲锁的时候展开。</p>
+<h3 id="事务的启动方式"><a href="#事务的启动方式" class="headerlink" title="事务的启动方式"></a>事务的启动方式</h3><p>如前面所述，长事务有这些潜在风险，我当然是建议你尽量避免。其实很多时候业务开发同学并不是有意使用长事务，通常是由于误用所致。MySQL的事务启动方式有以下几种：</p>
+<ol>
+<li><p>显式启动事务语句， begin 或 start transaction。配套的提交语句是commit，回滚语句是rollback。</p>
+</li>
+<li><p>set autocommit&#x3D;0，<strong>这个命令会将这个线程的自动提交关掉。意味着如果你只执行一个select语句，这个事务就启动了，而且并不会自动提交</strong>。这个事务持续存在直到你<strong>主动执行commit 或 rollback 语句</strong>，或者断开连接。</p>
+</li>
+</ol>
+<p>有些客户端连接框架会默认连接成功后先执行一个set autocommit&#x3D;0的命令。<strong>这就导致接下来的查询都在事务中，如果是长连接，就导致了意外的长事务。</strong></p>
+<p><strong>因此，我会建议你总是使用set autocommit&#x3D;1, 通过显式语句的方式来启动事务。</strong></p>
+<p>但是有的开发同学会纠结“多一次交互”的问题。对于一个需要频繁使用事务的业务，第二种方式每个事务在开始时都不需要主动执行一次 “begin”，减少了语句的交互次数。如果你也有这个顾虑，我建议你使用commit work and chain语法。</p>
+<p>在autocommit为1的情况下，用begin显式启动的事务，如果执行commit则提交事务。<strong>如果执行 commit work and chain，则是提交事务并自动启动下一个事务，这样也省去了再次执行begin语句的开销。同时带来的好处是从程序开发的角度明确地知道每个语句是否处于事务中。（详细的可以看看这篇文章<a href="https://juejin.cn/post/6987373561836994590">带你看看事务的分类和在MySQL中使用链式事务 | SQL全面教程七：事务(3)事务分类和MySQL中的commit work and chain - 掘金 (juejin.cn)</a>）</strong></p>
+<p>你可以在information_schema库的innodb_trx这个表中查询长事务，比如下面这个语句，用于查找持续时间超过60s的事务。</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> information_schema.innodb_trx <span class="keyword">where</span> TIME_TO_SEC(timediff(now(),trx_started))<span class="operator">&gt;</span><span class="number">60</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>主要介绍了MySQL的事务隔离级别的现象和实现，根据实现原理分析了长事务存在的风险，以及如何用正确的方式避免长事务。希望我举的例子能够帮助你理解事务，并更好地使用MySQL的事务特性。</p>
+<p>现在知道了系统里面应该避免长事务，如果你是业务开发负责人同时也是数据库负责人，你会有什么方案来避免出现或者处理这种情况呢？</p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>My-Backend-Learning-Journey</title>
     <url>/2024/09/07/My-Backend-Learning-Journey/</url>
     <content><![CDATA[<h1 id="后端技术知识一览"><a href="#后端技术知识一览" class="headerlink" title="后端技术知识一览"></a>后端技术知识一览</h1><blockquote>
@@ -735,207 +936,6 @@
       <tags>
         <tag>Java</tag>
         <tag>Backend</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>事务隔离：为什么你改了我还看不见？</title>
-    <url>/2024/09/09/MySQL03/</url>
-    <content><![CDATA[<p>提到事务，你肯定不陌生，和数据库打交道的时候，我们总是会用到事务。最经典的例子就是转账，你要给朋友小王转100块钱，而此时你的银行卡只有100块钱。</p>
-<p>转账过程具体到程序里会有一系列的操作，比如查询余额、做加减法、更新余额等，这些操作必须保证是一体的，不然等程序查完之后，还没做减法之前，你这100块钱，完全可以借着这个时间差再查一次，然后再给另外一个朋友转账，如果银行这么整，不就乱了么？这时就要用到“事务”这个概念了。</p>
-<p><strong>简单来说，事务就是要保证一组数据库操作，要么全部成功，要么全部失败。</strong>在MySQL中，<strong>事务支持是在引擎层实现的。</strong>你现在知道，MySQL是一个支持多引擎的系统，但并不是所有的引擎都支持事务。<strong>比如MySQL原生的MyISAM引擎就不支持事务，这也是MyISAM被InnoDB取代的重要原因之一。</strong></p>
-<p>今天的文章里，我将会以InnoDB为例，剖析MySQL在事务支持方面的特定实现，并基于原理给出相应的实践建议，希望这些案例能加深你对MySQL事务原理的理解。</p>
-<h3 id="隔离性与隔离级别"><a href="#隔离性与隔离级别" class="headerlink" title="隔离性与隔离级别"></a>隔离性与隔离级别</h3><p>提到事务，你肯定会想到<strong>ACID（Atomicity、Consistency、Isolation、Durability，即原子性、一致性、隔离性、持久性）</strong>，今天我们就来说说其中I，也就是“隔离性”。</p>
-<p>当数据库上有多个事务同时执行的时候，就可能出现<strong>脏读（dirty read）、不可重复读（non-repeatable read）、幻读（phantom read）的问题</strong>，为了解决这些问题，就有了“隔离级别”的概念。（简单的说，隔离级别是对于事务而言的，隔离的是事务不是其他的东西）</p>
-<p>在谈隔离级别之前，你首先要知道，你<strong>隔离得越严实，效率就会越低</strong>。因此很多时候，我们都要在二者之间寻找一个平衡点。<strong>SQL标准的事务隔离级别包括：读未提交（read uncommitted）、读提交（read committed）、可重复读（repeatable read）和串行化（serializable ）。</strong>下面我逐一为你解释：</p>
-<ul>
-<li><strong>读未提交</strong>是指：一个事务还<strong>没提交</strong>时，它做的变更<strong>就能被别的事务看到</strong>。（可以读到别人没有提交的事务，等同于考试的时候可以直接看到别人试卷的答案）</li>
-<li><strong>读提交</strong>是指：一个事务提交之后，它做的变更才会被其他事务看到。（你提交试卷之后我才能看到你的答案）</li>
-<li><strong>可重复读</strong>是指：<strong>一个事务执行过程中看到的数据，总是跟这个事务在启动时看到的数据是一致的</strong>。当然在可重复读隔离级别下，未提交变更对其他事务也是不可见的。（始终相信自己最开始见到的数据是不会变化的，可以重复读取到最开始的值）</li>
-<li><strong>串行化</strong>：顾名思义是对于同一行记录，“写”会加“写锁”，“读”会加“读锁”。<strong>当出现读写锁冲突的时候，后访问的事务必须等前一个事务执行完成，才能继续执行。</strong>（<strong>串行就是排队等待，排成一行</strong>）</li>
-</ul>
-<p>其中“读提交”和“可重复读”比较难理解，所以我用一个例子说明这几种隔离级别。假设数据表T中只有一列，其中一行的值为1，下面是按照时间顺序执行两个事务的行为。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; create table T(c int) engine=InnoDB;</span><br><span class="line">insert into T(c) values(1);</span><br></pre></td></tr></table></figure>
-
-<p>我们来看看在不同的隔离级别下，事务A会有哪些不同的返回结果，也就是图里面V1、V2、V3的返回值分别是什么。</p>
-<p><img src="/2024/09/09/MySQL03/image-20240909200825360.png" alt="image-20240909200825360"></p>
-<ul>
-<li><strong>若隔离级别是“读未提交”， 则V1的值就是2。这时候事务B虽然还没有提交，但是结果已经被A看到了。</strong>因此，V2、V3也都是2。</li>
-<li>若隔离级别是“读提交”，则V1是1，V2的值是2。<strong>事务B的更新在提交后才能被A看到。</strong>所以， V3的值也是2。</li>
-<li>若隔离级别是“可重复读”，则V1、V2是1，V3是2。之所以V2还是1，遵循的就是这个要求：<strong>事务在执行期间看到的数据前后必须是一致的。</strong></li>
-<li>若隔离级别是“串行化”，<strong>则在事务B执行“将1改成2”的时候，会被锁住。直到事务A提交后，事务B才可以继续执行。</strong>所以从A的角度看， V1、V2值是1，V3的值是2。</li>
-</ul>
-<p>在实现上，数据库里面会<strong>创建一个视图</strong>，访问的时候<strong>以视图的逻辑结果为准</strong>。（视图的作用体现在这里了）</p>
-<ul>
-<li>在“可重复读”隔离级别下，<strong>这个视图是在事务启动时创建的，整个事务存在期间都用这个视图。</strong></li>
-<li>在“读提交”隔离级别下，<strong>这个视图是在每个SQL语句开始执行的时候创建的。</strong></li>
-<li>这里需要注意的是，<strong>“读未提交”隔离级别下直接返回记录上的最新值，没有视图概念。</strong></li>
-<li>而“串行化”隔离级别下<strong>直接用加锁的方式来避免并行访问。</strong></li>
-</ul>
-<p>我们可以看到在不同的隔离级别下，数据库行为是有所不同的。<strong>Oracle数据库的默认隔离级别其实就是“读提交”，因此对于一些从Oracle迁移到MySQL的应用，为保证数据库隔离级别的一致，你一定要记得将MySQL的隔离级别设置为“读提交”。（MySQL 的默认事务隔离级别是 <strong>REPEATABLE READ</strong>（可重复读））</strong></p>
-<p>配置的方式是，<strong>将启动参数transaction-isolation的值设置成READ-COMMITTED</strong>。你可以用show variables来查看当前的值。（这个输出的东西很多，你可以指定输出流输入到一个文件中看看）</p>
-<p><img src="/2024/09/09/MySQL03/image-20240909201622812.png" alt="image-20240909201622812"></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; show variables like &#x27;transaction_isolation&#x27;;</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br><span class="line"></span><br><span class="line">| Variable_name | Value |</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br><span class="line"></span><br><span class="line">| transaction_isolation | READ-COMMITTED |</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br></pre></td></tr></table></figure>
-
-<p>总结来说，存在即合理，哪个隔离级别都有它自己的使用场景，你要根据自己的业务情况来定。我想<strong>你可能会问那什么时候需要“可重复读”的场景呢</strong>？我们来看一个数据校对逻辑的案例。</p>
-<p>假设你在管理一个个人银行账户表。一个表存了每个月月底的余额，一个表存了账单明细。<strong>这时候你要做数据校对，也就是判断上个月的余额和当前余额的差额，是否与本月的账单明细一致。你一定希望在校对过程中，即使有用户发生了一笔新的交易，也不影响你的校对结果。</strong></p>
-<p><strong>这时候使用“可重复读”隔离级别就很方便。事务启动时的视图可以认为是静态的，不受其他事务更新的影响。</strong></p>
-<h3 id="事务隔离的实现"><a href="#事务隔离的实现" class="headerlink" title="事务隔离的实现"></a>事务隔离的实现</h3><p>理解了事务的隔离级别，我们再来看看事务隔离具体是怎么实现的。这里我们展开说明“可重复读”。</p>
-<p><strong>在MySQL中，实际上每条记录在更新的时候都会同时记录一条回滚操作。记录上的最新值，通过回滚操作，都可以得到前一个状态的值。（这就是Undo log用于回滚的。Undo Log（撤销日志）在数据库管理系统中用于实现回滚操作，确保数据的完整性和一致性）</strong></p>
-<p>建议先看完这篇博客再看下面的内容</p>
-<p><a href="https://blog.csdn.net/Weixiaohuai/article/details/117867353">MySQL回滚日志（undo log）总结_mysql undo log-CSDN博客</a></p>
-<p>下面是这篇文章比较重要的部分：</p>
-<p>MVCC（Multi-Version Concurrency Control，<strong>多版本并发控制</strong>）是一种用于数据库管理系统的并发控制机制，旨在允许<strong>多个事务同时读取和写入数据，而不互相阻塞</strong>。</p>
-<p>在MySQL数据库InnoDB存储引擎中，用undo Log来实现多版本并发控制(MVCC)。</p>
-<p><strong>当读取的某一行被其他事务锁定时，它可以从undo log中分析出该行记录以前的数据版本是怎样的，从而让用户能够读取到当前事务操作之前的数据【快照读】。</strong></p>
-<p>下面解释一下什么是快照读，与之对应的还有一个是—当前读。</p>
-<ul>
-<li>快照读：<br>SQL读取的数据是快照版本【可见版本】，<strong>也就是历史版本</strong>，不用加锁，普通的SELECT就是快照读。</li>
-<li>当前读：<br><strong>SQL读取的数据是最新版本。</strong>通过锁机制来保证读取的数据无法通过其他事务进行修改UPDATE、DELETE、INSERT、SELECT … LOCK IN SHARE MODE、SELECT … FOR UPDATE都是当前读。</li>
-</ul>
-<p>说实话，这个玩意的底层实现很类似于Git的底层实现</p>
-<p>undo log的存储机制</p>
-<p>undo log的存储<strong>由InnoDB存储引擎</strong>实现，<strong>数据保存在InnoDB的数据文件中</strong>。</p>
-<p>在InnoDB存储引擎中，undo log是<strong>采用分段(segment)的方式进行存储的</strong>。<strong>rollback segment称为回滚段，每个回滚段中有1024个undo log segment。</strong></p>
-<p>在MySQL5.5之前，只支持1个rollback segment，也就是<strong>只能记录1024个undo操作</strong>。（这个记录的方式和Redis的AOF很类似）</p>
-<p><strong>在MySQL5.5之后，可以支持128个rollback segment，分别从resg slot0 - resg slot127，每一个resg slot，也就是每一个回滚段，内部由1024个undo segment 组成，即总共可以记录128 * 1024个undo操作。（这个又有一点像Redis分片集群的slot槽）</strong></p>
-<p><img src="/2024/09/09/MySQL03/image-20240909210933285.png" alt="image-20240909210933285"></p>
-<p><strong>undo log日志里面不仅存放着数据更新前的记录，还记录着RowID、事务ID、回滚指针。（这个玩意和Git底层很类似）</strong>其中事务ID每次递增，回滚指针第一次如果是insert语句的话，回滚指针为NULL，第二次update之后的undo log的回滚指针就会指向刚刚那一条undo log日志，依次类推，就会形成一条undo log的回滚链，方便找到该条记录的历史版本。</p>
-<p>undo log的工作原理</p>
-<p>在更新数据之前，MySQL会<strong>提前</strong>生成undo log日志，当<strong>事务提交</strong>的时候，并<strong>不会立即删除undo log</strong>，要执行回滚（rollback）操作时，从缓存中读取数据。<strong>undo log日志的删除是通过通过后台purge线程进行回收处理的。</strong></p>
-<p><img src="/2024/09/09/MySQL03/image-20240909211811977.png" alt="image-20240909211811977"></p>
-<p>如上图：</p>
-<ul>
-<li>1、事务A执行update操作，此时事务还没提交，<strong>会将数据进行备份到对应的undo buffer，然后由undo buffer持久化到磁盘中的undo log文件中，此时undo log保存了未提交之前的操作日志</strong>，接着将操作的数据，也就是Teacher表的数据持久保存到<strong>InnoDB的数据文件IBD。</strong>（注意是先在缓存中记录到undo buffer再持久化到undo log日志中，最后才是将数据持久化到存储引擎的IBD文件中）</li>
-<li>2、此时事务B进行查询操作，直接从undo buffer缓存中进行读取，这时事务A还没提交事务。如果要回滚（rollback）事务，是不读磁盘的，<strong>先直接从undo buffer缓存读取。</strong></li>
-</ul>
-<p>用undo log实现原子性和持久化的事务的简化过程：</p>
-<p>假设有A、B两个数据，值分别为1,2。</p>
-<ul>
-<li>A. 事务开始</li>
-<li>B. 记录A&#x3D;1到undo log中</li>
-<li>C. 修改A&#x3D;3</li>
-<li>D. 记录B&#x3D;2到undo log中</li>
-<li>E. 修改B&#x3D;4</li>
-<li>F. 将undo log写到磁盘 ——-<strong>undo log持久化</strong></li>
-<li>G. 将数据写到磁盘 ——-<strong>数据持久化</strong></li>
-<li>H. 事务提交 ——-<strong>提交事务</strong></li>
-</ul>
-<p>之所以能同时保证原子性和持久化，是因为以下特点：</p>
-<ul>
-<li><strong>更新数据前</strong>记录undo log。</li>
-<li>为了保证持久性，<strong>必须将数据在事务提交前写到磁盘，只要事务成功提交，数据必然已经持久化到磁盘。</strong></li>
-<li><strong>undo log必须先于数据持久化到磁盘。</strong>如果在G,H之间发生<strong>系统崩溃</strong>，undo log是完整的，<strong>可以用来回滚。</strong></li>
-<li>如果在A - F之间发生系统崩溃，因为数据没有持久化到磁盘，所以磁盘上的数据还是保持在事务开始前的状态。</li>
-</ul>
-<p>缺陷：每个事务提交前将数据和undo log写入磁盘，这样会导致大量的磁盘IO，因此性能较差。 <strong>如果能够将数据缓存一段时间，就能减少IO提高性能，但是这样就会失去事务的持久性。</strong></p>
-<blockquote>
-<p><strong>undo日志属于逻辑日志，redo（recovery）是物理日志</strong>，所谓逻辑日志是undo log<strong>是记录一个操作过程</strong>，不会物理删除</p>
-<p><strong>binlog也是逻辑日志，AOF也是逻辑日志</strong></p>
-<p>undo log，sql执行delete或者update操作都会记录一条undo日志</p>
-<p><strong>undo是应对数据库回滚的情况，redo是应对数据库执行到一半故障继续执行的情况，binlog是应对恢复数据库的情况</strong></p>
-</blockquote>
-<p>再看一篇试试</p>
-<p><a href="https://cloud.tencent.com/developer/article/2220871">图文结合带你搞定MySQL日志之Undo log(回滚日志)-腾讯云开发者社区-腾讯云 (tencent.com)</a></p>
-<p>下面提取了部分重点内容：</p>
-<p><strong>如何理解Undo Log</strong></p>
-<p>事务需要保证<strong>原子性</strong>，也就是事务中的操作要么全部完成，要么什么也不做。但有时候事务执行到一半会出现一些情况，比如：</p>
-<ul>
-<li>情况一：事务执行过程中可能遇到<strong>各种错误</strong>，比如<a href="https://cloud.tencent.com/act/pro/promotion-cvm?from_column=20065&from=20065">服务器</a>本身的错误，操作系统错误，甚至是突然断电导致的错误。</li>
-<li>情况二：DBA可以在事务执行过程中手动输入ROLLBACK语句结束当前事务的执行。以上情况出现，我们需要把数据改回原先的样子，这个过程称之为回滚。</li>
-</ul>
-<p>每当我们要对一条记录做改动时**(这里的改动可以指<code>INSERT、DELETE、UPDATE</code>)，都需要把回滚时所需的东西记下来。**比如:</p>
-<ul>
-<li>你插入一条记录时，至少要把这条记录的主键值记下来，之后回滚的时候只需要把这个主键值对应的记录删掉就好了。**(对于每个<code>INSERT</code>, InnoDB存储引擎会完成一个<code>DELETE</code>)**</li>
-<li>你删除了一条记录，至少要把这条记录中的内容都记下来，这样之后回滚时再把由这些内容组成的记录插入到表中就好了。**(对于每个<code>DELETE</code>,InnoDB存储引擎会执行一个<code>INSERT</code>)**</li>
-<li>你修改了一条记录，至少要把修改这条记录前的旧值都记录下来，这样之后回滚时再把这条记录更新为旧值就好了。**(对于每个<code>UPDATE</code>，InnoDB存储引擎会执行一个<code>相反的UPDATE</code>，将修改前的行放回去)**</li>
-</ul>
-<p><a href="https://cloud.tencent.com/product/cdb?from_column=20065&from=20065">MySQL</a>把这些为了回滚而记录的这些内容称之为<code>撤销日志</code>或者<code>回滚日志</code>(即Undo Log)。<strong>注意，由于查询操作(SELECT）并不会修改任何用户记录，所以在杳询操作行时，并不需要记录相应的Undo日志</strong></p>
-<p><strong>此外，Undo Log会产生<code>Redo Log</code>，也就是Undo Log的产生会伴随着Redo Log的产生，这是因为Undo Log也需要持久性的保护。</strong></p>
-<p>这里解释一下，为什么它们是相辅相成的，这里简单的说一下，本来我们执行到一半挂了，undo是回到开始，redo是继续执行完</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在数据库管理系统中，Undo Log 和 Redo Log 是用于实现数据一致性和事务管理的两种重要日志，它们通常会一起生成，以确保在事务过程中能够安全地恢复数据。以下是详细解释：</span><br><span class="line"></span><br><span class="line">### 1. **Undo Log 的作用**</span><br><span class="line"></span><br><span class="line">- **回滚功能**: Undo Log 记录了事务对数据的修改前状态，允许在事务失败或被中断时将数据恢复到修改之前的状态。</span><br><span class="line">- **持久性保护**: 为了确保在系统崩溃或故障后仍能进行数据恢复，Undo Log 必须被持久化到磁盘。</span><br><span class="line"></span><br><span class="line">### 2. **Redo Log 的作用**</span><br><span class="line"></span><br><span class="line">- **恢复功能**: Redo Log 记录了已提交事务的修改操作，用于在系统崩溃后重放这些操作，从而恢复数据到最新状态。</span><br><span class="line">- **事务的完整性**: Redo Log 确保即使在故障发生时，已提交的事务也不会丢失。</span><br><span class="line"></span><br><span class="line">### 3. **二者的关系**</span><br><span class="line"></span><br><span class="line">- **同时生成**: 在事务执行过程中，每当数据库修改数据时，系统会同时生成 Undo Log 和 Redo Log。</span><br><span class="line">  - **Undo Log**: 记录修改前的状态，以便在需要回滚时使用。</span><br><span class="line">  - **Redo Log**: 记录修改后的状态，以便在系统重启时重放已提交的事务。</span><br><span class="line">- **持久性需求**:</span><br><span class="line">  - Undo Log 需要被持久化，以确保在崩溃后能够恢复未完成的事务或回滚操作。</span><br><span class="line">  - Redo Log 则确保已完成的事务能够在故障后恢复。</span><br><span class="line"></span><br><span class="line">### 4. **总结**</span><br><span class="line"></span><br><span class="line">因此，Undo Log 和 Redo Log 的产生是相辅相成的。Undo Log 提供了回滚的能力，而 Redo Log 确保了已提交事务的持久性。两者的结合使得数据库能够在发生故障时，既能恢复到一致的状态，又能保证数据的完整性和安全性。</span><br></pre></td></tr></table></figure>
-
-<p><strong>Undo Log的存储结构</strong></p>
-<p>InnoDB对Undo Log的管理采用段的方式，也就是<code>回滚段（rollback segment）</code>。每个回滚段记录了<code>1024 个Undo Log segment</code>，而在每个Undo Log segment段中进行<code>Undo页</code>的申请。</p>
-<p>在<code>InnoDB1.1版本</code>之前（不包括1.1版本），只有一个<code>rollback segment</code>，因此支持<strong>同时在线</strong>的事务限制为 <strong>1024</strong>。虽然对绝大多数的应用来说都已经够用。</p>
-<p>从1.1版本开始InnoDB支持最大<code>128个rollback segment</code>，故其支持<strong>同时在线的事务</strong>限制提高到了<code>128*1024</code>。</p>
-<p>虽然InnoDB1.1版本支持了128个<code>rollback segment</code>，但是这些<code>rollback segment</code>都存储于共享表空间<strong>ibdata（上面提到的IBD文件）</strong>中。从lnnoDB1.2版本开始，可通过参数对<code>rollback segment</code>做进一步的设置。这些参数包括:</p>
-<ul>
-<li><code>innodb_undo_directory:</code>设置rollback segment文件所在的路径。这意味着rollback segment可以存放在共享表空间以外的位置，即可以设置为独立表空间。该参数的默认值为“.&#x2F;”，表示当前InnoDB存储引擎的目录。</li>
-<li><code>innodb_undo_logs:</code>设置rollback segment的个数，默认值为128。在InnoDB1.2版本中，该参数用来替换之前版本的参数innodb_rollback_segments。</li>
-<li><code>innodb_undo_tablespaces:</code>设置构成rollback segment文件的数量，这样rollback segment可以较为平均地分布在多个文件中。设置该参数后，会在路径innodb_undo_directory看到undo为前缀的文件，该文件就代表rollback segment文件。</li>
-</ul>
-<p>当事务提交时，InnoDB存储引擎会做以下两件事情：    </p>
-<ul>
-<li>1.将Undo Log放入列表中，<strong>以供之后的purge(清洗、清除)操作</strong>    </li>
-<li>2.判断Undo Log所在的页是否可以重用(低于3&#x2F;4可以重用)，若可以分配给下个事务使用</li>
-</ul>
-<p><strong>Undo页的重用</strong></p>
-<p>当我们开启一个事务需要写Undo log的时候，就得先去<code>Undo Log segment</code>中去找到一个空闲的位置，当有空位的时候，就去申请Undo页，在这个申请到的Undo页中进行Undo Log的写入。<strong>我们知道MySQL默认一页的大小是<code>16k</code>。</strong></p>
-<p>为每一个事务分配一个页，<strong>是非常浪费的</strong>(除非你的事务非常长)，假设你的应用的TPS(每秒处理的事务数目)为1000，那么1s就需要1000个页，大概需要16M的存储，1分钟大概需要1G的存储。<strong>如果照这样下去除非MySQL清理的非常勤快，否则随着时间的推移，磁盘空间会增长的非常快</strong>，而且很多空间都是浪费的。</p>
-<p><strong>于是Undo页就被设计的可以重用了</strong>，当事务提交时，并<strong>不会立刻删除</strong>Undo页。因为重用，所以这个Undo页可能混杂着其他事务的Undo Log。<strong>Undo Log在commit后，会被放到一个链表中，然后判断Undo页的使用空间是否小于3&#x2F;4，如果小于3&#x2F;4的话，则表示当前的Undo页可以被重用，那么它就不会被回收，其他事务的Undo Log可以记录在当前Undo页的后面。</strong>由于Undo Log是离散的，所以清理对应的磁盘空间时，效率不高。</p>
-<p><strong>Undo Log的类型</strong></p>
-<p>在InnoDB存储引擎中，Undo Log分为：</p>
-<ul>
-<li><p><strong>insert Undo Log</strong> </p>
-<p>insert Undo Log是指在insert操作中产生的Undo Log。<strong>因为insert操作的记录，只对事务本身可见，对其他事务不可见(这是事务隔离性的要求)，故该Undo Log可以在事务提交后直接删除。不需要进行purge操作。</strong></p>
-</li>
-<li><p><strong>update Undo Log</strong></p>
-<p>update Undo Log记录的是对delete和update操作产生的Undo Log。该Undo Log可能需要提供MVCC机制，因此<strong>不能在事务提交时就进行删除</strong>。提交时放入Undo Log链表，等待purge线程进行最后的删除。</p>
-</li>
-</ul>
-<p><strong>Undo Log的生命周期</strong></p>
-<p>以下是Undo+Redo事务的简化过程: 假设有2个数值，分别为 A&#x3D;1 和 B&#x3D;2 ，然后将A修改为3，B修改为4</p>
-<figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="number">1.</span> start transaction;</span><br><span class="line"><span class="number">2</span>．记录A=<span class="number">1</span>到<span class="title class_">Undo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">3.</span> update A = <span class="number">3</span>;</span><br><span class="line"><span class="number">4</span>．记录A=<span class="number">3</span> 到<span class="title class_">Redo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">5</span>．记录B=<span class="number">2</span>到<span class="title class_">Undo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">6.</span> update B = <span class="number">4</span>;</span><br><span class="line"><span class="number">7</span>．记录B=<span class="number">4</span>到<span class="title class_">Redo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">8</span>．将<span class="title class_">Redo</span> <span class="title class_">Log</span>刷新到磁盘;</span><br><span class="line"><span class="number">9.</span> commit</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li>在1-8步骤的任意一步系统宕机，<strong>事务未提交，该事务就不会对磁盘上的数据做任何影响</strong>。</li>
-<li>如果在8-9之间宕机。<ul>
-<li>Redo Log 进行恢复</li>
-<li>Undo Log 发现有事务没完成进行回滚。</li>
-</ul>
-</li>
-<li>若在9之后系统宕机，内存映射中变更的数据<strong>还来不及刷回磁盘</strong>，那么系统恢复之后，<strong>可以根据Redo Log把数据刷回磁盘。</strong></li>
-</ul>
-<p>流程图：</p>
-<p><strong>这里还有一个binlog没有画，突然想起来之前使用Seata的时候好像就出现过这个redo，undo，binlog了</strong></p>
-<p><strong>又想起来了，之前使用ShardingSphere的时候就是使用的它的binlog来实现主从复制的</strong></p>
-<p><img src="/2024/09/09/MySQL03/image-20240909220208902.png" alt="image-20240909220208902"></p>
-<p>接下来再继续看</p>
-<p>假设一个值从1被按顺序改成了2、3、4，在回滚日志里面就会有类似下面的记录。</p>
-<p>当前值是4，但是在查询这条记录的时候，不同时刻启动的事务会有不同的read-view。如图中看到的，在视图A、B、C里面，这一个记录的值分别是1、2、4，<strong>同一条记录在系统中可以存在多个版本，就是数据库的多版本并发控制（MVCC）</strong>。对于read-view A，要得到1，就必须将当前值依次执行图中所有的回滚操作得到。</p>
-<p><img src="/2024/09/09/MySQL03/image-20240909204425101.png" alt="image-20240909204425101"></p>
-<p>同时你会发现，即使现在有另外一个事务正在将4改成5，这个事务跟read-view A、B、C对应的事务是不会冲突的，因为只要是修改没有commit，看的都是undo log中的备份数据。</p>
-<p><strong>你一定会问，回滚日志总不能一直保留吧，什么时候删除呢？答案是，在不需要的时候才删除。也就是说，系统会判断，当没有事务再需要用到这些回滚日志时，回滚日志会被删除。</strong></p>
-<p>什么时候才不需要了呢？<strong>就是当系统里没有比这个回滚日志更早的read-view的时候。（这里的回收机制有点类似GCRoot）</strong></p>
-<p>基于上面的说明，我们来讨论一下为什么建议你尽量不要使用长事务。</p>
-<p>长事务意味着<strong>系统里面会存在很老的事务视图</strong>。由于这些事务随时可能访问数据库里面的任何数据，所以这个事务提交之前，数据库里面它可能用到的回滚记录都必须保留，这就会<strong>导致大量占用存储空间</strong>。</p>
-<p>这里简单提一下为什么会有那么长的事务</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 业务逻辑复杂</span><br><span class="line">复杂的处理流程: 某些业务逻辑涉及多个步骤，可能需要长时间才能完成。例如，涉及审批、审核或多方协作的事务。</span><br><span class="line">2. 用户交互</span><br><span class="line">等待用户输入: 在许多应用中，事务可能需要等待用户的输入或确认。例如，在线购物中的支付过程，用户可能需要时间来确认付款。</span><br><span class="line">3. 网络延迟</span><br><span class="line">网络问题: 在分布式系统中，网络延迟可能导致事务处理时间延长。如果事务需要访问多个服务或数据库，网络问题可能导致长时间未提交。</span><br><span class="line">4. 锁竞争</span><br><span class="line">资源争用: 长事务可能会持有锁，导致其他事务无法执行。为了避免死锁，开发者可能选择不立即提交事务，而是等待某个条件满足。</span><br><span class="line">5. 性能问题</span><br><span class="line">数据库性能瓶颈: 如果数据库性能较差，查询或写入操作可能会耗时较长，导致事务延迟提交。</span><br><span class="line">6. 故障恢复</span><br><span class="line">故障处理: 如果系统或应用在处理事务时遇到故障，可能会导致事务未能及时提交，处于挂起状态。</span><br><span class="line">7. 设计缺陷</span><br><span class="line">系统设计不当: 如果系统设计没有考虑到事务的合理管理，可能会导致长时间持有未提交的事务。</span><br><span class="line">8. 长时间运行的报告或查询</span><br><span class="line">复杂查询: 某些查询可能需要长时间执行，尤其是在大数据集上进行复杂的分析和报告时，可能会导致事务维持较长时间。</span><br><span class="line">总结</span><br><span class="line">长事务未提交的原因可能涉及业务逻辑、用户交互、网络延迟、锁竞争等多种因素。长时间存在的事务视图会导致存储空间占用增加，影响数据库性能，因此在设计时应该尽量避免长事务，及时提交或回滚事务，以提高系统的效率和稳定性。</span><br></pre></td></tr></table></figure>
-
-<p>在MySQL 5.5及以前的版本，<strong>回滚日志是跟数据字典一起放在ibdata文件里的</strong>，即使<strong>长事务最终提交，回滚段被清理，文件也不会变小</strong>。我见过数据只有20GB，而回滚段有200GB的库。最终只好为了清理回滚段，重建整个库。</p>
-<p>除了对回滚段的影响，长事务还占用锁资源，也可能拖垮整个库，这个我们会在后面讲锁的时候展开。</p>
-<h3 id="事务的启动方式"><a href="#事务的启动方式" class="headerlink" title="事务的启动方式"></a>事务的启动方式</h3><p>如前面所述，长事务有这些潜在风险，我当然是建议你尽量避免。其实很多时候业务开发同学并不是有意使用长事务，通常是由于误用所致。MySQL的事务启动方式有以下几种：</p>
-<ol>
-<li><p>显式启动事务语句， begin 或 start transaction。配套的提交语句是commit，回滚语句是rollback。</p>
-</li>
-<li><p>set autocommit&#x3D;0，<strong>这个命令会将这个线程的自动提交关掉。意味着如果你只执行一个select语句，这个事务就启动了，而且并不会自动提交</strong>。这个事务持续存在直到你<strong>主动执行commit 或 rollback 语句</strong>，或者断开连接。</p>
-</li>
-</ol>
-<p>有些客户端连接框架会默认连接成功后先执行一个set autocommit&#x3D;0的命令。<strong>这就导致接下来的查询都在事务中，如果是长连接，就导致了意外的长事务。</strong></p>
-<p><strong>因此，我会建议你总是使用set autocommit&#x3D;1, 通过显式语句的方式来启动事务。</strong></p>
-<p>但是有的开发同学会纠结“多一次交互”的问题。对于一个需要频繁使用事务的业务，第二种方式每个事务在开始时都不需要主动执行一次 “begin”，减少了语句的交互次数。如果你也有这个顾虑，我建议你使用commit work and chain语法。</p>
-<p>在autocommit为1的情况下，用begin显式启动的事务，如果执行commit则提交事务。<strong>如果执行 commit work and chain，则是提交事务并自动启动下一个事务，这样也省去了再次执行begin语句的开销。同时带来的好处是从程序开发的角度明确地知道每个语句是否处于事务中。（详细的可以看看这篇文章<a href="https://juejin.cn/post/6987373561836994590">带你看看事务的分类和在MySQL中使用链式事务 | SQL全面教程七：事务(3)事务分类和MySQL中的commit work and chain - 掘金 (juejin.cn)</a>）</strong></p>
-<p>你可以在information_schema库的innodb_trx这个表中查询长事务，比如下面这个语句，用于查找持续时间超过60s的事务。</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> information_schema.innodb_trx <span class="keyword">where</span> TIME_TO_SEC(timediff(now(),trx_started))<span class="operator">&gt;</span><span class="number">60</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>主要介绍了MySQL的事务隔离级别的现象和实现，根据实现原理分析了长事务存在的风险，以及如何用正确的方式避免长事务。希望我举的例子能够帮助你理解事务，并更好地使用MySQL的事务特性。</p>
-<p>现在知道了系统里面应该避免长事务，如果你是业务开发负责人同时也是数据库负责人，你会有什么方案来避免出现或者处理这种情况呢？</p>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
       </tags>
   </entry>
 </search>
