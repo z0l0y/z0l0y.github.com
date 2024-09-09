@@ -1,6 +1,540 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>事务隔离：为什么你改了我还看不见？</title>
+    <url>/2024/09/09/MySQL03/</url>
+    <content><![CDATA[<p>提到事务，你肯定不陌生，和数据库打交道的时候，我们总是会用到事务。最经典的例子就是转账，你要给朋友小王转100块钱，而此时你的银行卡只有100块钱。</p>
+<p>转账过程具体到程序里会有一系列的操作，比如查询余额、做加减法、更新余额等，这些操作必须保证是一体的，不然等程序查完之后，还没做减法之前，你这100块钱，完全可以借着这个时间差再查一次，然后再给另外一个朋友转账，如果银行这么整，不就乱了么？这时就要用到“事务”这个概念了。</p>
+<p><strong>简单来说，事务就是要保证一组数据库操作，要么全部成功，要么全部失败。</strong>在MySQL中，<strong>事务支持是在引擎层实现的。</strong>你现在知道，MySQL是一个支持多引擎的系统，但并不是所有的引擎都支持事务。<strong>比如MySQL原生的MyISAM引擎就不支持事务，这也是MyISAM被InnoDB取代的重要原因之一。</strong></p>
+<p>今天的文章里，我将会以InnoDB为例，剖析MySQL在事务支持方面的特定实现，并基于原理给出相应的实践建议，希望这些案例能加深你对MySQL事务原理的理解。</p>
+<h3 id="隔离性与隔离级别"><a href="#隔离性与隔离级别" class="headerlink" title="隔离性与隔离级别"></a>隔离性与隔离级别</h3><p>提到事务，你肯定会想到<strong>ACID（Atomicity、Consistency、Isolation、Durability，即原子性、一致性、隔离性、持久性）</strong>，今天我们就来说说其中I，也就是“隔离性”。</p>
+<p>当数据库上有多个事务同时执行的时候，就可能出现<strong>脏读（dirty read）、不可重复读（non-repeatable read）、幻读（phantom read）的问题</strong>，为了解决这些问题，就有了“隔离级别”的概念。（简单的说，隔离级别是对于事务而言的，隔离的是事务不是其他的东西）</p>
+<p>在谈隔离级别之前，你首先要知道，你<strong>隔离得越严实，效率就会越低</strong>。因此很多时候，我们都要在二者之间寻找一个平衡点。<strong>SQL标准的事务隔离级别包括：读未提交（read uncommitted）、读提交（read committed）、可重复读（repeatable read）和串行化（serializable ）。</strong>下面我逐一为你解释：</p>
+<ul>
+<li><strong>读未提交</strong>是指：一个事务还<strong>没提交</strong>时，它做的变更<strong>就能被别的事务看到</strong>。（可以读到别人没有提交的事务，等同于考试的时候可以直接看到别人试卷的答案）</li>
+<li><strong>读提交</strong>是指：一个事务提交之后，它做的变更才会被其他事务看到。（你提交试卷之后我才能看到你的答案）</li>
+<li><strong>可重复读</strong>是指：<strong>一个事务执行过程中看到的数据，总是跟这个事务在启动时看到的数据是一致的</strong>。当然在可重复读隔离级别下，未提交变更对其他事务也是不可见的。（始终相信自己最开始见到的数据是不会变化的，可以重复读取到最开始的值。<strong>这个其实底层是靠undo log的回滚指针不停往前找的</strong>）</li>
+<li><strong>串行化</strong>：顾名思义是对于同一行记录，“写”会加“写锁”，“读”会加“读锁”。<strong>当出现读写锁冲突的时候，后访问的事务必须等前一个事务执行完成，才能继续执行。</strong>（<strong>串行就是排队等待，排成一行</strong>）</li>
+</ul>
+<p>其中“读提交”和“可重复读”比较难理解，所以我用一个例子说明这几种隔离级别。假设数据表T中只有一列，其中一行的值为1，下面是按照时间顺序执行两个事务的行为。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; create table T(c int) engine=InnoDB;</span><br><span class="line">insert into T(c) values(1);</span><br></pre></td></tr></table></figure>
+
+<p>我们来看看在不同的隔离级别下，事务A会有哪些不同的返回结果，也就是图里面V1、V2、V3的返回值分别是什么。</p>
+<p><img src="/2024/09/09/MySQL03/image-20240909200825360.png" alt="image-20240909200825360"></p>
+<ul>
+<li><strong>若隔离级别是“读未提交”， 则V1的值就是2。这时候事务B虽然还没有提交，但是结果已经被A看到了。</strong>因此，V2、V3也都是2。</li>
+<li>若隔离级别是“读提交”，则V1是1，V2的值是2。<strong>事务B的更新在提交后才能被A看到。</strong>所以， V3的值也是2。</li>
+<li>若隔离级别是“可重复读”，则V1、V2是1，V3是2。之所以V2还是1，遵循的就是这个要求：<strong>事务在执行期间看到的数据前后必须是一致的。</strong></li>
+<li>若隔离级别是“串行化”，<strong>则在事务B执行“将1改成2”的时候，会被锁住。直到事务A提交后，事务B才可以继续执行。</strong>所以从A的角度看， V1、V2值是1，V3的值是2。</li>
+</ul>
+<p>在实现上，数据库里面会<strong>创建一个视图</strong>，访问的时候<strong>以视图的逻辑结果为准</strong>。（视图的作用体现在这里了）</p>
+<ul>
+<li>在“可重复读”隔离级别下，<strong>这个视图是在事务启动时创建的，整个事务存在期间都用这个视图。</strong></li>
+<li>在“读提交”隔离级别下，<strong>这个视图是在每个SQL语句开始执行的时候创建的。</strong></li>
+<li>这里需要注意的是，<strong>“读未提交”隔离级别下直接返回记录上的最新值，没有视图概念。</strong></li>
+<li>而“串行化”隔离级别下<strong>直接用加锁的方式来避免并行访问。</strong></li>
+</ul>
+<p>我们可以看到在不同的隔离级别下，数据库行为是有所不同的。<strong>Oracle数据库的默认隔离级别其实就是“读提交”，因此对于一些从Oracle迁移到MySQL的应用，为保证数据库隔离级别的一致，你一定要记得将MySQL的隔离级别设置为“读提交”。（MySQL 的默认事务隔离级别是 <strong>REPEATABLE READ</strong>（可重复读））</strong></p>
+<p>配置的方式是，<strong>将启动参数transaction-isolation的值设置成READ-COMMITTED</strong>。你可以用show variables来查看当前的值。（这个输出的东西很多，你可以指定输出流输入到一个文件中看看）</p>
+<p><img src="/2024/09/09/MySQL03/image-20240909201622812.png" alt="image-20240909201622812"></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; show variables like &#x27;transaction_isolation&#x27;;</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br><span class="line"></span><br><span class="line">| Variable_name | Value |</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br><span class="line"></span><br><span class="line">| transaction_isolation | READ-COMMITTED |</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br></pre></td></tr></table></figure>
+
+<p>总结来说，存在即合理，哪个隔离级别都有它自己的使用场景，你要根据自己的业务情况来定。我想<strong>你可能会问那什么时候需要“可重复读”的场景呢</strong>？我们来看一个数据校对逻辑的案例。</p>
+<p>假设你在管理一个个人银行账户表。一个表存了每个月月底的余额，一个表存了账单明细。<strong>这时候你要做数据校对，也就是判断上个月的余额和当前余额的差额，是否与本月的账单明细一致。你一定希望在校对过程中，即使有用户发生了一笔新的交易，也不影响你的校对结果。</strong></p>
+<p><strong>这时候使用“可重复读”隔离级别就很方便。事务启动时的视图可以认为是静态的，不受其他事务更新的影响。</strong></p>
+<h3 id="事务隔离的实现"><a href="#事务隔离的实现" class="headerlink" title="事务隔离的实现"></a>事务隔离的实现</h3><p>理解了事务的隔离级别，我们再来看看事务隔离具体是怎么实现的。这里我们展开说明“可重复读”。</p>
+<p><strong>在MySQL中，实际上每条记录在更新的时候都会同时记录一条回滚操作。记录上的最新值，通过回滚操作，都可以得到前一个状态的值。（这就是Undo log用于回滚的。Undo Log（撤销日志）在数据库管理系统中用于实现回滚操作，确保数据的完整性和一致性）</strong></p>
+<p>建议先看完这篇博客再看下面的内容</p>
+<p><a href="https://blog.csdn.net/Weixiaohuai/article/details/117867353">MySQL回滚日志（undo log）总结_mysql undo log-CSDN博客</a></p>
+<p>下面是这篇文章比较重要的部分：</p>
+<p>MVCC（Multi-Version Concurrency Control，<strong>多版本并发控制</strong>）是一种用于数据库管理系统的并发控制机制，旨在允许<strong>多个事务同时读取和写入数据，而不互相阻塞</strong>。</p>
+<p>在MySQL数据库InnoDB存储引擎中，用undo Log来实现多版本并发控制(MVCC)。</p>
+<p><strong>当读取的某一行被其他事务锁定时，它可以从undo log中分析出该行记录以前的数据版本是怎样的，从而让用户能够读取到当前事务操作之前的数据【快照读】。</strong></p>
+<p>下面解释一下什么是快照读，与之对应的还有一个是—当前读。</p>
+<ul>
+<li>快照读：<br>SQL读取的数据是快照版本【可见版本】，<strong>也就是历史版本</strong>，不用加锁，普通的SELECT就是快照读。</li>
+<li>当前读：<br><strong>SQL读取的数据是最新版本。</strong>通过锁机制来保证读取的数据无法通过其他事务进行修改UPDATE、DELETE、INSERT、SELECT … LOCK IN SHARE MODE、SELECT … FOR UPDATE都是当前读。</li>
+</ul>
+<p>说实话，这个玩意的底层实现很类似于Git的底层实现</p>
+<p>undo log的存储机制</p>
+<p>undo log的存储<strong>由InnoDB存储引擎</strong>实现，<strong>数据保存在InnoDB的数据文件中</strong>。</p>
+<p>在InnoDB存储引擎中，undo log是<strong>采用分段(segment)的方式进行存储的</strong>。<strong>rollback segment称为回滚段，每个回滚段中有1024个undo log segment。</strong></p>
+<p>在MySQL5.5之前，只支持1个rollback segment，也就是<strong>只能记录1024个undo操作</strong>。（这个记录的方式和Redis的AOF很类似）</p>
+<p><strong>在MySQL5.5之后，可以支持128个rollback segment，分别从resg slot0 - resg slot127，每一个resg slot，也就是每一个回滚段，内部由1024个undo segment 组成，即总共可以记录128 * 1024个undo操作。（这个又有一点像Redis分片集群的slot槽）</strong></p>
+<p><img src="/2024/09/09/MySQL03/image-20240909210933285.png" alt="image-20240909210933285"></p>
+<p><strong>undo log日志里面不仅存放着数据更新前的记录，还记录着RowID、事务ID、回滚指针。（这个玩意和Git底层很类似）</strong>其中事务ID每次递增，回滚指针第一次如果是insert语句的话，回滚指针为NULL，第二次update之后的undo log的回滚指针就会指向刚刚那一条undo log日志，依次类推，就会形成一条undo log的回滚链，方便找到该条记录的历史版本。</p>
+<p>undo log的工作原理</p>
+<p>在更新数据之前，MySQL会<strong>提前</strong>生成undo log日志，当<strong>事务提交</strong>的时候，并<strong>不会立即删除undo log</strong>，要执行回滚（rollback）操作时，从缓存中读取数据。<strong>undo log日志的删除是通过通过后台purge线程进行回收处理的。</strong></p>
+<p><img src="/2024/09/09/MySQL03/image-20240909211811977.png" alt="image-20240909211811977"></p>
+<p>如上图：</p>
+<ul>
+<li>1、事务A执行update操作，此时事务还没提交，<strong>会将数据进行备份到对应的undo buffer，然后由undo buffer持久化到磁盘中的undo log文件中，此时undo log保存了未提交之前的操作日志</strong>，接着将操作的数据，也就是Teacher表的数据持久保存到<strong>InnoDB的数据文件IBD。</strong>（注意是先在缓存中记录到undo buffer再持久化到undo log日志中，最后才是将数据持久化到存储引擎的IBD文件中）</li>
+<li>2、此时事务B进行查询操作，直接从undo buffer缓存中进行读取，这时事务A还没提交事务。如果要回滚（rollback）事务，是不读磁盘的，<strong>先直接从undo buffer缓存读取。</strong></li>
+</ul>
+<p>用undo log实现原子性和持久化的事务的简化过程：</p>
+<p>假设有A、B两个数据，值分别为1,2。</p>
+<ul>
+<li>A. 事务开始</li>
+<li>B. 记录A&#x3D;1到undo log中</li>
+<li>C. 修改A&#x3D;3</li>
+<li>D. 记录B&#x3D;2到undo log中</li>
+<li>E. 修改B&#x3D;4</li>
+<li>F. 将undo log写到磁盘 ——-<strong>undo log持久化</strong></li>
+<li>G. 将数据写到磁盘 ——-<strong>数据持久化</strong></li>
+<li>H. 事务提交 ——-<strong>提交事务</strong></li>
+</ul>
+<p>之所以能同时保证原子性和持久化，是因为以下特点：</p>
+<ul>
+<li><strong>更新数据前</strong>记录undo log。</li>
+<li>为了保证持久性，<strong>必须将数据在事务提交前写到磁盘，只要事务成功提交，数据必然已经持久化到磁盘。</strong></li>
+<li><strong>undo log必须先于数据持久化到磁盘。</strong>如果在G,H之间发生<strong>系统崩溃</strong>，undo log是完整的，<strong>可以用来回滚。</strong></li>
+<li>如果在A - F之间发生系统崩溃，因为数据没有持久化到磁盘，所以磁盘上的数据还是保持在事务开始前的状态。</li>
+</ul>
+<p>缺陷：每个事务提交前将数据和undo log写入磁盘，这样会导致大量的磁盘IO，因此性能较差。 <strong>如果能够将数据缓存一段时间，就能减少IO提高性能，但是这样就会失去事务的持久性。</strong></p>
+<blockquote>
+<p><strong>undo日志属于逻辑日志，redo（recovery）是物理日志</strong>，所谓逻辑日志是undo log<strong>是记录一个操作过程</strong>，不会物理删除</p>
+<p><strong>binlog也是逻辑日志，AOF也是逻辑日志</strong></p>
+<p>undo log，sql执行delete或者update操作都会记录一条undo日志</p>
+<p><strong>undo是应对数据库回滚的情况，redo是应对数据库执行到一半故障继续执行的情况，binlog是应对恢复数据库的情况</strong></p>
+</blockquote>
+<p>再看一篇试试</p>
+<p><a href="https://cloud.tencent.com/developer/article/2220871">图文结合带你搞定MySQL日志之Undo log(回滚日志)-腾讯云开发者社区-腾讯云 (tencent.com)</a></p>
+<p>下面提取了部分重点内容：</p>
+<p><strong>如何理解Undo Log</strong></p>
+<p>事务需要保证<strong>原子性</strong>，也就是事务中的操作要么全部完成，要么什么也不做。但有时候事务执行到一半会出现一些情况，比如：</p>
+<ul>
+<li>情况一：事务执行过程中可能遇到<strong>各种错误</strong>，比如<a href="https://cloud.tencent.com/act/pro/promotion-cvm?from_column=20065&from=20065">服务器</a>本身的错误，操作系统错误，甚至是突然断电导致的错误。</li>
+<li>情况二：DBA可以在事务执行过程中手动输入ROLLBACK语句结束当前事务的执行。以上情况出现，我们需要把数据改回原先的样子，这个过程称之为回滚。</li>
+</ul>
+<p>每当我们要对一条记录做改动时**(这里的改动可以指<code>INSERT、DELETE、UPDATE</code>)，都需要把回滚时所需的东西记下来。**比如:</p>
+<ul>
+<li>你插入一条记录时，至少要把这条记录的主键值记下来，之后回滚的时候只需要把这个主键值对应的记录删掉就好了。**(对于每个<code>INSERT</code>, InnoDB存储引擎会完成一个<code>DELETE</code>)**</li>
+<li>你删除了一条记录，至少要把这条记录中的内容都记下来，这样之后回滚时再把由这些内容组成的记录插入到表中就好了。**(对于每个<code>DELETE</code>,InnoDB存储引擎会执行一个<code>INSERT</code>)**</li>
+<li>你修改了一条记录，至少要把修改这条记录前的旧值都记录下来，这样之后回滚时再把这条记录更新为旧值就好了。**(对于每个<code>UPDATE</code>，InnoDB存储引擎会执行一个<code>相反的UPDATE</code>，将修改前的行放回去)**</li>
+</ul>
+<p><a href="https://cloud.tencent.com/product/cdb?from_column=20065&from=20065">MySQL</a>把这些为了回滚而记录的这些内容称之为<code>撤销日志</code>或者<code>回滚日志</code>(即Undo Log)。<strong>注意，由于查询操作(SELECT）并不会修改任何用户记录，所以在杳询操作行时，并不需要记录相应的Undo日志</strong></p>
+<p><strong>此外，Undo Log会产生<code>Redo Log</code>，也就是Undo Log的产生会伴随着Redo Log的产生，这是因为Undo Log也需要持久性的保护。</strong></p>
+<p>这里解释一下，为什么它们是相辅相成的，这里简单的说一下，本来我们执行到一半挂了，undo是回到开始，redo是继续执行完</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在数据库管理系统中，Undo Log 和 Redo Log 是用于实现数据一致性和事务管理的两种重要日志，它们通常会一起生成，以确保在事务过程中能够安全地恢复数据。以下是详细解释：</span><br><span class="line"></span><br><span class="line">### 1. **Undo Log 的作用**</span><br><span class="line"></span><br><span class="line">- **回滚功能**: Undo Log 记录了事务对数据的修改前状态，允许在事务失败或被中断时将数据恢复到修改之前的状态。</span><br><span class="line">- **持久性保护**: 为了确保在系统崩溃或故障后仍能进行数据恢复，Undo Log 必须被持久化到磁盘。</span><br><span class="line"></span><br><span class="line">### 2. **Redo Log 的作用**</span><br><span class="line"></span><br><span class="line">- **恢复功能**: Redo Log 记录了已提交事务的修改操作，用于在系统崩溃后重放这些操作，从而恢复数据到最新状态。</span><br><span class="line">- **事务的完整性**: Redo Log 确保即使在故障发生时，已提交的事务也不会丢失。</span><br><span class="line"></span><br><span class="line">### 3. **二者的关系**</span><br><span class="line"></span><br><span class="line">- **同时生成**: 在事务执行过程中，每当数据库修改数据时，系统会同时生成 Undo Log 和 Redo Log。</span><br><span class="line">  - **Undo Log**: 记录修改前的状态，以便在需要回滚时使用。</span><br><span class="line">  - **Redo Log**: 记录修改后的状态，以便在系统重启时重放已提交的事务。</span><br><span class="line">- **持久性需求**:</span><br><span class="line">  - Undo Log 需要被持久化，以确保在崩溃后能够恢复未完成的事务或回滚操作。</span><br><span class="line">  - Redo Log 则确保已完成的事务能够在故障后恢复。</span><br><span class="line"></span><br><span class="line">### 4. **总结**</span><br><span class="line"></span><br><span class="line">因此，Undo Log 和 Redo Log 的产生是相辅相成的。Undo Log 提供了回滚的能力，而 Redo Log 确保了已提交事务的持久性。两者的结合使得数据库能够在发生故障时，既能恢复到一致的状态，又能保证数据的完整性和安全性。</span><br></pre></td></tr></table></figure>
+
+<p><strong>Undo Log的存储结构</strong></p>
+<p>InnoDB对Undo Log的管理采用段的方式，也就是<code>回滚段（rollback segment）</code>。每个回滚段记录了<code>1024 个Undo Log segment</code>，而在每个Undo Log segment段中进行<code>Undo页</code>的申请。</p>
+<p>在<code>InnoDB1.1版本</code>之前（不包括1.1版本），只有一个<code>rollback segment</code>，因此支持<strong>同时在线</strong>的事务限制为 <strong>1024</strong>。虽然对绝大多数的应用来说都已经够用。</p>
+<p>从1.1版本开始InnoDB支持最大<code>128个rollback segment</code>，故其支持<strong>同时在线的事务</strong>限制提高到了<code>128*1024</code>。</p>
+<p>虽然InnoDB1.1版本支持了128个<code>rollback segment</code>，但是这些<code>rollback segment</code>都存储于共享表空间<strong>ibdata（上面提到的IBD文件）</strong>中。从lnnoDB1.2版本开始，可通过参数对<code>rollback segment</code>做进一步的设置。这些参数包括:</p>
+<ul>
+<li><code>innodb_undo_directory:</code>设置rollback segment文件所在的路径。这意味着rollback segment可以存放在共享表空间以外的位置，即可以设置为独立表空间。该参数的默认值为“.&#x2F;”，表示当前InnoDB存储引擎的目录。</li>
+<li><code>innodb_undo_logs:</code>设置rollback segment的个数，默认值为128。在InnoDB1.2版本中，该参数用来替换之前版本的参数innodb_rollback_segments。</li>
+<li><code>innodb_undo_tablespaces:</code>设置构成rollback segment文件的数量，这样rollback segment可以较为平均地分布在多个文件中。设置该参数后，会在路径innodb_undo_directory看到undo为前缀的文件，该文件就代表rollback segment文件。</li>
+</ul>
+<p>当事务提交时，InnoDB存储引擎会做以下两件事情：    </p>
+<ul>
+<li>1.将Undo Log放入列表中，<strong>以供之后的purge(清洗、清除)操作</strong>    </li>
+<li>2.判断Undo Log所在的页是否可以重用(低于3&#x2F;4可以重用)，若可以分配给下个事务使用</li>
+</ul>
+<p><strong>Undo页的重用</strong></p>
+<p>当我们开启一个事务需要写Undo log的时候，就得先去<code>Undo Log segment</code>中去找到一个空闲的位置，当有空位的时候，就去申请Undo页，在这个申请到的Undo页中进行Undo Log的写入。<strong>我们知道MySQL默认一页的大小是<code>16k</code>。</strong></p>
+<p>为每一个事务分配一个页，<strong>是非常浪费的</strong>(除非你的事务非常长)，假设你的应用的TPS(每秒处理的事务数目)为1000，那么1s就需要1000个页，大概需要16M的存储，1分钟大概需要1G的存储。<strong>如果照这样下去除非MySQL清理的非常勤快，否则随着时间的推移，磁盘空间会增长的非常快</strong>，而且很多空间都是浪费的。</p>
+<p><strong>于是Undo页就被设计的可以重用了</strong>，当事务提交时，并<strong>不会立刻删除</strong>Undo页。因为重用，所以这个Undo页可能混杂着其他事务的Undo Log。<strong>Undo Log在commit后，会被放到一个链表中，然后判断Undo页的使用空间是否小于3&#x2F;4，如果小于3&#x2F;4的话，则表示当前的Undo页可以被重用，那么它就不会被回收，其他事务的Undo Log可以记录在当前Undo页的后面。</strong>由于Undo Log是离散的，所以清理对应的磁盘空间时，效率不高。</p>
+<p><strong>Undo Log的类型</strong></p>
+<p>在InnoDB存储引擎中，Undo Log分为：</p>
+<ul>
+<li><p><strong>insert Undo Log</strong> </p>
+<p>insert Undo Log是指在insert操作中产生的Undo Log。<strong>因为insert操作的记录，只对事务本身可见，对其他事务不可见(这是事务隔离性的要求)，故该Undo Log可以在事务提交后直接删除。不需要进行purge操作。</strong></p>
+</li>
+<li><p><strong>update Undo Log</strong></p>
+<p>update Undo Log记录的是对delete和update操作产生的Undo Log。该Undo Log可能需要提供MVCC机制，因此<strong>不能在事务提交时就进行删除</strong>。提交时放入Undo Log链表，等待purge线程进行最后的删除。</p>
+</li>
+</ul>
+<p><strong>Undo Log的生命周期</strong></p>
+<p>以下是Undo+Redo事务的简化过程: 假设有2个数值，分别为 A&#x3D;1 和 B&#x3D;2 ，然后将A修改为3，B修改为4</p>
+<figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="number">1.</span> start transaction;</span><br><span class="line"><span class="number">2</span>．记录A=<span class="number">1</span>到<span class="title class_">Undo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">3.</span> update A = <span class="number">3</span>;</span><br><span class="line"><span class="number">4</span>．记录A=<span class="number">3</span> 到<span class="title class_">Redo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">5</span>．记录B=<span class="number">2</span>到<span class="title class_">Undo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">6.</span> update B = <span class="number">4</span>;</span><br><span class="line"><span class="number">7</span>．记录B=<span class="number">4</span>到<span class="title class_">Redo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">8</span>．将<span class="title class_">Redo</span> <span class="title class_">Log</span>刷新到磁盘;</span><br><span class="line"><span class="number">9.</span> commit</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>在1-8步骤的任意一步系统宕机，<strong>事务未提交，该事务就不会对磁盘上的数据做任何影响</strong>。</li>
+<li>如果在8-9之间宕机。<ul>
+<li>Redo Log 进行恢复</li>
+<li>Undo Log 发现有事务没完成进行回滚。</li>
+</ul>
+</li>
+<li>若在9之后系统宕机，内存映射中变更的数据<strong>还来不及刷回磁盘</strong>，那么系统恢复之后，<strong>可以根据Redo Log把数据刷回磁盘。</strong></li>
+</ul>
+<p>流程图：</p>
+<p><strong>这里还有一个binlog没有画，突然想起来之前使用Seata的时候好像就出现过这个redo，undo，binlog了</strong></p>
+<p><strong>又想起来了，之前使用ShardingSphere的时候就是使用的它的binlog来实现主从复制的</strong></p>
+<p><img src="/2024/09/09/MySQL03/image-20240909220208902.png" alt="image-20240909220208902"></p>
+<p>接下来再继续看</p>
+<p>假设一个值从1被按顺序改成了2、3、4，在回滚日志里面就会有类似下面的记录。</p>
+<p>当前值是4，但是在查询这条记录的时候，不同时刻启动的事务会有不同的read-view。如图中看到的，在视图A、B、C里面，这一个记录的值分别是1、2、4，<strong>同一条记录在系统中可以存在多个版本，就是数据库的多版本并发控制（MVCC）</strong>。对于read-view A，要得到1，就必须将当前值依次执行图中所有的回滚操作得到。</p>
+<p><img src="/2024/09/09/MySQL03/image-20240909204425101.png" alt="image-20240909204425101"></p>
+<p>同时你会发现，即使现在有另外一个事务正在将4改成5，这个事务跟read-view A、B、C对应的事务是不会冲突的，因为只要是修改没有commit，看的都是undo log中的备份数据。</p>
+<p><strong>你一定会问，回滚日志总不能一直保留吧，什么时候删除呢？答案是，在不需要的时候才删除。也就是说，系统会判断，当没有事务再需要用到这些回滚日志时，回滚日志会被删除。</strong></p>
+<p>什么时候才不需要了呢？<strong>就是当系统里没有比这个回滚日志更早的read-view的时候。（这里的回收机制有点类似GCRoot）</strong></p>
+<p>基于上面的说明，我们来讨论一下为什么建议你尽量不要使用长事务。</p>
+<p>长事务意味着<strong>系统里面会存在很老的事务视图</strong>。由于这些事务随时可能访问数据库里面的任何数据，所以这个事务提交之前，数据库里面它可能用到的回滚记录都必须保留，这就会<strong>导致大量占用存储空间</strong>。</p>
+<p>这里简单提一下为什么会有那么长的事务</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 业务逻辑复杂</span><br><span class="line">复杂的处理流程: 某些业务逻辑涉及多个步骤，可能需要长时间才能完成。例如，涉及审批、审核或多方协作的事务。</span><br><span class="line">2. 用户交互</span><br><span class="line">等待用户输入: 在许多应用中，事务可能需要等待用户的输入或确认。例如，在线购物中的支付过程，用户可能需要时间来确认付款。</span><br><span class="line">3. 网络延迟</span><br><span class="line">网络问题: 在分布式系统中，网络延迟可能导致事务处理时间延长。如果事务需要访问多个服务或数据库，网络问题可能导致长时间未提交。</span><br><span class="line">4. 锁竞争</span><br><span class="line">资源争用: 长事务可能会持有锁，导致其他事务无法执行。为了避免死锁，开发者可能选择不立即提交事务，而是等待某个条件满足。</span><br><span class="line">5. 性能问题</span><br><span class="line">数据库性能瓶颈: 如果数据库性能较差，查询或写入操作可能会耗时较长，导致事务延迟提交。</span><br><span class="line">6. 故障恢复</span><br><span class="line">故障处理: 如果系统或应用在处理事务时遇到故障，可能会导致事务未能及时提交，处于挂起状态。</span><br><span class="line">7. 设计缺陷</span><br><span class="line">系统设计不当: 如果系统设计没有考虑到事务的合理管理，可能会导致长时间持有未提交的事务。</span><br><span class="line">8. 长时间运行的报告或查询</span><br><span class="line">复杂查询: 某些查询可能需要长时间执行，尤其是在大数据集上进行复杂的分析和报告时，可能会导致事务维持较长时间。</span><br><span class="line">总结</span><br><span class="line">长事务未提交的原因可能涉及业务逻辑、用户交互、网络延迟、锁竞争等多种因素。长时间存在的事务视图会导致存储空间占用增加，影响数据库性能，因此在设计时应该尽量避免长事务，及时提交或回滚事务，以提高系统的效率和稳定性。</span><br></pre></td></tr></table></figure>
+
+<p>在MySQL 5.5及以前的版本，<strong>回滚日志是跟数据字典一起放在ibdata文件里的</strong>，即使<strong>长事务最终提交，回滚段被清理，文件也不会变小</strong>。我见过数据只有20GB，而回滚段有200GB的库。最终只好为了清理回滚段，重建整个库。</p>
+<p>除了对回滚段的影响，长事务还占用锁资源，也可能拖垮整个库，这个我们会在后面讲锁的时候展开。</p>
+<h3 id="事务的启动方式"><a href="#事务的启动方式" class="headerlink" title="事务的启动方式"></a>事务的启动方式</h3><p>如前面所述，长事务有这些潜在风险，我当然是建议你尽量避免。其实很多时候业务开发同学并不是有意使用长事务，通常是由于误用所致。MySQL的事务启动方式有以下几种：</p>
+<ol>
+<li><p>显式启动事务语句， begin 或 start transaction。配套的提交语句是commit，回滚语句是rollback。</p>
+</li>
+<li><p>set autocommit&#x3D;0，<strong>这个命令会将这个线程的自动提交关掉。意味着如果你只执行一个select语句，这个事务就启动了，而且并不会自动提交</strong>。这个事务持续存在直到你<strong>主动执行commit 或 rollback 语句</strong>，或者断开连接。</p>
+</li>
+</ol>
+<p>有些客户端连接框架会默认连接成功后先执行一个set autocommit&#x3D;0的命令。<strong>这就导致接下来的查询都在事务中，如果是长连接，就导致了意外的长事务。</strong></p>
+<p><strong>因此，我会建议你总是使用set autocommit&#x3D;1, 通过显式语句的方式来启动事务。</strong></p>
+<p>但是有的开发同学会纠结“多一次交互”的问题。对于一个需要频繁使用事务的业务，第二种方式每个事务在开始时都不需要主动执行一次 “begin”，减少了语句的交互次数。如果你也有这个顾虑，我建议你使用commit work and chain语法。</p>
+<p>在autocommit为1的情况下，用begin显式启动的事务，如果执行commit则提交事务。<strong>如果执行 commit work and chain，则是提交事务并自动启动下一个事务，这样也省去了再次执行begin语句的开销。同时带来的好处是从程序开发的角度明确地知道每个语句是否处于事务中。（详细的可以看看这篇文章<a href="https://juejin.cn/post/6987373561836994590">带你看看事务的分类和在MySQL中使用链式事务 | SQL全面教程七：事务(3)事务分类和MySQL中的commit work and chain - 掘金 (juejin.cn)</a>）</strong></p>
+<p>你可以在information_schema库的innodb_trx这个表中查询长事务，比如下面这个语句，用于查找持续时间超过60s的事务。</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> information_schema.innodb_trx <span class="keyword">where</span> TIME_TO_SEC(timediff(now(),trx_started))<span class="operator">&gt;</span><span class="number">60</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>主要介绍了MySQL的事务隔离级别的现象和实现，根据实现原理分析了长事务存在的风险，以及如何用正确的方式避免长事务。希望我举的例子能够帮助你理解事务，并更好地使用MySQL的事务特性。</p>
+<p>现在知道了系统里面应该避免长事务，如果你是业务开发负责人同时也是数据库负责人，你会有什么方案来避免出现或者处理这种情况呢？</p>
+<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>在上期文章的最后，留下的问题是一天一备跟一周一备的对比。</p>
+<p>好处是“最长恢复时间”更短。</p>
+<p>在一天一备的模式里，最坏情况下需要应用一天的binlog。比如，你每天0点做一次全量备份，而要恢复出一个到昨天晚上23点的备份。</p>
+<p>一周一备最坏情况就要应用一周的binlog了。</p>
+<p><strong>系统的对应指标就是RTO（恢复目标时间）。</strong></p>
+<p>当然这个是有成本的，因为更频繁全量备份需要消耗更多存储空间，所以这个RTO是成本换来的，就需要你根据业务重要性来评估了。</p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>日志系统：一条SQL更新语句是如何执行的？</title>
+    <url>/2024/09/09/MySQL02/</url>
+    <content><![CDATA[<h1 id="日志系统：一条SQL更新语句是如何执行的？"><a href="#日志系统：一条SQL更新语句是如何执行的？" class="headerlink" title="日志系统：一条SQL更新语句是如何执行的？"></a>日志系统：一条SQL更新语句是如何执行的？</h1><p>前面我们系统了解了一个查询语句的执行流程，并介绍了执行过程中涉及的处理模块。相信你还记得，<strong>一条查询语句的执行过程一般是经过连接器、分析器、优化器、执行器等功能模块，最后到达存储引擎。</strong></p>
+<p>那么，<strong>一条更新语句</strong>的执行流程又是怎样的呢？</p>
+<p>之前你可能经常听DBA同事说，MySQL可以恢复到半个月内任意一秒的状态，惊叹的同时，你是不是心中也会不免会好奇，这是怎样做到的呢？</p>
+<p>我们还是从一个表的一条更新语句说起，下面是这个表的创建语句，这个表有一个主键ID和一个整型字段c：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; create table T(ID int primary key, c int);</span><br></pre></td></tr></table></figure>
+
+<p>如果要将ID&#x3D;2这一行的值加1，SQL语句就会这么写：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; update T set c=c+1 where ID=2;</span><br></pre></td></tr></table></figure>
+
+<p>前面介绍过SQL语句基本的执行链路，这里我再把那张图拿过来，你也可以先简单看看这个图回顾下。首先，可以确定的说，查询语句的那一套流程，更新语句也是同样会走一遍。</p>
+<p><img src="/2024/09/09/MySQL02/image-20240909163544965.png" alt="image-20240909163544965"></p>
+<p>你执行语句前要<strong>先连接数据库，这是连接器的工作</strong>。</p>
+<p>前面我们说过，在一个表上有更新的时候，跟这个表有关的查询缓存会失效，<strong>所以这条语句就会把表T上所有缓存结果都清空。这也就是我们一般不建议使用查询缓存的原因</strong>。</p>
+<p>接下来，<strong>分析器</strong>会通过词法和语法解析知道这是一条更新语句。<strong>优化器</strong>决定要使用ID这个索引。然后，<strong>执行器</strong>负责具体执行，找到这一行，然后更新。</p>
+<p>与查询流程不一样的是，<strong>更新流程还涉及两个重要的日志模块</strong>，它们正是我们今天要讨论的主角：<strong>redo log（重做日志）和 binlog（归档日志）</strong>。如果接触MySQL，那这两个词肯定是绕不过的，我后面的内容里也会不断地和你强调。不过话说回来，redo log和binlog在设计上有很多有意思的地方，这些设计思路也可以用到你自己的程序里。</p>
+<h3 id="重要的日志模块：redo-log"><a href="#重要的日志模块：redo-log" class="headerlink" title="重要的日志模块：redo log"></a>重要的日志模块：redo log</h3><p>不知道你还记不记得《孔乙己》这篇文章，酒店掌柜有一个粉板，专门用来记录客人的赊账记录。如果赊账的人不多，那么他可以把顾客名和账目写在板上。但如果赊账的人多了，粉板总会有记不下的时候，这个时候掌柜一定还有一个专门记录赊账的账本。</p>
+<p>如果有人要赊账或者还账的话，掌柜一般有两种做法：</p>
+<ul>
+<li>一种做法是直接把账本翻出来，把这次赊的账加上去或者扣除掉；</li>
+<li>另一种做法是先在粉板上记下这次的账，等打烊以后再把账本翻出来核算。</li>
+</ul>
+<p>在生意红火柜台很忙时，掌柜一定会选择后者，因为前者操作实在是太麻烦了。首先，你得找到这个人的赊账总额那条记录。你想想，密密麻麻几十页，掌柜要找到那个名字，可能还得带上老花镜慢慢找，找到之后再拿出算盘计算，最后再将结果写回到账本上。</p>
+<p>这整个过程想想都麻烦。相比之下，还是先在粉板上记一下方便。你想想，如果掌柜没有粉板的帮助，每次记账都得翻账本，效率是不是低得让人难以忍受？</p>
+<p>同样，在MySQL里也有这个问题，<strong>如果每一次的更新操作都需要写进磁盘，然后磁盘也要找到对应的那条记录，然后再更新，整个过程IO成本、查找成本都很高</strong>。为了解决这个问题，MySQL的设计者就用了类似酒店掌柜粉板的思路来提升更新效率。</p>
+<p><strong>而粉板和账本配合的整个过程，其实就是MySQL里经常说到的WAL技术，WAL的全称是Write-Ahead Logging，它的关键点就是先写日志，再写磁盘，也就是先写粉板，等不忙的时候再写账本。（这个其实也是为了避免写了磁盘之后没有时间来得急写日志，导致Log不一致的问题）</strong></p>
+<p>具体来说，当有一条记录需要更新的时候，<strong>InnoDB引擎就会先把记录写到redo log（粉板）里面，并更新内存，这个时候更新就算完成了</strong>。同时，InnoDB引擎会在<strong>适当</strong>的时候，将这个操作记录<strong>更新到磁盘</strong>里面，<strong>而这个更新往往是在系统比较空闲的时候做，这就像打烊以后掌柜做的事</strong>。</p>
+<p>如果今天赊账的不多，掌柜可以等打烊后再整理。但如果某天赊账的特别多，粉板写满了，又怎么办呢？这个时候掌柜只好放下手中的活儿，把粉板中的一部分赊账记录更新到账本中，然后把这些记录从粉板上擦掉，为记新账腾出空间。</p>
+<p>与此类似，<strong>InnoDB的redo log是固定大小的，比如可以配置为一组4个文件，每个文件的大小是1GB，那么这块“粉板”总共就可以记录4GB的操作。从头开始写，写到末尾就又回到开头循环写，如下面这个图所示。</strong></p>
+<p><img src="/2024/09/09/MySQL02/image-20240909164238628.png" alt="image-20240909164238628"></p>
+<p><strong>write pos是当前记录的位置</strong>，一边写一边后移，写到第3号文件末尾后就回到0号文件开头。<strong>checkpoint是当前要擦除的位置，也是往后推移并且循环的，擦除记录前要把记录更新到数据文件。（我记得之前好像看过一个类似的环形更新方法，反正Redis分布式采用的方法有一个是环形的）</strong></p>
+<p><strong>write pos和checkpoint之间的是“粉板”上还空着的部分，可以用来记录新的操作。如果write pos追上checkpoint，表示“粉板”满了，这时候不能再执行新的更新，得停下来先擦掉一些记录，把checkpoint推进一下。（有一点像JVM的STW）</strong></p>
+<p>有了redo log，<strong>InnoDB就可以保证即使数据库发生异常重启，之前提交的记录都不会丢失</strong>，这个能力称为<strong>crash-safe</strong>。（这玩意经常在面试中问，大概就是什么MySQL数据库突然断电了，怎么找回数据的）</p>
+<p>要理解crash-safe这个概念，可以想想我们前面赊账记录的例子。只要赊账记录记在了粉板上或写在了账本上，之后即使掌柜忘记了，比如突然<strong>停业</strong>几天，<strong>恢复</strong>生意后<strong>依然</strong>可以通过账本和粉板上的数据明确赊账账目。</p>
+<h3 id="重要的日志模块：binlog"><a href="#重要的日志模块：binlog" class="headerlink" title="重要的日志模块：binlog"></a>重要的日志模块：binlog</h3><p>前面我们讲过，MySQL整体来看，其实就有两块：一块是Server层，它主要做的是<strong>MySQL功能层面</strong>的事情；还有一块是引擎层，<strong>负责存储</strong>相关的具体事宜。上面我们聊到的粉板redo log是<strong>InnoDB引擎特有的日志</strong>，而<strong>Server层也有自己的日志，称为binlog（归档日志）</strong>。</p>
+<p>我想你肯定会问，为什么会有两份日志呢？</p>
+<p>因为<strong>最开始</strong>MySQL里<strong>并没有InnoDB引擎</strong>。<strong>MySQL自带的引擎是MyISAM</strong>，但是MyISAM<strong>没有</strong>crash-safe的能力，binlog日志只能用于归档。而InnoDB是另一个公司以插件形式引入MySQL的，既然只依靠binlog是没有crash-safe能力的，所以InnoDB使用另外一套日志系统——也就是redo log来实现crash-safe能力。</p>
+<p>这两种日志有以下三点不同。</p>
+<ol>
+<li>从引擎来看：<strong>redo log是InnoDB引擎特有的</strong>；<strong>binlog是MySQL的Server层实现的，所有引擎都可以使用。</strong></li>
+<li>从日志类型来看：<strong>redo log是物理日志</strong>，记录的是“在某个数据页上做了什么修改”；<strong>binlog是逻辑日志</strong>，记录的是这个语句的原始逻辑，比如“给ID&#x3D;2这一行的c字段加1 ”。<strong>（这个binlog记录的逻辑日志和Redis的AOF（Append Only File）挺类似的）</strong></li>
+<li>从空间使用来看：<strong>redo log是循环写的，空间固定会用完；binlog是可以追加写入的。“追加写”是指binlog文件写到一定大小后会切换到下一个，并不会覆盖以前的日志。</strong></li>
+</ol>
+<p>有了对这两个日志的概念性理解，我们再来看执行器和InnoDB引擎在执行这个简单的update语句时的内部流程。</p>
+<ol>
+<li>执行器先找引擎取ID&#x3D;2这一行。ID是主键，<strong>引擎直接用树（B+树）搜索找到这一行</strong>。如果ID&#x3D;2这一行所在的数据页本来就在内存中，就直接返回给执行器；否则，需要先从磁盘读入内存，然后再返回。</li>
+<li>执行器拿到引擎给的行数据，把这个值加上1，比如原来是N，现在就是N+1，得到新的一行数据，再调用引擎接口写入这行新数据。<strong>（这个有点类似用户态和内核态，写入之类的不安全操作交给操作系统内核执行）</strong></li>
+<li>引擎将这行新数据<strong>更新到内存</strong>中，同时将这个<strong>更新操作记录到redo log</strong>里面，<strong>此时redo log处于prepare状态</strong>。<strong>然后告知执行器执行完成了，随时可以提交事务</strong>。</li>
+<li><strong>执行器生成这个操作的binlog，并把binlog写入磁盘。</strong></li>
+<li>执行器调用引擎的提交事务接口，<strong>引擎把刚刚写入的redo log改成提交（commit）状态</strong>，更新完成。</li>
+</ol>
+<p>这里我给出这个update语句的执行流程图，图中浅色框表示是在InnoDB内部执行的<strong>（反正只要是执行写操作就一定是在InnoDB中执行的，它这里深色表示只是代表调用了引擎的接口）</strong>，<strong>深色框表示是在执行器</strong>中执行的。</p>
+<p><img src="/2024/09/09/MySQL02/image-20240909165928810.png" alt="image-20240909165928810"></p>
+<p>你可能注意到了，最后三步看上去有点“绕”，<strong>将redo log的写入拆成了两个步骤</strong>：<strong>prepare和commit</strong>，这就是”两阶段提交”。（搞半天原来后面讲了）</p>
+<h3 id="两阶段提交"><a href="#两阶段提交" class="headerlink" title="两阶段提交"></a>两阶段提交</h3><p>为什么必须有“两阶段提交”呢？<strong>这是为了让两份日志之间的逻辑一致。</strong>要说明这个问题，我们得从文章开头的那个问题说起：<strong>怎样让数据库恢复到半个月内任意一秒的状态？</strong></p>
+<p>前面我们说过了，binlog会记录所有的逻辑操作，并且是采用“追加写”的形式。如果你的DBA承诺说半个月内可以恢复，那么备份系统中一定会保存最近半个月的所有binlog，<strong>同时系统会定期做整库备份。这里的“定期”取决于系统的重要性，可以是一天一备，也可以是一周一备。</strong></p>
+<p>当需要恢复到指定的某一秒时，比如某天下午两点发现中午十二点有一次误删表，<strong>需要找回数据</strong>，那你可以这么做：</p>
+<ul>
+<li>首先，找到最近的一次全量备份，如果你运气好，可能就是昨天晚上的一个备份，<strong>从这个备份恢复到临时库</strong>；</li>
+<li><strong>然后，从备份的时间点开始，将备份的binlog依次取出来，重放到中午误删表之前的那个时刻。</strong></li>
+</ul>
+<p><strong>这里的思路挺像Docker的镜像构建方式的，都是将一个基础的东西作为我们的基石，然后再在上面加东西</strong></p>
+<p><strong>这样你的临时库就跟误删之前的线上库一样了，然后你可以把表数据从临时库取出来，按需要恢复到线上库去。</strong></p>
+<p>好了，说完了数据恢复过程，我们回来说说，为什么日志需要“两阶段提交”。这里不妨用反证法来进行解释。</p>
+<p>由于redo log和binlog是两个独立的逻辑，如果不用两阶段提交，<strong>要么就是先写完redo log再写binlog</strong>，或者采用反过来的顺序。我们看看这两种方式会有什么问题。</p>
+<p>仍然用前面的update语句来做例子。假设当前ID&#x3D;2的行，字段c的值是0，再假设执行update语句过程中在写完第一个日志后，第二个日志还没有写完期间发生了crash，会出现什么情况呢？</p>
+<ol>
+<li><strong>先写redo log后写binlog</strong>。假设在redo log写完，binlog还没有写完的时候，MySQL进程异常重启。由于我们前面说过的，redo log写完之后，系统即使崩溃，仍然能够把数据恢复回来，所以恢复后这一行c的值是1。 <strong>但是由于binlog没写完就crash了，这时候binlog里面就没有记录这个语句。因此，之后备份日志的时候，存起来的binlog里面就没有这条语句。 然后你会发现，如果需要用这个binlog来恢复临时库的话，由于这个语句的binlog丢失，这个临时库就会少了这一次更新，恢复出来的这一行c的值就是0，与原库的值不同</strong>。</li>
+<li><strong>先写binlog后写redo log</strong>。如果在binlog写完之后crash，由于redo log还没写，崩溃恢复以后这个事务无效，所以这一行c的值是0。但是binlog里面已经记录了“把c从0改成1”这个日志。所以，在之后用binlog来恢复的时候就多了一个事务出来，恢复出来的这一行c的值就是1，<strong>与原库的值不同</strong>。</li>
+</ol>
+<p><strong>看样子意思是binlog才能恢复一个完整的数据库，redo log一般用于恢复数据库突然故障丢失的数据</strong></p>
+<p><strong>可以看到，如果不使用“两阶段提交”，那么数据库的状态就有可能和用它的日志恢复出来的库的状态不一致。</strong></p>
+<p>你可能会说，这个概率是不是很低，平时也没有什么动不动就需要<strong>恢复临时库</strong>的场景呀？</p>
+<p>其实不是的，<strong>不只是误操作后需要用这个过程来恢复数据</strong>。当你需要<strong>扩容</strong>的时候，也就是需要<strong>再多搭建一些备库来增加系统的读能力的时候</strong>，现在常见的做法也是用<strong>全量备份</strong>加上<strong>应用binlog</strong>来实现的，<strong>这个“不一致”就会导致你的线上出现主从数据库不一致的情况</strong>。</p>
+<p><strong>简单说，redo log和binlog都可以用于表示事务的提交状态，而两阶段提交就是让这两个状态保持逻辑上的一致。</strong></p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>介绍了MySQL里面最重要的两个日志，<strong>即物理日志redo log和逻辑日志binlog</strong>。</p>
+<p><strong>redo log用于保证crash-safe能力</strong>。<strong>innodb_flush_log_at_trx_commit</strong>这个参数设置成1的时候，表示每次事务的redo log都直接持久化到磁盘。<strong>这个参数我建议你设置成1，这样可以保证MySQL异常重启之后数据不丢失。</strong></p>
+<p><strong>sync_binlog这个参数设置成1的时候，表示每次事务的binlog都持久化到磁盘。这个参数也建议你设置成1，这样可以保证MySQL异常重启之后binlog不丢失。</strong></p>
+<p>此外还介绍了与MySQL日志系统密切相关的“两阶段提交”。两阶段提交是跨系统<strong>维持数据逻辑一致性</strong>时<strong>常用</strong>的一个方案，即使你不做数据库内核开发，<strong>日常开发</strong>中也有可能会用到。</p>
+<p>前面说到定期全量备份的周期“取决于系统重要性，有的是一天一备，有的是一周一备”。那么在什么场景下，一天一备会比一周一备更有优势呢？或者说，它影响了这个数据库系统的哪个指标？</p>
+<p>补充资料：（小林Coding写的还是比较详细的）</p>
+<p><a href="https://blog.csdn.net/weixin_63566550/article/details/129819638">【MySQL】一文彻底搞懂 Redo-log 为什么要两阶段提交？_mysql redolog两阶段提交-CSDN博客</a></p>
+<p>把这篇文章比较重要的东西提取到下面了：</p>
+<p>两阶段提交的过程是怎样的？</p>
+<p>相信大家应该听说过<code>MySQL</code>事务两阶段提交方案，啥叫做事务两阶段提交呢？实则是指<code>Redo-log</code>分两次写入，如下：</p>
+<p><img src="/2024/09/09/MySQL02/image-20240909191851549.png" alt="image-20240909191851549"></p>
+<p>从图中可看出，事务的提交过程有两个阶段，<strong>就是将 redo log 的写入拆成了两个步骤：prepare 和 commit</strong>，<strong>中间再穿插写入binlog</strong>，具体如下：</p>
+<ul>
+<li><strong>prepare 阶段：</strong>将 XID（内部 XA 事务的 ID） 写入到 redo log，<strong>同时将 redo log 对应的事务状态设置为 prepare，然后将 redo log 持久化到磁盘（innodb_flush_log_at_trx_commit &#x3D; 1 的作用）；</strong></li>
+<li><strong>commit 阶段：</strong>把 XID 写入到 binlog，然后<strong>将 binlog 持久化到磁盘（sync_binlog &#x3D; 1 的作用），</strong>接着调用引擎的提交事务接口，<strong>将 redo log 状态设置为 commit</strong>，此时该状态并<strong>不需要持久化</strong>到磁盘，<strong>只需要 write 到文件系统的 page cache 中就够了</strong>，因为只要 binlog 写磁盘成功，就算 redo log 的状态还是 prepare 也没有关系，<strong>一样会被认为事务已经执行成功；</strong></li>
+</ul>
+<p>为什么需要两阶段提交？</p>
+<blockquote>
+<p>其实想要弄明白这个问题，要结合bin-log日志一起来聊。</p>
+</blockquote>
+<p>如果只写一次的话，那到底先写bin-log还是redo-log呢？</p>
+<ul>
+<li><strong>先写bin-log，再写redo-log：</strong>当事务提交后，先写bin-log成功，结果在写redo-log时断电宕机了，再重启后由于redo-log中没有该事务的日志记录，因此不会恢复该事务提交的数据。但要注意，主从架构中同步数据是使用bin-log来实现的，而宕机前bin-log写入成功了，就代表这个事务提交的数据会被同步到从机，<strong>也就意味着从机会比主机多出一条数据。</strong></li>
+<li><strong>先写redo-log，再写bin-log：</strong>当事务提交后，先写redo-log成功，但在写bin-log时宕机了，主节点重启后，会根据redo-log恢复数据，但从机依旧是依赖bin-log来同步数据的，因此从机无法将这个事务提交的数据同步过去，毕竟bin-log中没有撒，<strong>最终从机会比主机少一条数据。</strong></li>
+</ul>
+<p>经过上述分析后可得知：如果redo-log<strong>只写一次</strong>，那不管谁先写，<strong>都有可能造成主从同步数据时的不一致问题</strong>出现，<strong>为了解决该问题，redo-log就被设计成了两阶段提交模式</strong>，设置成两阶段提交后，整个执行过程有三处崩溃点：</p>
+<ul>
+<li>redo-log(prepare)：在写入准备状态的redo记录时宕机，事务还未提交，<strong>不会影响一致性</strong>。</li>
+<li>bin-log：在写bin记录时崩溃，重启后会根据redo记录中的事务ID，<strong>回滚</strong>前面已写入的数据。（然后会继续执行这个过程）</li>
+<li>redo-log(commit)：在bin-log写入成功后，<strong>写redo(commit)记录时崩溃</strong>，因为bin-log中已经写入成功了，<strong>所以从机也可以同步数据，因此重启时直接再次提交事务</strong>，写入一条redo(commit)记录即可。（这种commit一半没有成功的，之后再commit一次就行了）</li>
+</ul>
+<p>通过这种两阶段提交的方案，就能够确保redo-log、bin-log两者的日志数据是相同的，<strong>bin-log中有的主机再恢复，如果bin-log没有则直接回滚主机上写入的数据，确保整个数据库系统的数据一致性。</strong></p>
+<blockquote>
+<p>OK~,最后再简单补充一点：为什么bin-log又被叫做二进制日志呢？因为记录日志时，MySQL写入的是二进制数据，而并非字符数据，也就意味着直接用cat&#x2F;vim这类工具是无法打开的，必须要通过MySQL提供的mysqlbinlog工具解析查看。</p>
+</blockquote>
+<p>两阶段提交有什么问题？</p>
+<p>两阶段提交虽然保证了两个日志文件的数据一致性，但是性能很差，主要有两个方面的影响：</p>
+<ul>
+<li>磁盘 I&#x2F;O 次数高：对于“双1”配置，<strong>每个事务提交都会进行两次 fsync（刷盘），一次是 redo log 刷盘，另一次是 binlog 刷盘。</strong></li>
+<li>锁竞争激烈：两阶段提交虽然能够保证「单事务」两个日志的内容一致，但在「多事务」的情况下，却不能保证两者的提交顺序一致，因此，在两阶段提交的流程基础上，还需要加一个锁来保证提交的原子性，从而保证多事务的情况下，两个日志的提交顺序一致。</li>
+</ul>
+<p>为什么两阶段提交的磁盘 <strong>I&#x2F;O 次数会很高</strong>？</p>
+<p>binlog 和 redo log 在内存中都对应的缓存空间，binlog 会缓存在 binlog cache，redo log 会缓存在 redo log buffer，它们持久化到磁盘的时机分别由下面这两个参数控制。一般我们为了避免日志丢失的风险，会将这两个参数设置为 1：</p>
+<ul>
+<li>当 sync_binlog &#x3D; 1 的时候，表示每次提交事务都会将 binlog cache 里的 binlog 直接持久到磁盘；</li>
+<li>当 innodb_flush_log_at_trx_commit &#x3D; 1 时，表示每次事务提交时，都将缓存在 redo log buffer 里的 redo log 直接持久化到磁盘；</li>
+</ul>
+<p><strong>可以看到，如果 sync_binlog 和 当 innodb_flush_log_at_trx_commit 都设置为 1，那么在每个事务提交过程中， 都会至少调用 2 次刷盘操作，一次是 redo log 刷盘，一次是 binlog 落盘，所以这会成为性能瓶颈。</strong></p>
+<p>为什么锁竞争激烈？</p>
+<p>在早期的 MySQL 版本中，通过使用 prepare_commit_mutex 互斥锁来保证事务提交的顺序，<strong>在一个事务获取到锁时才能进入 prepare 阶段，一直到 commit 阶段结束才能释放锁，下个事务才可以继续进行 prepare 操作。</strong></p>
+<p><strong>通过加锁虽然完美地解决了顺序一致性的问题，但在并发量较大的时候，就会导致对锁的争用，性能不佳。</strong></p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>一条SQL查询语句是如何执行的？</title>
+    <url>/2024/09/09/MySQL01/</url>
+    <content><![CDATA[<h1 id="一条SQL查询语句是如何执行的？"><a href="#一条SQL查询语句是如何执行的？" class="headerlink" title="一条SQL查询语句是如何执行的？"></a>一条SQL查询语句是如何执行的？</h1><p>平时我们使用数据库，看到的通常都是一个整体。比如，你有个最简单的表，表里只有一个ID字段，在执行下面这个查询语句时：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from table where ID = 10;</span><br></pre></td></tr></table></figure>
+
+<p>我们看到的只是输入一条语句，返回一个结果，却不知道这条语句在MySQL内部的执行过程。</p>
+<p>其实这也和SQL这门语言有关系，SQL这门语言的定位就是一种声明式编程的语言，具体可以看看这个<a href="https://composingprograms.netlify.app/4/3">声明式编程</a>，本来就是不直接描述计算过程，而是描述一些计算的预期结果，比如上面SQL语句的意思是我想从这张表中获得所有ID为10的数据，并将获得到的数据按字段全部映射到结果中。</p>
+<p>下面给出的是MySQL的基本架构示意图，从中你可以清楚地看到SQL语句在MySQL的各个功能模块中的执行过程。</p>
+<p><img src="/2024/09/09/MySQL01/image-20240909122001902.png" alt="image-20240909122001902"></p>
+<p>大体来说，MySQL可以分为Server层和存储引擎层两部分。</p>
+<p><strong>Server层</strong>包括<strong>连接器、查询缓存、分析器、优化器、执行器</strong>等，涵盖MySQL的大多数核心服务功能，<strong>以及所有的内置函数（如日期、时间、数学和加密函数等）</strong>，<strong>所有跨存储引擎的功能都在这一层实现，比如存储过程、触发器、视图等</strong>。</p>
+<p>而<strong>存储引擎层</strong>负责数据的<strong>存储和提取</strong>。其架构模式是<strong>插件式的</strong>，<strong>支持InnoDB、MyISAM、Memory等多个存储引擎</strong>。现在<strong>最常用的存储引擎是InnoDB</strong>，它从<strong>MySQL 5.5.5</strong>版本开始成为了默认存储引擎。</p>
+<p>也就是说，你执行create table建表的时候，如果不指定引擎类型，<strong>默认使用的就是InnoDB</strong>。不过，你也可以通过指定存储引擎的类型来选择别的引擎，<strong>比如在create table语句中使用engine&#x3D;memory, 来指定使用内存引擎创建表</strong>。不同存储引擎的表数据存取方式不同，支持的功能也不同，在后面的文章中，我们会讨论到引擎的选择。</p>
+<p>从图中不难看出，不同的存储引擎共用一个<strong>Server层</strong>，也就是从连接器到执行器的部分。你可以先对每个组件的名字有个印象，接下来会结合开头提到的那条SQL语句，带你走一遍整个执行流程，依次看下每个组件的作用。</p>
+<h2 id="连接器"><a href="#连接器" class="headerlink" title="连接器"></a>连接器</h2><p>第一步，你要操作数据库，首先你就要连接到这个数据库上，这时候接待你的就是连接器。连接器负责跟客户端建立连接、获取权限、维持和管理连接。连接命令一般是这么写的：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql -h$ip -P$port -u$user -p</span><br></pre></td></tr></table></figure>
+
+<p><strong>输完命令之后，你就需要在交互对话里面输入密码。虽然密码也可以直接跟在-p后面写在命令行中，但这样可能会导致你的密码泄露。如果你连的是生产服务器，强烈建议你不要这么做。</strong></p>
+<p>大概就是这个样子</p>
+<p><img src="/2024/09/09/MySQL01/image-20240909122445750.png" alt="image-20240909122445750"></p>
+<p>连接命令中的mysql是客户端工具，<strong>主要就是用来跟服务端建立连接的</strong>。在完成经典的TCP握手后，连接器就要开始<strong>认证你的身份</strong>，这个时候用的就是你输入的用户名和密码。</p>
+<ul>
+<li>如果用户名或密码不对，你就会收到一个”Access denied for user”的错误，然后客户端程序结束执行。</li>
+<li>如果用户名密码认证通过，连接器会到权限表里面查出你拥有的权限。<strong>之后，这个连接里面的权限判断逻辑，都将依赖于此时读到的权限</strong>。</li>
+</ul>
+<p>这就意味着，<strong>一个用户成功建立连接后，即使你用管理员账号对这个用户的权限做了修改，也不会影响已经存在连接的权限。修改完成后，只有再新建的连接才会使用新的权限设置。</strong></p>
+<p>对于上面过程还有一个比较详细的解释，建议看看</p>
+<ul>
+<li><a href="https://blog.csdn.net/LYue123/article/details/89256577">彻底弄懂mysql（一）–mysql的通信协议_mysql tcp protocol url-CSDN博客</a></li>
+<li><a href="https://blog.csdn.net/LYue123/article/details/89285157?spm=1001.2014.3001.5502">彻底弄懂mysql（二）–连接方式_mysql连接池怎么算开启一次连接-CSDN博客</a></li>
+</ul>
+<p>这里我再提示一下，这个MySQL报文其实我们很久之前就见过了，特别是在IDEA中，那个数据连接的左下角就是报文。</p>
+<p>总结一下，上面两篇文章：</p>
+<p>第一篇主要是介绍了MySQL的通信具体是什么样的，先TCP三次握手，然后再到握手认证阶段（登陆认证报文就是在这个时候用的），最后就是命令执行阶段（我们可以输入命令啦）</p>
+<p>有两个问题问的特别好：</p>
+<ul>
+<li>为什么还要进行三次握手认证？</li>
+<li>因为TCP三次握手，<strong>只是将客户端与服务端建立起了连接，然后通过端口知道我要访问的是MySQL这个服务</strong>，但是MySQL它不同于HTTP，只要你知道URL就能得到一个响应，<strong>MySQL必须登陆后你才能进行操作</strong>。所以这个过程最重要的就是<strong>验证客户端的登陆权限</strong>。</li>
+<li>为什么是服务端主动给客户端发送认证呢？</li>
+<li>HTTP不是说<strong>只有客户端主动与服务端进行请求</strong>，<strong>服务端不是不能在没有请求的情况下主动进行响应吗</strong>？<br>首先，大家也不要陷入误区，<strong>在进行认证的这个交互中，实际上客户端与服务端还没有进行任何业务上的往来，只是进行一个认证</strong>，所以与上面说的HTTP的不同，如果细心的话你会发现，<strong>认证成功后，在命令执行阶段，MySQL这种通信方式是与HTTP非常类似的，在没有请求的情况下，服务端的MySQL也不会主动给你发送任何数据，所以这里不要混淆</strong>。<br>再说为什么服务端先发送，那肯定是因为他有不得不发送的道理，所以我们就需要理解一下，他发送的是什么东西。</li>
+</ul>
+<p>还包括了一个例子：</p>
+<ul>
+<li>小明找工作，投了一个简历给某个公司（TCP三次握手成功）<br>这时候，某公司就主动打电话了，告诉他，我们需要笔试，笔试的时间，网址，以及一些别的相关信息，规则等</li>
+<li>小明接收到这个消息之后，到了那个时间他就会请求那个网址，并将自己的信息告诉他</li>
+<li>这时候公司验证你的信息，验证成功后，你就可以开始笔试了</li>
+</ul>
+<p>特别是这个挑战随机数，有点意思：</p>
+<p>MySQL报文<strong>挑战随机数</strong>（通常称为“随机数”或“挑战数字”）是在MySQL客户端与服务器之间进行身份验证时使用的一种机制。具体来说，它在以下场景中发挥作用：</p>
+<ol>
+<li><strong>身份验证</strong>: 当客户端连接到MySQL服务器时，服务器会生成一个随机数并发送给客户端。这个随机数用于生成加密的身份验证信息。</li>
+<li><strong>提高安全性</strong>: 通过使用随机数，服务器可以确保每次连接的身份验证过程都是唯一的，防止重放攻击。</li>
+<li><strong>握手协议</strong>: 在MySQL的握手协议中，随机数是服务器发送给客户端的一部分，客户端使用这个随机数与用户的密码结合，生成最终的身份验证信息。</li>
+</ol>
+<p>说实话有点像盐值加密</p>
+<p>MySQL 客户端的<strong>权能标志</strong>（Client Capability Flags）是一个用于表示客户端所支持功能的位标志。这些标志在客户端与 MySQL 服务器进行连接时起着重要的作用，确保双方能够有效地通信。</p>
+<ol>
+<li><strong>功能协商</strong>: 客户端在建立连接时会发送其支持的功能标志，服务器根据这些标志来决定如何处理请求。</li>
+<li><strong>兼容性</strong>: 通过交换权能标志，客户端和服务器可以确保双方功能的兼容性，避免因不兼容的功能导致的错误。</li>
+<li><strong>优化性能</strong>: 权能标志可以帮助服务器优化数据传输方式，选择最适合双方的协议和功能。</li>
+</ol>
+<p>第二篇主要是比较了一下短链接和长连接的区别，然后建议一般还是使用连接池来提升性能。</p>
+<p>总结一下这篇文章的重点部分：</p>
+<ul>
+<li>短连接：<br><strong>客户端连接–创建socket认证连接–维护连接–数据传输–关闭连接</strong></li>
+<li>长连接：<br><strong>客户端连接–创建socket认证连接–维护连接–数据传输–维护连接–数据传输…-关闭连接</strong></li>
+<li>连接池：<br>连接池的一个核心思想就是<strong>连接复用</strong>，<strong>通过建立一个数据库连接池以及一套连接使用、分配和管理策略</strong>，使得该连接池中的连接可以得到高效、安全的复用，<strong>避免了数据库连接频繁建立、关闭的开销</strong>。</li>
+</ul>
+<p>因为常见数据库的连接是一个比较影响性能的一个事情，所以使用连接池的目的也是尽量少的创建连接，然后呢又要避免去维护很多空闲的连接</p>
+<p>所以建议了解一下连接池的一些参数设置：（感觉我们只用关心下面四个被加粗的就行了）</p>
+<ul>
+<li><strong>初始化连接就是，创建的时候想池里放入的连接对象数</strong></li>
+<li>最大连接数量，就是允许同一时间能都进行工作的最大数量，如果是0表示没有限制</li>
+<li><strong>最大空闲连接，就是连接池中最大空闲连接数，如果超了，就要释放一部分空闲超时连接，如果是0表示不需要释放</strong></li>
+<li><strong>最小空闲连接数，太少了就要进行创建</strong></li>
+<li><strong>超时等待时间，如果一个访问到来的时候，已经到达了最大连接数，那这个请求会被放在请求等待队列中，开启一个计时器，如果经过这个时间后，还没有可用连接，就直接抛出异常给此用户。如果是-1表示无限等待。</strong></li>
+</ul>
+<p>后面感觉还是有一点不够用，又找了一些文章来看</p>
+<ul>
+<li><p><a href="https://blog.csdn.net/weixin_44296929/article/details/102738568">连接池总结（作用、对比、参数含义、以及讲解）-CSDN博客</a></p>
+<p>看完之后感觉连接池就是类似公交车的长连接，用了很久才会被回收，但是每一个人都可以用，不像TCP长连接只能供一个人使用</p>
+</li>
+<li><p><a href="https://www.jianshu.com/p/6c61cc49a0ed">数据库连接池-常用参数配置及含义 - 简书 (jianshu.com)</a></p>
+<p>这个讲的配置相对详细一点</p>
+</li>
+</ul>
+<p>连接完成后，如果你没有后续的动作，这个连接就处于空闲状态，你可以在show processlist命令中看到它。文本中这个图是show processlist的结果，其中的Command列显示为“Sleep”的这一行，就表示现在系统里面有一个空闲连接。</p>
+<p>客户端如果太长时间没动静，连接器就会自动将它断开。这个时间是由参数wait_timeout控制的，默认值是8小时。</p>
+<p><img src="/2024/09/09/MySQL01/image-20240909145917788.png" alt="image-20240909145917788"></p>
+<p>如果在连接被断开之后，客户端再次发送请求的话，就会收到一个错误提醒： <strong>Lost connection</strong> to MySQL server during query。<strong>这时候如果你要继续，就需要重连，然后再执行请求了。（这个情况我之前好像遇到过）</strong></p>
+<p>数据库里面，<strong>长连接是指连接成功后，如果客户端持续有请求，则一直使用同一个连接。短连接则是指每次执行完很少的几次查询就断开连接，下次查询再重新建立一个</strong>。</p>
+<p><strong>建立连接的过程通常是比较复杂的，所以我建议你在使用中要尽量减少建立连接的动作，也就是尽量使用长连接。</strong></p>
+<p>建议再看一篇文章，再看下面的东西</p>
+<p>[<a href="https://zhuanlan.zhihu.com/p/43941022">玩转MySQL之二]MySQL连接机制浅析及运维 - 知乎 (zhihu.com)</a></p>
+<p>这篇文章很好的解释了为什么有的时候是不能使用短连接的：</p>
+<ul>
+<li><p>在<a href="https://zhida.zhihu.com/search?q=%E6%85%A2%E9%80%9F%E7%BD%91%E7%BB%9C&zhida_source=entity&is_preview=1">慢速网络</a>下使用短连接，连接的开销会很大；在生产繁忙的系统中，连接也可能会受到系统端口数的限制，如果要每秒建立几千个连接，<strong>那么连接断开后，端口不会被马上回收利用，必须经历一个“FIN”阶段的等待，直到可被回收利用为止，这样就可能会导致端口资源不够用</strong>。</p>
+</li>
+<li><p>从客户端的角度来说，<strong>使用长连接有一个好处，可以不用每次创建新连接，若客户端对MySQL服务器的连接请求很频繁，永久连接将更加高效</strong>。对于**<a href="https://zhida.zhihu.com/search?q=%E9%AB%98%E5%B9%B6%E5%8F%91&zhida_source=entity&is_preview=1">高并发</a>业务<strong>，如果可能会碰到连接的冲击，</strong>推荐使用长连接或连接池。**</p>
+</li>
+<li><p>从服务器的角度来看，情况则略有不同，<strong>它可以节省创建连接的开销，但维持连接也是需要内存的</strong>。如果滥用长连接的话，可能会使用过多的MySQL<a href="https://zhida.zhihu.com/search?q=%E6%9C%8D%E5%8A%A1%E5%99%A8%E8%BF%9E%E6%8E%A5&zhida_source=entity&is_preview=1">服务器连接</a>。<strong>现代的操作系统可以拥有几千个MySQL连接，但很有可能绝大部分都是睡眠（sleep）状态的，这样的工作方式不够高效，而且连接占据内存，也会导致内存的浪费。</strong></p>
+</li>
+<li><p>对于扩展性好的站点来说，其实大部分的访问并不需要连接数据库。<strong>如果用户需要频繁访问数据库，那么可能会在流量增大的时候产生性能问题</strong>，此时长短连接都是无法解决问题的，<strong>所以应该进行合理的设计和优化来避免性能问题。</strong></p>
+</li>
+<li><p>为了确保扩展性好的站点在高流量情况下仍能保持良好的性能，以下是一些<strong>合理的设计和优化策略</strong>：</p>
+<p>\1. <strong>优化应用层</strong>—从应用程序代码来看</p>
+<p>减少数据库请求: 在应用逻辑中优化数据访问，尽量减少数据库请求的次数。例如，<strong>通过批量查询或合并请求。</strong></p>
+<p>使用分页: 对于大数据集，<strong>使用分页而不是一次性加载所有数据。</strong></p>
+<p>\2.  <strong>缓存机制</strong>—从缓存中间件来看</p>
+<p>使用缓存: <strong>在数据库前面引入缓存层（如 Redis、Memcached）来存储频繁访问的数据</strong>。这样可以减少数据库的直接查询次数。</p>
+<p>页面缓存: <strong>对于静态内容或不常变化的页面，使用页面缓存可以减少数据库的压力</strong>。<strong>该放Nginx的放Nginx，该放CDN的放CDN。</strong></p>
+<p>\3. **负载均衡 **—大的方面，从数据库实例来看</p>
+<p><strong>多实例部署</strong>: 将数据库部署为<strong>主从复制或集群模式，使用负载均衡器分散请求，提高并发处理能力。</strong></p>
+<p><strong>读写分离</strong>: 将读请求和写请求分开，<strong>写操作发送到主数据库，读操作发送到从数据库。</strong></p>
+<p><strong>数据分片</strong>: 对于大规模数据，可以考虑数据分片，将数据分散到不同的数据库实例中，<strong>减少单个数据库的压力。</strong></p>
+<p>\4.<strong>数据库优化</strong>—小的方面，从数据库表来看</p>
+<p><strong>索引优化</strong>: 确保数据库表中的索引设置合理，以加速查询。</p>
+<p><strong>查询优化</strong>: 使用 EXPLAIN 分析 SQL 查询，优化慢查询，减少不必要的数据检索。</p>
+</li>
+</ul>
+<p>下面这个感觉又可以出一个场景题了</p>
+<p>但是全部使用长连接后，你可能会发现，<strong>有些时候MySQL占用内存涨得特别快，这是因为MySQL在执行过程中临时使用的内存是管理在连接对象里面的。这些资源会在连接断开的时候才释放。所以如果长连接累积下来，可能导致内存占用太大，被系统强行杀掉（OOM），从现象看就是MySQL异常重启了。</strong></p>
+<p>怎么解决这个问题呢？你可以考虑以下两种方案。（至于为什么是这样，你看后面的查询缓存就知道了）</p>
+<ol>
+<li>定期断开长连接。使用一段时间，或者程序里面判断执行过一个占用内存的大查询后，断开连接，之后要查询再重连。</li>
+<li>如果你用的是MySQL 5.7或更新版本，可以在每次执行一个比较大的操作后，通过执行 mysql_reset_connection来重新初始化连接资源。这个过程不需要重连和重新做权限验证，但是会将连接恢复到刚刚创建完时的状态。</li>
+</ol>
+<h2 id="查询缓存"><a href="#查询缓存" class="headerlink" title="查询缓存"></a>查询缓存</h2><p>连接建立完成后，你就可以执行select语句了。执行逻辑就会来到第二步：查询缓存。</p>
+<p>MySQL拿到一个查询请求后，<strong>会先到查询缓存看看，之前是不是执行过这条语句。之前执行过的语句及其结果可能会以key-value对的形式，被直接缓存在内存中。key是查询的语句，value是查询的结果。如果你的查询能够直接在这个缓存中找到key，那么这个value就会被直接返回给客户端。</strong></p>
+<p>如果语句不在查询缓存中，就会继续后面的执行阶段。<strong>执行完成后，执行结果会被存入查询缓存中。</strong>你可以看到，<strong>如果查询命中缓存，MySQL不需要执行后面的复杂操作，就可以直接返回结果，这个效率会很高。</strong></p>
+<p><strong>但是大多数情况下我会建议你不要使用查询缓存，为什么呢？因为查询缓存往往弊大于利。</strong></p>
+<p>查询缓存的失效非常频繁，<strong>只要有对一个表的更新，这个表上所有的查询缓存都会被清空</strong>。因此很可能你费劲地把结果存起来，还没使用呢，就被一个更新全清空了。对于更新压力大的数据库来说，<strong>查询缓存的命中率会非常低</strong>。除非你的业务就是有一张<strong>静态表</strong>，很长时间才会更新一次。比如，一个系统配置表，那这张表上的查询<strong>才适合使用查询缓存</strong>。</p>
+<p>好在MySQL也提供了这种“按需使用”的方式。你可以将参数query_cache_type设置成DEMAND，这样对于默认的SQL语句都不使用查询缓存。<strong>而对于你确定要使用查询缓存的语句，可以用SQL_CACHE显式指定，像下面这个语句一样：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select SQL_CACHE * from table where ID = 10;</span><br></pre></td></tr></table></figure>
+
+<p>需要注意的是，MySQL 8.0版本直接将查询缓存的整块功能删掉了，<strong>也就是说8.0开始彻底没有这个功能了</strong>。</p>
+<h2 id="分析器"><a href="#分析器" class="headerlink" title="分析器"></a>分析器</h2><p><strong>如果没有命中查询缓存，就要开始真正执行语句了。首先，MySQL需要知道你要做什么，因此需要对SQL语句做解析。</strong></p>
+<p>分析器先会做“<strong>词法分析</strong>”。<strong>你输入的是由多个字符串和空格组成的一条SQL语句，MySQL需要识别出里面的字符串分别是什么，代表什么。</strong></p>
+<p>这个有点像SICP讲的Scheme分析器啊<a href="https://composingprograms.netlify.app/3/4">组合语言的解释器 (composingprograms.netlify.app)</a></p>
+<p>还有一点像ES的IK分词器，那个分词器里面我记得还有具体的算法来进行分词</p>
+<p>MySQL从你输入的”select”这个关键字识别出来，这是一个查询语句。它也要把字符串“T”识别成“表名T”，把字符串“ID”识别成“列ID”。</p>
+<p>做完了这些识别以后，就要做“<strong>语法分析</strong>”。根据词法分析的结果，语法分析器会根据语法规则，判断你输入的这个SQL语句是否满足MySQL语法。</p>
+<p>如果你的语句不对，就会收到“You have an error in your SQL syntax”的错误提醒，比如下面这个语句select少打了开头的字母“s”。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; elect * from t where ID=1;</span><br><span class="line"></span><br><span class="line">ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near &#x27;elect * from t where ID=1&#x27; at line 1</span><br></pre></td></tr></table></figure>
+
+<p>一般语法错误会提示第一个出现错误的位置，所以你要关注的是紧接“use near”的内容。</p>
+<h2 id="优化器"><a href="#优化器" class="headerlink" title="优化器"></a>优化器</h2><p>经过了<strong>分析器，MySQL就知道你要做什么了</strong>。在开始执行之前，还要先经过<strong>优化器的处理</strong>。</p>
+<p>优化器是在表里面有多个索引的时候，决定使用哪个索引；或者在一个语句有多表关联（join）的时候，决定各个表的连接顺序。比如你执行下面这样的语句，这个语句是执行两个表的join：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from t1 join t2 using(ID)  where t1.c=10 and t2.d=20;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>既可以先从表t1里面取出c&#x3D;10的记录的ID值，再根据ID值关联到表t2，再判断t2里面d的值是否等于20。</li>
+<li>也可以先从表t2里面取出d&#x3D;20的记录的ID值，再根据ID值关联到t1，再判断t1里面c的值是否等于10。</li>
+</ul>
+<p>这两种执行方法的逻辑结果是一样的，但是执行的效率会有不同，而优化器的作用就是决定选择使用哪一个方案。</p>
+<p><strong>优化器阶段完成后，这个语句的执行方案就确定下来了，然后进入执行器阶段。</strong>如果你还有一些疑问，比如优化器是怎么选择索引的，有没有可能选择错等等，没关系，我会在后面的文章中单独展开说明优化器的内容。</p>
+<h2 id="执行器"><a href="#执行器" class="headerlink" title="执行器"></a>执行器</h2><p>MySQL<strong>通过分析器知道了你要做什么，通过优化器知道了该怎么做，于是就进入了执行器阶段，开始执行语句</strong>。</p>
+<p>开始执行的时候，<strong>要先判断一下你对这个表T有没有执行查询的权限，如果没有，就会返回没有权限的错误</strong>，如下所示。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from T where ID=10;</span><br><span class="line"></span><br><span class="line">ERROR 1142 (42000): SELECT command denied to user &#x27;b&#x27;@&#x27;localhost&#x27; for table &#x27;T&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>如果有权限，就<strong>打开表继续执行</strong>。打开表的时候，<strong>执行器就会根据表的引擎定义，去使用这个引擎提供的接口</strong>。</p>
+<p>比如我们这个例子中的表T中，ID字段没有索引，那么执行器的执行流程是这样的：</p>
+<ol>
+<li><strong>调用InnoDB引擎接口</strong>取这个表的第一行，判断ID值是不是10，如果不是则跳过，如果是则将这行存在结果集中；</li>
+<li>调用引擎接口取“下一行”，重复相同的判断逻辑，直到取到这个表的最后一行。</li>
+<li>执行器将上述遍历过程中所有满足条件的行组成的记录集作为结果集返回给客户端。</li>
+</ol>
+<p>至此，这个语句就执行完成了。</p>
+<p>对于有索引的表，执行的逻辑也差不多。<strong>第一次调用的是“取满足条件的第一行”这个接口，之后循环取“满足条件的下一行”这个接口</strong>，这些接口都是引擎中已经定义好的。</p>
+<p>你会在数据库的<strong>慢查询日志</strong>中看到一个<strong>rows_examined的字段</strong>，表示这个语句执行过程中扫描了多少行。<strong>这个值就是在执行器每次调用引擎获取数据行的时候累加的</strong>。</p>
+<p>在有些场景下，执行器调用一次，在引擎内部则扫描了多行，因此<strong>引擎扫描行数跟rows_examined并不是完全相同的。</strong></p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>如果表T中没有字段k，而你执行了这个语句 select * from T where k&#x3D;1, 那肯定是会报“不存在这个列”的错误： “Unknown column ‘k’ in ‘where clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？</p>
+<blockquote>
+<p>在执行 SQL 查询的过程中，当出现类似于 “Unknown column ‘k’ in ‘where clause’” 的错误信息时，这是在语义分析阶段报出的错误。</p>
+<p>具体的解析和执行过程如下：</p>
+<ol>
+<li><strong>词法分析和语法分析阶段</strong>：在这个阶段，MySQL 解析器将输入的 SQL 查询语句进行词法分析和语法分析，<strong>生成语法树（Parse Tree）或语法分析树（Parse Tree）</strong>。<strong>这个阶段主要是验证查询语句的语法正确性，检查语句中的关键字、标识符、运算符等是否符合语法规则。</strong></li>
+<li><strong>语义分析阶段</strong>：<strong>在语义分析阶段，MySQL 对语法树进行进一步的分析和验证。这个阶段主要是检查语句的语义正确性，包括验证列和表的存在性、数据类型的匹配、约束条件的合法性等。</strong>在执行 SQL 查询时，MySQL 需要确保查询中使用的列和表是存在的。</li>
+</ol>
+<p>当执行语句 “SELECT * FROM T WHERE k&#x3D;1” 时，MySQL 会在<strong>语义分析阶段尝试解析和验证其中的列名</strong>。如果表 T 中不存在名为 ‘k’ 的列，MySQL 将报告 “Unknown column ‘k’ in ‘where clause’” 错误，表示查询中引用了不存在的列。</p>
+<p>因此，<strong>该错误是在语义分析阶段报出的，即在验证查询语句的语义正确性时发现的</strong>。在这个阶段，MySQL 检查查询语句是否符合数据库模式的定义和约束条件。</p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>My-Backend-Learning-Journey</title>
     <url>/2024/09/07/My-Backend-Learning-Journey/</url>
     <content><![CDATA[<h1 id="后端技术知识一览"><a href="#后端技术知识一览" class="headerlink" title="后端技术知识一览"></a>后端技术知识一览</h1><blockquote>
@@ -411,531 +945,49 @@
       </tags>
   </entry>
   <entry>
-    <title>日志系统：一条SQL更新语句是如何执行的？</title>
-    <url>/2024/09/09/MySQL02/</url>
-    <content><![CDATA[<h1 id="日志系统：一条SQL更新语句是如何执行的？"><a href="#日志系统：一条SQL更新语句是如何执行的？" class="headerlink" title="日志系统：一条SQL更新语句是如何执行的？"></a>日志系统：一条SQL更新语句是如何执行的？</h1><p>前面我们系统了解了一个查询语句的执行流程，并介绍了执行过程中涉及的处理模块。相信你还记得，<strong>一条查询语句的执行过程一般是经过连接器、分析器、优化器、执行器等功能模块，最后到达存储引擎。</strong></p>
-<p>那么，<strong>一条更新语句</strong>的执行流程又是怎样的呢？</p>
-<p>之前你可能经常听DBA同事说，MySQL可以恢复到半个月内任意一秒的状态，惊叹的同时，你是不是心中也会不免会好奇，这是怎样做到的呢？</p>
-<p>我们还是从一个表的一条更新语句说起，下面是这个表的创建语句，这个表有一个主键ID和一个整型字段c：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; create table T(ID int primary key, c int);</span><br></pre></td></tr></table></figure>
-
-<p>如果要将ID&#x3D;2这一行的值加1，SQL语句就会这么写：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; update T set c=c+1 where ID=2;</span><br></pre></td></tr></table></figure>
-
-<p>前面介绍过SQL语句基本的执行链路，这里我再把那张图拿过来，你也可以先简单看看这个图回顾下。首先，可以确定的说，查询语句的那一套流程，更新语句也是同样会走一遍。</p>
-<p><img src="/2024/09/09/MySQL02/image-20240909163544965.png" alt="image-20240909163544965"></p>
-<p>你执行语句前要<strong>先连接数据库，这是连接器的工作</strong>。</p>
-<p>前面我们说过，在一个表上有更新的时候，跟这个表有关的查询缓存会失效，<strong>所以这条语句就会把表T上所有缓存结果都清空。这也就是我们一般不建议使用查询缓存的原因</strong>。</p>
-<p>接下来，<strong>分析器</strong>会通过词法和语法解析知道这是一条更新语句。<strong>优化器</strong>决定要使用ID这个索引。然后，<strong>执行器</strong>负责具体执行，找到这一行，然后更新。</p>
-<p>与查询流程不一样的是，<strong>更新流程还涉及两个重要的日志模块</strong>，它们正是我们今天要讨论的主角：<strong>redo log（重做日志）和 binlog（归档日志）</strong>。如果接触MySQL，那这两个词肯定是绕不过的，我后面的内容里也会不断地和你强调。不过话说回来，redo log和binlog在设计上有很多有意思的地方，这些设计思路也可以用到你自己的程序里。</p>
-<h3 id="重要的日志模块：redo-log"><a href="#重要的日志模块：redo-log" class="headerlink" title="重要的日志模块：redo log"></a>重要的日志模块：redo log</h3><p>不知道你还记不记得《孔乙己》这篇文章，酒店掌柜有一个粉板，专门用来记录客人的赊账记录。如果赊账的人不多，那么他可以把顾客名和账目写在板上。但如果赊账的人多了，粉板总会有记不下的时候，这个时候掌柜一定还有一个专门记录赊账的账本。</p>
-<p>如果有人要赊账或者还账的话，掌柜一般有两种做法：</p>
+    <title>深入浅出索引（上）</title>
+    <url>/2024/09/09/MySQL04/</url>
+    <content><![CDATA[<p>提到数据库索引，我想你并不陌生，在日常工作中会经常接触到。<strong>比如某一个SQL查询比较慢，分析完原因之后，你可能就会说“给某个字段加个索引吧”之类的解决方案</strong>。但到底什么是索引，索引又是如何工作的呢？今天就让我们一起来聊聊这个话题吧。</p>
+<p>数据库索引的内容比较多，我分成了上下两篇文章。<strong>索引是数据库系统里面最重要的概念之一</strong>，所以希望你能够耐心看完。在后面的实战文章中，我也会经常引用这两篇文章中提到的知识点，加深你对数据库索引的理解。</p>
+<p><strong>一句话简单来说，索引的出现其实就是为了提高数据查询的效率，就像书的目录一样。</strong>一本500页的书，如果你想快速找到其中的某一个知识点，在不借助目录的情况下，那我估计你可得找一会儿。<strong>同样，对于数据库的表而言，索引其实就是它的“目录”。（这个索引还有一个兄弟，叫做倒排索引，是ES中的一个概念）</strong></p>
+<h3 id="索引的常见模型"><a href="#索引的常见模型" class="headerlink" title="索引的常见模型"></a>索引的常见模型</h3><p>索引的出现是为了<strong>提高查询效率</strong>，但是实现索引的方式却有很多种，所以这里也就引入了索引模型的概念。<strong>可以用于提高读写效率的数据结构很多，这里我先给你介绍三种常见、也比较简单的数据结构，它们分别是哈希表、有序数组和搜索树。</strong></p>
+<p>下面我主要从使用的角度，为你简单分析一下这三种模型的区别。</p>
+<p><strong>哈希表是一种以键-值（key-value）存储数据的结构，我们只要输入待查找的值即key，就可以找到其对应的值即Value。哈希的思路很简单，把值放在数组里，用一个哈希函数把key换算成一个确定的位置，然后把value放在数组的这个位置。（这里是直接将HashMap的下标当作索引了）</strong></p>
+<p>不可避免地，多个key值经过哈希函数的换算，会出现同一个值的情况。<strong>处理这种情况的一种方法是，拉出一个链表。（当然在一定的情况下会升级为红黑树）</strong></p>
+<p>假设，你现在维护着一个身份证信息和姓名的表，需要根据身份证号查找对应的名字，这时对应的哈希索引的示意图如下所示：</p>
+<p><img src="/2024/09/09/MySQL04/image-20240909233015979.png" alt="image-20240909233015979"></p>
+<p>图中，User2和User4根据身份证号算出来的值都是N，但没关系，后面还跟了一个链表。假设，这时候你要查ID_card_n2对应的名字是什么，处理步骤就是：首先，将ID_card_n2通过哈希函数算出N；然后，按顺序遍历，找到User2。</p>
+<p>需要注意的是，图中四个ID_card_n的值<strong>并不是递增的</strong>，这样做的好处是<strong>增加新的User时速度会很快</strong>，只需要往后追加。但缺点是，因为不是有序的，所以<strong>哈希索引做区间查询的速度是很慢的</strong>。</p>
+<p>你可以设想下，如果你现在要找身份证号在[ID_card_X, ID_card_Y]这个区间的所有用户，就必须全部扫描一遍了。</p>
+<p>所以，<strong>哈希表这种结构适用于只有等值查询的场景</strong>，比如<strong>Memcached及其他一些NoSQL引擎</strong>。</p>
+<p>而<strong>有序数组在等值查询和范围查询场景中的性能就都非常优秀</strong>。还是上面这个根据身份证号查名字的例子，如果我们使用有序数组来实现的话，示意图如下所示：</p>
+<p><img src="/2024/09/09/MySQL04/image-20240909233223301.png" alt="image-20240909233223301"></p>
+<p>这里我们假设身份证号没有重复，这个数组就是按照身份证号递增的顺序保存的。这时候如果你要查ID_card_n2对应的名字，<strong>用二分法就可以快速得到，这个时间复杂度是O(log(N))。</strong></p>
+<p>同时很显然，这个索引结构支持范围查询。你要查身份证号在[ID_card_X, ID_card_Y]区间的User，可以先用二分法找到ID_card_X（如果不存在ID_card_X，就找到大于ID_card_X的第一个User），然后向右遍历，直到查到第一个大于ID_card_Y的身份证号，退出循环。</p>
+<p><strong>如果仅仅看查询效率，有序数组就是最好的数据结构了。但是，在需要更新数据的时候就麻烦了，你往中间插入一个记录就必须得挪动后面所有的记录，成本太高。</strong></p>
+<p>所以，<strong>有序数组索引只适用于静态存储引擎</strong>，比如你要保存的是2017年某个城市的所有人口信息，这类<strong>不会再修改的数据</strong>。</p>
+<p>二叉搜索树也是课本里的经典数据结构了。还是上面根据身份证号查名字的例子，如果我们用二叉搜索树来实现的话，示意图如下所示：</p>
+<p><img src="/2024/09/09/MySQL04/image-20240909233347671.png" alt="image-20240909233347671"></p>
+<p><strong>二叉搜索树的特点是：每个节点的左儿子小于父节点，父节点又小于右儿子。</strong>这样如果你要查ID_card_n2的话，按照图中的搜索顺序就是按照UserA -&gt; UserC -&gt; UserF -&gt; User2这个路径得到。这个时间复杂度是O(log(N))。</p>
+<p><strong>当然为了维持O(log(N))的查询复杂度，你就需要保持这棵树是平衡二叉树。为了做这个保证，更新的时间复杂度也是O(log(N))。</strong></p>
+<p>树可以有二叉，也可以有多叉。多叉树就是每个节点有多个儿子，儿子之间的大小保证从左到右递增。<strong>二叉树是搜索效率最高的，但是实际上大多数的数据库存储却并不使用二叉树。其原因是，索引不止存在内存中，还要写到磁盘上。</strong></p>
+<p>你可以想象一下一棵100万节点的平衡二叉树，树高20。一次查询可能需要访问20个数据块。<strong>在机械硬盘时代，从磁盘随机读一个数据块需要10 ms左右的寻址时间。也就是说，对于一个100万行的表，如果使用二叉树来存储，单独访问一个行可能需要20个10 ms的时间，这个查询可真够慢的。</strong></p>
+<p>为了让一个查询尽量少地读磁盘，就必须让查询过程访问尽量少的数据块。那么，我们就不应该使用二叉树，<strong>而是要使用“N叉”树。这里，“N叉”树中的“N”取决于数据块的大小</strong>。</p>
+<p><strong>以InnoDB的一个整数字段索引为例，这个N差不多是1200。这棵树高是4的时候，就可以存1200的3次方个值，这已经17亿了。考虑到树根的数据块总是在内存中的，一个10亿行的表上一个整数字段的索引，查找一个值最多只需要访问3次磁盘。其实，树的第二层也有很大概率在内存中，那么访问磁盘的平均次数就更少了。</strong></p>
+<p><strong>N叉树由于在读写上的性能优点，以及适配磁盘的访问模式，已经被广泛应用在数据库引擎中了。</strong></p>
+<p><strong>不管是哈希还是有序数组，或者N叉树，它们都是不断迭代、不断优化的产物或者解决方案</strong>。数据库技术发展到今天，跳表、LSM树等数据结构也被用于引擎设计中，这里我就不再一一展开了。</p>
+<p>这里补充一下关于红黑树，跳表，LSM树的资料：</p>
 <ul>
-<li>一种做法是直接把账本翻出来，把这次赊的账加上去或者扣除掉；</li>
-<li>另一种做法是先在粉板上记下这次的账，等打烊以后再把账本翻出来核算。</li>
+<li><a href="https://www.cnblogs.com/henuliulei/p/15114440.html">b树，b+树，b-树,红黑树详解一锅端 - 你的雷哥 - 博客园 (cnblogs.com)</a></li>
+<li><a href="https://blog.csdn.net/cy973071263/article/details/122543826">【数据结构】史上最好理解的红黑树讲解，让你彻底搞懂红黑树-CSDN博客</a></li>
+<li><a href="https://cloud.tencent.com/developer/article/2392723">【全网最易懂的红黑树讲解】一眼看懂二叉树、平衡树、红黑树，一文打尽-腾讯云开发者社区-腾讯云 (tencent.com)</a></li>
+<li><a href="https://www.jianshu.com/p/9d8296562806">Skip List–跳表（全网最详细的跳表文章没有之一） - 简书 (jianshu.com)</a></li>
+<li><a href="https://zhuanlan.zhihu.com/p/415799237">深入浅出分析LSM树（日志结构合并树） - 知乎 (zhihu.com)</a></li>
 </ul>
-<p>在生意红火柜台很忙时，掌柜一定会选择后者，因为前者操作实在是太麻烦了。首先，你得找到这个人的赊账总额那条记录。你想想，密密麻麻几十页，掌柜要找到那个名字，可能还得带上老花镜慢慢找，找到之后再拿出算盘计算，最后再将结果写回到账本上。</p>
-<p>这整个过程想想都麻烦。相比之下，还是先在粉板上记一下方便。你想想，如果掌柜没有粉板的帮助，每次记账都得翻账本，效率是不是低得让人难以忍受？</p>
-<p>同样，在MySQL里也有这个问题，<strong>如果每一次的更新操作都需要写进磁盘，然后磁盘也要找到对应的那条记录，然后再更新，整个过程IO成本、查找成本都很高</strong>。为了解决这个问题，MySQL的设计者就用了类似酒店掌柜粉板的思路来提升更新效率。</p>
-<p><strong>而粉板和账本配合的整个过程，其实就是MySQL里经常说到的WAL技术，WAL的全称是Write-Ahead Logging，它的关键点就是先写日志，再写磁盘，也就是先写粉板，等不忙的时候再写账本。（这个其实也是为了避免写了磁盘之后没有时间来得急写日志，导致Log不一致的问题）</strong></p>
-<p>具体来说，当有一条记录需要更新的时候，<strong>InnoDB引擎就会先把记录写到redo log（粉板）里面，并更新内存，这个时候更新就算完成了</strong>。同时，InnoDB引擎会在<strong>适当</strong>的时候，将这个操作记录<strong>更新到磁盘</strong>里面，<strong>而这个更新往往是在系统比较空闲的时候做，这就像打烊以后掌柜做的事</strong>。</p>
-<p>如果今天赊账的不多，掌柜可以等打烊后再整理。但如果某天赊账的特别多，粉板写满了，又怎么办呢？这个时候掌柜只好放下手中的活儿，把粉板中的一部分赊账记录更新到账本中，然后把这些记录从粉板上擦掉，为记新账腾出空间。</p>
-<p>与此类似，<strong>InnoDB的redo log是固定大小的，比如可以配置为一组4个文件，每个文件的大小是1GB，那么这块“粉板”总共就可以记录4GB的操作。从头开始写，写到末尾就又回到开头循环写，如下面这个图所示。</strong></p>
-<p><img src="/2024/09/09/MySQL02/image-20240909164238628.png" alt="image-20240909164238628"></p>
-<p><strong>write pos是当前记录的位置</strong>，一边写一边后移，写到第3号文件末尾后就回到0号文件开头。<strong>checkpoint是当前要擦除的位置，也是往后推移并且循环的，擦除记录前要把记录更新到数据文件。（我记得之前好像看过一个类似的环形更新方法，反正Redis分布式采用的方法有一个是环形的）</strong></p>
-<p><strong>write pos和checkpoint之间的是“粉板”上还空着的部分，可以用来记录新的操作。如果write pos追上checkpoint，表示“粉板”满了，这时候不能再执行新的更新，得停下来先擦掉一些记录，把checkpoint推进一下。（有一点像JVM的STW）</strong></p>
-<p>有了redo log，<strong>InnoDB就可以保证即使数据库发生异常重启，之前提交的记录都不会丢失</strong>，这个能力称为<strong>crash-safe</strong>。（这玩意经常在面试中问，大概就是什么MySQL数据库突然断电了，怎么找回数据的）</p>
-<p>要理解crash-safe这个概念，可以想想我们前面赊账记录的例子。只要赊账记录记在了粉板上或写在了账本上，之后即使掌柜忘记了，比如突然<strong>停业</strong>几天，<strong>恢复</strong>生意后<strong>依然</strong>可以通过账本和粉板上的数据明确赊账账目。</p>
-<h3 id="重要的日志模块：binlog"><a href="#重要的日志模块：binlog" class="headerlink" title="重要的日志模块：binlog"></a>重要的日志模块：binlog</h3><p>前面我们讲过，MySQL整体来看，其实就有两块：一块是Server层，它主要做的是<strong>MySQL功能层面</strong>的事情；还有一块是引擎层，<strong>负责存储</strong>相关的具体事宜。上面我们聊到的粉板redo log是<strong>InnoDB引擎特有的日志</strong>，而<strong>Server层也有自己的日志，称为binlog（归档日志）</strong>。</p>
-<p>我想你肯定会问，为什么会有两份日志呢？</p>
-<p>因为<strong>最开始</strong>MySQL里<strong>并没有InnoDB引擎</strong>。<strong>MySQL自带的引擎是MyISAM</strong>，但是MyISAM<strong>没有</strong>crash-safe的能力，binlog日志只能用于归档。而InnoDB是另一个公司以插件形式引入MySQL的，既然只依靠binlog是没有crash-safe能力的，所以InnoDB使用另外一套日志系统——也就是redo log来实现crash-safe能力。</p>
-<p>这两种日志有以下三点不同。</p>
-<ol>
-<li>从引擎来看：<strong>redo log是InnoDB引擎特有的</strong>；<strong>binlog是MySQL的Server层实现的，所有引擎都可以使用。</strong></li>
-<li>从日志类型来看：<strong>redo log是物理日志</strong>，记录的是“在某个数据页上做了什么修改”；<strong>binlog是逻辑日志</strong>，记录的是这个语句的原始逻辑，比如“给ID&#x3D;2这一行的c字段加1 ”。<strong>（这个binlog记录的逻辑日志和Redis的AOF（Append Only File）挺类似的）</strong></li>
-<li>从空间使用来看：<strong>redo log是循环写的，空间固定会用完；binlog是可以追加写入的。“追加写”是指binlog文件写到一定大小后会切换到下一个，并不会覆盖以前的日志。</strong></li>
-</ol>
-<p>有了对这两个日志的概念性理解，我们再来看执行器和InnoDB引擎在执行这个简单的update语句时的内部流程。</p>
-<ol>
-<li>执行器先找引擎取ID&#x3D;2这一行。ID是主键，<strong>引擎直接用树（B+树）搜索找到这一行</strong>。如果ID&#x3D;2这一行所在的数据页本来就在内存中，就直接返回给执行器；否则，需要先从磁盘读入内存，然后再返回。</li>
-<li>执行器拿到引擎给的行数据，把这个值加上1，比如原来是N，现在就是N+1，得到新的一行数据，再调用引擎接口写入这行新数据。<strong>（这个有点类似用户态和内核态，写入之类的不安全操作交给操作系统内核执行）</strong></li>
-<li>引擎将这行新数据<strong>更新到内存</strong>中，同时将这个<strong>更新操作记录到redo log</strong>里面，<strong>此时redo log处于prepare状态</strong>。<strong>然后告知执行器执行完成了，随时可以提交事务</strong>。</li>
-<li><strong>执行器生成这个操作的binlog，并把binlog写入磁盘。</strong></li>
-<li>执行器调用引擎的提交事务接口，<strong>引擎把刚刚写入的redo log改成提交（commit）状态</strong>，更新完成。</li>
-</ol>
-<p>这里我给出这个update语句的执行流程图，图中浅色框表示是在InnoDB内部执行的<strong>（反正只要是执行写操作就一定是在InnoDB中执行的，它这里深色表示只是代表调用了引擎的接口）</strong>，<strong>深色框表示是在执行器</strong>中执行的。</p>
-<p><img src="/2024/09/09/MySQL02/image-20240909165928810.png" alt="image-20240909165928810"></p>
-<p>你可能注意到了，最后三步看上去有点“绕”，<strong>将redo log的写入拆成了两个步骤</strong>：<strong>prepare和commit</strong>，这就是”两阶段提交”。（搞半天原来后面讲了）</p>
-<h3 id="两阶段提交"><a href="#两阶段提交" class="headerlink" title="两阶段提交"></a>两阶段提交</h3><p>为什么必须有“两阶段提交”呢？<strong>这是为了让两份日志之间的逻辑一致。</strong>要说明这个问题，我们得从文章开头的那个问题说起：<strong>怎样让数据库恢复到半个月内任意一秒的状态？</strong></p>
-<p>前面我们说过了，binlog会记录所有的逻辑操作，并且是采用“追加写”的形式。如果你的DBA承诺说半个月内可以恢复，那么备份系统中一定会保存最近半个月的所有binlog，<strong>同时系统会定期做整库备份。这里的“定期”取决于系统的重要性，可以是一天一备，也可以是一周一备。</strong></p>
-<p>当需要恢复到指定的某一秒时，比如某天下午两点发现中午十二点有一次误删表，<strong>需要找回数据</strong>，那你可以这么做：</p>
-<ul>
-<li>首先，找到最近的一次全量备份，如果你运气好，可能就是昨天晚上的一个备份，<strong>从这个备份恢复到临时库</strong>；</li>
-<li><strong>然后，从备份的时间点开始，将备份的binlog依次取出来，重放到中午误删表之前的那个时刻。</strong></li>
-</ul>
-<p><strong>这里的思路挺像Docker的镜像构建方式的，都是将一个基础的东西作为我们的基石，然后再在上面加东西</strong></p>
-<p><strong>这样你的临时库就跟误删之前的线上库一样了，然后你可以把表数据从临时库取出来，按需要恢复到线上库去。</strong></p>
-<p>好了，说完了数据恢复过程，我们回来说说，为什么日志需要“两阶段提交”。这里不妨用反证法来进行解释。</p>
-<p>由于redo log和binlog是两个独立的逻辑，如果不用两阶段提交，<strong>要么就是先写完redo log再写binlog</strong>，或者采用反过来的顺序。我们看看这两种方式会有什么问题。</p>
-<p>仍然用前面的update语句来做例子。假设当前ID&#x3D;2的行，字段c的值是0，再假设执行update语句过程中在写完第一个日志后，第二个日志还没有写完期间发生了crash，会出现什么情况呢？</p>
-<ol>
-<li><strong>先写redo log后写binlog</strong>。假设在redo log写完，binlog还没有写完的时候，MySQL进程异常重启。由于我们前面说过的，redo log写完之后，系统即使崩溃，仍然能够把数据恢复回来，所以恢复后这一行c的值是1。 <strong>但是由于binlog没写完就crash了，这时候binlog里面就没有记录这个语句。因此，之后备份日志的时候，存起来的binlog里面就没有这条语句。 然后你会发现，如果需要用这个binlog来恢复临时库的话，由于这个语句的binlog丢失，这个临时库就会少了这一次更新，恢复出来的这一行c的值就是0，与原库的值不同</strong>。</li>
-<li><strong>先写binlog后写redo log</strong>。如果在binlog写完之后crash，由于redo log还没写，崩溃恢复以后这个事务无效，所以这一行c的值是0。但是binlog里面已经记录了“把c从0改成1”这个日志。所以，在之后用binlog来恢复的时候就多了一个事务出来，恢复出来的这一行c的值就是1，<strong>与原库的值不同</strong>。</li>
-</ol>
-<p><strong>看样子意思是binlog才能恢复一个完整的数据库，redo log一般用于恢复数据库突然故障丢失的数据</strong></p>
-<p><strong>可以看到，如果不使用“两阶段提交”，那么数据库的状态就有可能和用它的日志恢复出来的库的状态不一致。</strong></p>
-<p>你可能会说，这个概率是不是很低，平时也没有什么动不动就需要<strong>恢复临时库</strong>的场景呀？</p>
-<p>其实不是的，<strong>不只是误操作后需要用这个过程来恢复数据</strong>。当你需要<strong>扩容</strong>的时候，也就是需要<strong>再多搭建一些备库来增加系统的读能力的时候</strong>，现在常见的做法也是用<strong>全量备份</strong>加上<strong>应用binlog</strong>来实现的，<strong>这个“不一致”就会导致你的线上出现主从数据库不一致的情况</strong>。</p>
-<p><strong>简单说，redo log和binlog都可以用于表示事务的提交状态，而两阶段提交就是让这两个状态保持逻辑上的一致。</strong></p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>介绍了MySQL里面最重要的两个日志，<strong>即物理日志redo log和逻辑日志binlog</strong>。</p>
-<p><strong>redo log用于保证crash-safe能力</strong>。<strong>innodb_flush_log_at_trx_commit</strong>这个参数设置成1的时候，表示每次事务的redo log都直接持久化到磁盘。<strong>这个参数我建议你设置成1，这样可以保证MySQL异常重启之后数据不丢失。</strong></p>
-<p><strong>sync_binlog这个参数设置成1的时候，表示每次事务的binlog都持久化到磁盘。这个参数也建议你设置成1，这样可以保证MySQL异常重启之后binlog不丢失。</strong></p>
-<p>此外还介绍了与MySQL日志系统密切相关的“两阶段提交”。两阶段提交是跨系统<strong>维持数据逻辑一致性</strong>时<strong>常用</strong>的一个方案，即使你不做数据库内核开发，<strong>日常开发</strong>中也有可能会用到。</p>
-<p>前面说到定期全量备份的周期“取决于系统重要性，有的是一天一备，有的是一周一备”。那么在什么场景下，一天一备会比一周一备更有优势呢？或者说，它影响了这个数据库系统的哪个指标？</p>
-<p>补充资料：（小林Coding写的还是比较详细的）</p>
-<p><a href="https://blog.csdn.net/weixin_63566550/article/details/129819638">【MySQL】一文彻底搞懂 Redo-log 为什么要两阶段提交？_mysql redolog两阶段提交-CSDN博客</a></p>
-<p>把这篇文章比较重要的东西提取到下面了：</p>
-<p>两阶段提交的过程是怎样的？</p>
-<p>相信大家应该听说过<code>MySQL</code>事务两阶段提交方案，啥叫做事务两阶段提交呢？实则是指<code>Redo-log</code>分两次写入，如下：</p>
-<p><img src="/2024/09/09/MySQL02/image-20240909191851549.png" alt="image-20240909191851549"></p>
-<p>从图中可看出，事务的提交过程有两个阶段，<strong>就是将 redo log 的写入拆成了两个步骤：prepare 和 commit</strong>，<strong>中间再穿插写入binlog</strong>，具体如下：</p>
-<ul>
-<li><strong>prepare 阶段：</strong>将 XID（内部 XA 事务的 ID） 写入到 redo log，<strong>同时将 redo log 对应的事务状态设置为 prepare，然后将 redo log 持久化到磁盘（innodb_flush_log_at_trx_commit &#x3D; 1 的作用）；</strong></li>
-<li><strong>commit 阶段：</strong>把 XID 写入到 binlog，然后<strong>将 binlog 持久化到磁盘（sync_binlog &#x3D; 1 的作用），</strong>接着调用引擎的提交事务接口，<strong>将 redo log 状态设置为 commit</strong>，此时该状态并<strong>不需要持久化</strong>到磁盘，<strong>只需要 write 到文件系统的 page cache 中就够了</strong>，因为只要 binlog 写磁盘成功，就算 redo log 的状态还是 prepare 也没有关系，<strong>一样会被认为事务已经执行成功；</strong></li>
-</ul>
-<p>为什么需要两阶段提交？</p>
-<blockquote>
-<p>其实想要弄明白这个问题，要结合bin-log日志一起来聊。</p>
-</blockquote>
-<p>如果只写一次的话，那到底先写bin-log还是redo-log呢？</p>
-<ul>
-<li><strong>先写bin-log，再写redo-log：</strong>当事务提交后，先写bin-log成功，结果在写redo-log时断电宕机了，再重启后由于redo-log中没有该事务的日志记录，因此不会恢复该事务提交的数据。但要注意，主从架构中同步数据是使用bin-log来实现的，而宕机前bin-log写入成功了，就代表这个事务提交的数据会被同步到从机，<strong>也就意味着从机会比主机多出一条数据。</strong></li>
-<li><strong>先写redo-log，再写bin-log：</strong>当事务提交后，先写redo-log成功，但在写bin-log时宕机了，主节点重启后，会根据redo-log恢复数据，但从机依旧是依赖bin-log来同步数据的，因此从机无法将这个事务提交的数据同步过去，毕竟bin-log中没有撒，<strong>最终从机会比主机少一条数据。</strong></li>
-</ul>
-<p>经过上述分析后可得知：如果redo-log<strong>只写一次</strong>，那不管谁先写，<strong>都有可能造成主从同步数据时的不一致问题</strong>出现，<strong>为了解决该问题，redo-log就被设计成了两阶段提交模式</strong>，设置成两阶段提交后，整个执行过程有三处崩溃点：</p>
-<ul>
-<li>redo-log(prepare)：在写入准备状态的redo记录时宕机，事务还未提交，<strong>不会影响一致性</strong>。</li>
-<li>bin-log：在写bin记录时崩溃，重启后会根据redo记录中的事务ID，<strong>回滚</strong>前面已写入的数据。（然后会继续执行这个过程）</li>
-<li>redo-log(commit)：在bin-log写入成功后，<strong>写redo(commit)记录时崩溃</strong>，因为bin-log中已经写入成功了，<strong>所以从机也可以同步数据，因此重启时直接再次提交事务</strong>，写入一条redo(commit)记录即可。（这种commit一半没有成功的，之后再commit一次就行了）</li>
-</ul>
-<p>通过这种两阶段提交的方案，就能够确保redo-log、bin-log两者的日志数据是相同的，<strong>bin-log中有的主机再恢复，如果bin-log没有则直接回滚主机上写入的数据，确保整个数据库系统的数据一致性。</strong></p>
-<blockquote>
-<p>OK~,最后再简单补充一点：为什么bin-log又被叫做二进制日志呢？因为记录日志时，MySQL写入的是二进制数据，而并非字符数据，也就意味着直接用cat&#x2F;vim这类工具是无法打开的，必须要通过MySQL提供的mysqlbinlog工具解析查看。</p>
-</blockquote>
-<p>两阶段提交有什么问题？</p>
-<p>两阶段提交虽然保证了两个日志文件的数据一致性，但是性能很差，主要有两个方面的影响：</p>
-<ul>
-<li>磁盘 I&#x2F;O 次数高：对于“双1”配置，<strong>每个事务提交都会进行两次 fsync（刷盘），一次是 redo log 刷盘，另一次是 binlog 刷盘。</strong></li>
-<li>锁竞争激烈：两阶段提交虽然能够保证「单事务」两个日志的内容一致，但在「多事务」的情况下，却不能保证两者的提交顺序一致，因此，在两阶段提交的流程基础上，还需要加一个锁来保证提交的原子性，从而保证多事务的情况下，两个日志的提交顺序一致。</li>
-</ul>
-<p>为什么两阶段提交的磁盘 <strong>I&#x2F;O 次数会很高</strong>？</p>
-<p>binlog 和 redo log 在内存中都对应的缓存空间，binlog 会缓存在 binlog cache，redo log 会缓存在 redo log buffer，它们持久化到磁盘的时机分别由下面这两个参数控制。一般我们为了避免日志丢失的风险，会将这两个参数设置为 1：</p>
-<ul>
-<li>当 sync_binlog &#x3D; 1 的时候，表示每次提交事务都会将 binlog cache 里的 binlog 直接持久到磁盘；</li>
-<li>当 innodb_flush_log_at_trx_commit &#x3D; 1 时，表示每次事务提交时，都将缓存在 redo log buffer 里的 redo log 直接持久化到磁盘；</li>
-</ul>
-<p><strong>可以看到，如果 sync_binlog 和 当 innodb_flush_log_at_trx_commit 都设置为 1，那么在每个事务提交过程中， 都会至少调用 2 次刷盘操作，一次是 redo log 刷盘，一次是 binlog 落盘，所以这会成为性能瓶颈。</strong></p>
-<p>为什么锁竞争激烈？</p>
-<p>在早期的 MySQL 版本中，通过使用 prepare_commit_mutex 互斥锁来保证事务提交的顺序，<strong>在一个事务获取到锁时才能进入 prepare 阶段，一直到 commit 阶段结束才能释放锁，下个事务才可以继续进行 prepare 操作。</strong></p>
-<p><strong>通过加锁虽然完美地解决了顺序一致性的问题，但在并发量较大的时候，就会导致对锁的争用，性能不佳。</strong></p>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>一条SQL查询语句是如何执行的？</title>
-    <url>/2024/09/09/MySQL01/</url>
-    <content><![CDATA[<h1 id="一条SQL查询语句是如何执行的？"><a href="#一条SQL查询语句是如何执行的？" class="headerlink" title="一条SQL查询语句是如何执行的？"></a>一条SQL查询语句是如何执行的？</h1><p>平时我们使用数据库，看到的通常都是一个整体。比如，你有个最简单的表，表里只有一个ID字段，在执行下面这个查询语句时：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from table where ID = 10;</span><br></pre></td></tr></table></figure>
-
-<p>我们看到的只是输入一条语句，返回一个结果，却不知道这条语句在MySQL内部的执行过程。</p>
-<p>其实这也和SQL这门语言有关系，SQL这门语言的定位就是一种声明式编程的语言，具体可以看看这个<a href="https://composingprograms.netlify.app/4/3">声明式编程</a>，本来就是不直接描述计算过程，而是描述一些计算的预期结果，比如上面SQL语句的意思是我想从这张表中获得所有ID为10的数据，并将获得到的数据按字段全部映射到结果中。</p>
-<p>下面给出的是MySQL的基本架构示意图，从中你可以清楚地看到SQL语句在MySQL的各个功能模块中的执行过程。</p>
-<p><img src="/2024/09/09/MySQL01/image-20240909122001902.png" alt="image-20240909122001902"></p>
-<p>大体来说，MySQL可以分为Server层和存储引擎层两部分。</p>
-<p><strong>Server层</strong>包括<strong>连接器、查询缓存、分析器、优化器、执行器</strong>等，涵盖MySQL的大多数核心服务功能，<strong>以及所有的内置函数（如日期、时间、数学和加密函数等）</strong>，<strong>所有跨存储引擎的功能都在这一层实现，比如存储过程、触发器、视图等</strong>。</p>
-<p>而<strong>存储引擎层</strong>负责数据的<strong>存储和提取</strong>。其架构模式是<strong>插件式的</strong>，<strong>支持InnoDB、MyISAM、Memory等多个存储引擎</strong>。现在<strong>最常用的存储引擎是InnoDB</strong>，它从<strong>MySQL 5.5.5</strong>版本开始成为了默认存储引擎。</p>
-<p>也就是说，你执行create table建表的时候，如果不指定引擎类型，<strong>默认使用的就是InnoDB</strong>。不过，你也可以通过指定存储引擎的类型来选择别的引擎，<strong>比如在create table语句中使用engine&#x3D;memory, 来指定使用内存引擎创建表</strong>。不同存储引擎的表数据存取方式不同，支持的功能也不同，在后面的文章中，我们会讨论到引擎的选择。</p>
-<p>从图中不难看出，不同的存储引擎共用一个<strong>Server层</strong>，也就是从连接器到执行器的部分。你可以先对每个组件的名字有个印象，接下来会结合开头提到的那条SQL语句，带你走一遍整个执行流程，依次看下每个组件的作用。</p>
-<h2 id="连接器"><a href="#连接器" class="headerlink" title="连接器"></a>连接器</h2><p>第一步，你要操作数据库，首先你就要连接到这个数据库上，这时候接待你的就是连接器。连接器负责跟客户端建立连接、获取权限、维持和管理连接。连接命令一般是这么写的：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql -h$ip -P$port -u$user -p</span><br></pre></td></tr></table></figure>
-
-<p><strong>输完命令之后，你就需要在交互对话里面输入密码。虽然密码也可以直接跟在-p后面写在命令行中，但这样可能会导致你的密码泄露。如果你连的是生产服务器，强烈建议你不要这么做。</strong></p>
-<p>大概就是这个样子</p>
-<p><img src="/2024/09/09/MySQL01/image-20240909122445750.png" alt="image-20240909122445750"></p>
-<p>连接命令中的mysql是客户端工具，<strong>主要就是用来跟服务端建立连接的</strong>。在完成经典的TCP握手后，连接器就要开始<strong>认证你的身份</strong>，这个时候用的就是你输入的用户名和密码。</p>
-<ul>
-<li>如果用户名或密码不对，你就会收到一个”Access denied for user”的错误，然后客户端程序结束执行。</li>
-<li>如果用户名密码认证通过，连接器会到权限表里面查出你拥有的权限。<strong>之后，这个连接里面的权限判断逻辑，都将依赖于此时读到的权限</strong>。</li>
-</ul>
-<p>这就意味着，<strong>一个用户成功建立连接后，即使你用管理员账号对这个用户的权限做了修改，也不会影响已经存在连接的权限。修改完成后，只有再新建的连接才会使用新的权限设置。</strong></p>
-<p>对于上面过程还有一个比较详细的解释，建议看看</p>
-<ul>
-<li><a href="https://blog.csdn.net/LYue123/article/details/89256577">彻底弄懂mysql（一）–mysql的通信协议_mysql tcp protocol url-CSDN博客</a></li>
-<li><a href="https://blog.csdn.net/LYue123/article/details/89285157?spm=1001.2014.3001.5502">彻底弄懂mysql（二）–连接方式_mysql连接池怎么算开启一次连接-CSDN博客</a></li>
-</ul>
-<p>这里我再提示一下，这个MySQL报文其实我们很久之前就见过了，特别是在IDEA中，那个数据连接的左下角就是报文。</p>
-<p>总结一下，上面两篇文章：</p>
-<p>第一篇主要是介绍了MySQL的通信具体是什么样的，先TCP三次握手，然后再到握手认证阶段（登陆认证报文就是在这个时候用的），最后就是命令执行阶段（我们可以输入命令啦）</p>
-<p>有两个问题问的特别好：</p>
-<ul>
-<li>为什么还要进行三次握手认证？</li>
-<li>因为TCP三次握手，<strong>只是将客户端与服务端建立起了连接，然后通过端口知道我要访问的是MySQL这个服务</strong>，但是MySQL它不同于HTTP，只要你知道URL就能得到一个响应，<strong>MySQL必须登陆后你才能进行操作</strong>。所以这个过程最重要的就是<strong>验证客户端的登陆权限</strong>。</li>
-<li>为什么是服务端主动给客户端发送认证呢？</li>
-<li>HTTP不是说<strong>只有客户端主动与服务端进行请求</strong>，<strong>服务端不是不能在没有请求的情况下主动进行响应吗</strong>？<br>首先，大家也不要陷入误区，<strong>在进行认证的这个交互中，实际上客户端与服务端还没有进行任何业务上的往来，只是进行一个认证</strong>，所以与上面说的HTTP的不同，如果细心的话你会发现，<strong>认证成功后，在命令执行阶段，MySQL这种通信方式是与HTTP非常类似的，在没有请求的情况下，服务端的MySQL也不会主动给你发送任何数据，所以这里不要混淆</strong>。<br>再说为什么服务端先发送，那肯定是因为他有不得不发送的道理，所以我们就需要理解一下，他发送的是什么东西。</li>
-</ul>
-<p>还包括了一个例子：</p>
-<ul>
-<li>小明找工作，投了一个简历给某个公司（TCP三次握手成功）<br>这时候，某公司就主动打电话了，告诉他，我们需要笔试，笔试的时间，网址，以及一些别的相关信息，规则等</li>
-<li>小明接收到这个消息之后，到了那个时间他就会请求那个网址，并将自己的信息告诉他</li>
-<li>这时候公司验证你的信息，验证成功后，你就可以开始笔试了</li>
-</ul>
-<p>特别是这个挑战随机数，有点意思：</p>
-<p>MySQL报文<strong>挑战随机数</strong>（通常称为“随机数”或“挑战数字”）是在MySQL客户端与服务器之间进行身份验证时使用的一种机制。具体来说，它在以下场景中发挥作用：</p>
-<ol>
-<li><strong>身份验证</strong>: 当客户端连接到MySQL服务器时，服务器会生成一个随机数并发送给客户端。这个随机数用于生成加密的身份验证信息。</li>
-<li><strong>提高安全性</strong>: 通过使用随机数，服务器可以确保每次连接的身份验证过程都是唯一的，防止重放攻击。</li>
-<li><strong>握手协议</strong>: 在MySQL的握手协议中，随机数是服务器发送给客户端的一部分，客户端使用这个随机数与用户的密码结合，生成最终的身份验证信息。</li>
-</ol>
-<p>说实话有点像盐值加密</p>
-<p>MySQL 客户端的<strong>权能标志</strong>（Client Capability Flags）是一个用于表示客户端所支持功能的位标志。这些标志在客户端与 MySQL 服务器进行连接时起着重要的作用，确保双方能够有效地通信。</p>
-<ol>
-<li><strong>功能协商</strong>: 客户端在建立连接时会发送其支持的功能标志，服务器根据这些标志来决定如何处理请求。</li>
-<li><strong>兼容性</strong>: 通过交换权能标志，客户端和服务器可以确保双方功能的兼容性，避免因不兼容的功能导致的错误。</li>
-<li><strong>优化性能</strong>: 权能标志可以帮助服务器优化数据传输方式，选择最适合双方的协议和功能。</li>
-</ol>
-<p>第二篇主要是比较了一下短链接和长连接的区别，然后建议一般还是使用连接池来提升性能。</p>
-<p>总结一下这篇文章的重点部分：</p>
-<ul>
-<li>短连接：<br><strong>客户端连接–创建socket认证连接–维护连接–数据传输–关闭连接</strong></li>
-<li>长连接：<br><strong>客户端连接–创建socket认证连接–维护连接–数据传输–维护连接–数据传输…-关闭连接</strong></li>
-<li>连接池：<br>连接池的一个核心思想就是<strong>连接复用</strong>，<strong>通过建立一个数据库连接池以及一套连接使用、分配和管理策略</strong>，使得该连接池中的连接可以得到高效、安全的复用，<strong>避免了数据库连接频繁建立、关闭的开销</strong>。</li>
-</ul>
-<p>因为常见数据库的连接是一个比较影响性能的一个事情，所以使用连接池的目的也是尽量少的创建连接，然后呢又要避免去维护很多空闲的连接</p>
-<p>所以建议了解一下连接池的一些参数设置：（感觉我们只用关心下面四个被加粗的就行了）</p>
-<ul>
-<li><strong>初始化连接就是，创建的时候想池里放入的连接对象数</strong></li>
-<li>最大连接数量，就是允许同一时间能都进行工作的最大数量，如果是0表示没有限制</li>
-<li><strong>最大空闲连接，就是连接池中最大空闲连接数，如果超了，就要释放一部分空闲超时连接，如果是0表示不需要释放</strong></li>
-<li><strong>最小空闲连接数，太少了就要进行创建</strong></li>
-<li><strong>超时等待时间，如果一个访问到来的时候，已经到达了最大连接数，那这个请求会被放在请求等待队列中，开启一个计时器，如果经过这个时间后，还没有可用连接，就直接抛出异常给此用户。如果是-1表示无限等待。</strong></li>
-</ul>
-<p>后面感觉还是有一点不够用，又找了一些文章来看</p>
-<ul>
-<li><p><a href="https://blog.csdn.net/weixin_44296929/article/details/102738568">连接池总结（作用、对比、参数含义、以及讲解）-CSDN博客</a></p>
-<p>看完之后感觉连接池就是类似公交车的长连接，用了很久才会被回收，但是每一个人都可以用，不像TCP长连接只能供一个人使用</p>
-</li>
-<li><p><a href="https://www.jianshu.com/p/6c61cc49a0ed">数据库连接池-常用参数配置及含义 - 简书 (jianshu.com)</a></p>
-<p>这个讲的配置相对详细一点</p>
-</li>
-</ul>
-<p>连接完成后，如果你没有后续的动作，这个连接就处于空闲状态，你可以在show processlist命令中看到它。文本中这个图是show processlist的结果，其中的Command列显示为“Sleep”的这一行，就表示现在系统里面有一个空闲连接。</p>
-<p>客户端如果太长时间没动静，连接器就会自动将它断开。这个时间是由参数wait_timeout控制的，默认值是8小时。</p>
-<p><img src="/2024/09/09/MySQL01/image-20240909145917788.png" alt="image-20240909145917788"></p>
-<p>如果在连接被断开之后，客户端再次发送请求的话，就会收到一个错误提醒： <strong>Lost connection</strong> to MySQL server during query。<strong>这时候如果你要继续，就需要重连，然后再执行请求了。（这个情况我之前好像遇到过）</strong></p>
-<p>数据库里面，<strong>长连接是指连接成功后，如果客户端持续有请求，则一直使用同一个连接。短连接则是指每次执行完很少的几次查询就断开连接，下次查询再重新建立一个</strong>。</p>
-<p><strong>建立连接的过程通常是比较复杂的，所以我建议你在使用中要尽量减少建立连接的动作，也就是尽量使用长连接。</strong></p>
-<p>建议再看一篇文章，再看下面的东西</p>
-<p>[<a href="https://zhuanlan.zhihu.com/p/43941022">玩转MySQL之二]MySQL连接机制浅析及运维 - 知乎 (zhihu.com)</a></p>
-<p>这篇文章很好的解释了为什么有的时候是不能使用短连接的：</p>
-<ul>
-<li><p>在<a href="https://zhida.zhihu.com/search?q=%E6%85%A2%E9%80%9F%E7%BD%91%E7%BB%9C&zhida_source=entity&is_preview=1">慢速网络</a>下使用短连接，连接的开销会很大；在生产繁忙的系统中，连接也可能会受到系统端口数的限制，如果要每秒建立几千个连接，<strong>那么连接断开后，端口不会被马上回收利用，必须经历一个“FIN”阶段的等待，直到可被回收利用为止，这样就可能会导致端口资源不够用</strong>。</p>
-</li>
-<li><p>从客户端的角度来说，<strong>使用长连接有一个好处，可以不用每次创建新连接，若客户端对MySQL服务器的连接请求很频繁，永久连接将更加高效</strong>。对于**<a href="https://zhida.zhihu.com/search?q=%E9%AB%98%E5%B9%B6%E5%8F%91&zhida_source=entity&is_preview=1">高并发</a>业务<strong>，如果可能会碰到连接的冲击，</strong>推荐使用长连接或连接池。**</p>
-</li>
-<li><p>从服务器的角度来看，情况则略有不同，<strong>它可以节省创建连接的开销，但维持连接也是需要内存的</strong>。如果滥用长连接的话，可能会使用过多的MySQL<a href="https://zhida.zhihu.com/search?q=%E6%9C%8D%E5%8A%A1%E5%99%A8%E8%BF%9E%E6%8E%A5&zhida_source=entity&is_preview=1">服务器连接</a>。<strong>现代的操作系统可以拥有几千个MySQL连接，但很有可能绝大部分都是睡眠（sleep）状态的，这样的工作方式不够高效，而且连接占据内存，也会导致内存的浪费。</strong></p>
-</li>
-<li><p>对于扩展性好的站点来说，其实大部分的访问并不需要连接数据库。<strong>如果用户需要频繁访问数据库，那么可能会在流量增大的时候产生性能问题</strong>，此时长短连接都是无法解决问题的，<strong>所以应该进行合理的设计和优化来避免性能问题。</strong></p>
-</li>
-<li><p>为了确保扩展性好的站点在高流量情况下仍能保持良好的性能，以下是一些<strong>合理的设计和优化策略</strong>：</p>
-<p>\1. <strong>优化应用层</strong>—从应用程序代码来看</p>
-<p>减少数据库请求: 在应用逻辑中优化数据访问，尽量减少数据库请求的次数。例如，<strong>通过批量查询或合并请求。</strong></p>
-<p>使用分页: 对于大数据集，<strong>使用分页而不是一次性加载所有数据。</strong></p>
-<p>\2.  <strong>缓存机制</strong>—从缓存中间件来看</p>
-<p>使用缓存: <strong>在数据库前面引入缓存层（如 Redis、Memcached）来存储频繁访问的数据</strong>。这样可以减少数据库的直接查询次数。</p>
-<p>页面缓存: <strong>对于静态内容或不常变化的页面，使用页面缓存可以减少数据库的压力</strong>。<strong>该放Nginx的放Nginx，该放CDN的放CDN。</strong></p>
-<p>\3. **负载均衡 **—大的方面，从数据库实例来看</p>
-<p><strong>多实例部署</strong>: 将数据库部署为<strong>主从复制或集群模式，使用负载均衡器分散请求，提高并发处理能力。</strong></p>
-<p><strong>读写分离</strong>: 将读请求和写请求分开，<strong>写操作发送到主数据库，读操作发送到从数据库。</strong></p>
-<p><strong>数据分片</strong>: 对于大规模数据，可以考虑数据分片，将数据分散到不同的数据库实例中，<strong>减少单个数据库的压力。</strong></p>
-<p>\4.<strong>数据库优化</strong>—小的方面，从数据库表来看</p>
-<p><strong>索引优化</strong>: 确保数据库表中的索引设置合理，以加速查询。</p>
-<p><strong>查询优化</strong>: 使用 EXPLAIN 分析 SQL 查询，优化慢查询，减少不必要的数据检索。</p>
-</li>
-</ul>
-<p>下面这个感觉又可以出一个场景题了</p>
-<p>但是全部使用长连接后，你可能会发现，<strong>有些时候MySQL占用内存涨得特别快，这是因为MySQL在执行过程中临时使用的内存是管理在连接对象里面的。这些资源会在连接断开的时候才释放。所以如果长连接累积下来，可能导致内存占用太大，被系统强行杀掉（OOM），从现象看就是MySQL异常重启了。</strong></p>
-<p>怎么解决这个问题呢？你可以考虑以下两种方案。（至于为什么是这样，你看后面的查询缓存就知道了）</p>
-<ol>
-<li>定期断开长连接。使用一段时间，或者程序里面判断执行过一个占用内存的大查询后，断开连接，之后要查询再重连。</li>
-<li>如果你用的是MySQL 5.7或更新版本，可以在每次执行一个比较大的操作后，通过执行 mysql_reset_connection来重新初始化连接资源。这个过程不需要重连和重新做权限验证，但是会将连接恢复到刚刚创建完时的状态。</li>
-</ol>
-<h2 id="查询缓存"><a href="#查询缓存" class="headerlink" title="查询缓存"></a>查询缓存</h2><p>连接建立完成后，你就可以执行select语句了。执行逻辑就会来到第二步：查询缓存。</p>
-<p>MySQL拿到一个查询请求后，<strong>会先到查询缓存看看，之前是不是执行过这条语句。之前执行过的语句及其结果可能会以key-value对的形式，被直接缓存在内存中。key是查询的语句，value是查询的结果。如果你的查询能够直接在这个缓存中找到key，那么这个value就会被直接返回给客户端。</strong></p>
-<p>如果语句不在查询缓存中，就会继续后面的执行阶段。<strong>执行完成后，执行结果会被存入查询缓存中。</strong>你可以看到，<strong>如果查询命中缓存，MySQL不需要执行后面的复杂操作，就可以直接返回结果，这个效率会很高。</strong></p>
-<p><strong>但是大多数情况下我会建议你不要使用查询缓存，为什么呢？因为查询缓存往往弊大于利。</strong></p>
-<p>查询缓存的失效非常频繁，<strong>只要有对一个表的更新，这个表上所有的查询缓存都会被清空</strong>。因此很可能你费劲地把结果存起来，还没使用呢，就被一个更新全清空了。对于更新压力大的数据库来说，<strong>查询缓存的命中率会非常低</strong>。除非你的业务就是有一张<strong>静态表</strong>，很长时间才会更新一次。比如，一个系统配置表，那这张表上的查询<strong>才适合使用查询缓存</strong>。</p>
-<p>好在MySQL也提供了这种“按需使用”的方式。你可以将参数query_cache_type设置成DEMAND，这样对于默认的SQL语句都不使用查询缓存。<strong>而对于你确定要使用查询缓存的语句，可以用SQL_CACHE显式指定，像下面这个语句一样：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select SQL_CACHE * from table where ID = 10;</span><br></pre></td></tr></table></figure>
-
-<p>需要注意的是，MySQL 8.0版本直接将查询缓存的整块功能删掉了，<strong>也就是说8.0开始彻底没有这个功能了</strong>。</p>
-<h2 id="分析器"><a href="#分析器" class="headerlink" title="分析器"></a>分析器</h2><p><strong>如果没有命中查询缓存，就要开始真正执行语句了。首先，MySQL需要知道你要做什么，因此需要对SQL语句做解析。</strong></p>
-<p>分析器先会做“<strong>词法分析</strong>”。<strong>你输入的是由多个字符串和空格组成的一条SQL语句，MySQL需要识别出里面的字符串分别是什么，代表什么。</strong></p>
-<p>这个有点像SICP讲的Scheme分析器啊<a href="https://composingprograms.netlify.app/3/4">组合语言的解释器 (composingprograms.netlify.app)</a></p>
-<p>还有一点像ES的IK分词器，那个分词器里面我记得还有具体的算法来进行分词</p>
-<p>MySQL从你输入的”select”这个关键字识别出来，这是一个查询语句。它也要把字符串“T”识别成“表名T”，把字符串“ID”识别成“列ID”。</p>
-<p>做完了这些识别以后，就要做“<strong>语法分析</strong>”。根据词法分析的结果，语法分析器会根据语法规则，判断你输入的这个SQL语句是否满足MySQL语法。</p>
-<p>如果你的语句不对，就会收到“You have an error in your SQL syntax”的错误提醒，比如下面这个语句select少打了开头的字母“s”。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; elect * from t where ID=1;</span><br><span class="line"></span><br><span class="line">ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near &#x27;elect * from t where ID=1&#x27; at line 1</span><br></pre></td></tr></table></figure>
-
-<p>一般语法错误会提示第一个出现错误的位置，所以你要关注的是紧接“use near”的内容。</p>
-<h2 id="优化器"><a href="#优化器" class="headerlink" title="优化器"></a>优化器</h2><p>经过了<strong>分析器，MySQL就知道你要做什么了</strong>。在开始执行之前，还要先经过<strong>优化器的处理</strong>。</p>
-<p>优化器是在表里面有多个索引的时候，决定使用哪个索引；或者在一个语句有多表关联（join）的时候，决定各个表的连接顺序。比如你执行下面这样的语句，这个语句是执行两个表的join：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from t1 join t2 using(ID)  where t1.c=10 and t2.d=20;</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li>既可以先从表t1里面取出c&#x3D;10的记录的ID值，再根据ID值关联到表t2，再判断t2里面d的值是否等于20。</li>
-<li>也可以先从表t2里面取出d&#x3D;20的记录的ID值，再根据ID值关联到t1，再判断t1里面c的值是否等于10。</li>
-</ul>
-<p>这两种执行方法的逻辑结果是一样的，但是执行的效率会有不同，而优化器的作用就是决定选择使用哪一个方案。</p>
-<p><strong>优化器阶段完成后，这个语句的执行方案就确定下来了，然后进入执行器阶段。</strong>如果你还有一些疑问，比如优化器是怎么选择索引的，有没有可能选择错等等，没关系，我会在后面的文章中单独展开说明优化器的内容。</p>
-<h2 id="执行器"><a href="#执行器" class="headerlink" title="执行器"></a>执行器</h2><p>MySQL<strong>通过分析器知道了你要做什么，通过优化器知道了该怎么做，于是就进入了执行器阶段，开始执行语句</strong>。</p>
-<p>开始执行的时候，<strong>要先判断一下你对这个表T有没有执行查询的权限，如果没有，就会返回没有权限的错误</strong>，如下所示。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from T where ID=10;</span><br><span class="line"></span><br><span class="line">ERROR 1142 (42000): SELECT command denied to user &#x27;b&#x27;@&#x27;localhost&#x27; for table &#x27;T&#x27;</span><br></pre></td></tr></table></figure>
-
-<p>如果有权限，就<strong>打开表继续执行</strong>。打开表的时候，<strong>执行器就会根据表的引擎定义，去使用这个引擎提供的接口</strong>。</p>
-<p>比如我们这个例子中的表T中，ID字段没有索引，那么执行器的执行流程是这样的：</p>
-<ol>
-<li><strong>调用InnoDB引擎接口</strong>取这个表的第一行，判断ID值是不是10，如果不是则跳过，如果是则将这行存在结果集中；</li>
-<li>调用引擎接口取“下一行”，重复相同的判断逻辑，直到取到这个表的最后一行。</li>
-<li>执行器将上述遍历过程中所有满足条件的行组成的记录集作为结果集返回给客户端。</li>
-</ol>
-<p>至此，这个语句就执行完成了。</p>
-<p>对于有索引的表，执行的逻辑也差不多。<strong>第一次调用的是“取满足条件的第一行”这个接口，之后循环取“满足条件的下一行”这个接口</strong>，这些接口都是引擎中已经定义好的。</p>
-<p>你会在数据库的<strong>慢查询日志</strong>中看到一个<strong>rows_examined的字段</strong>，表示这个语句执行过程中扫描了多少行。<strong>这个值就是在执行器每次调用引擎获取数据行的时候累加的</strong>。</p>
-<p>在有些场景下，执行器调用一次，在引擎内部则扫描了多行，因此<strong>引擎扫描行数跟rows_examined并不是完全相同的。</strong></p>
-<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>如果表T中没有字段k，而你执行了这个语句 select * from T where k&#x3D;1, 那肯定是会报“不存在这个列”的错误： “Unknown column ‘k’ in ‘where clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？</p>
-<blockquote>
-<p>在执行 SQL 查询的过程中，当出现类似于 “Unknown column ‘k’ in ‘where clause’” 的错误信息时，这是在语义分析阶段报出的错误。</p>
-<p>具体的解析和执行过程如下：</p>
-<ol>
-<li><strong>词法分析和语法分析阶段</strong>：在这个阶段，MySQL 解析器将输入的 SQL 查询语句进行词法分析和语法分析，<strong>生成语法树（Parse Tree）或语法分析树（Parse Tree）</strong>。<strong>这个阶段主要是验证查询语句的语法正确性，检查语句中的关键字、标识符、运算符等是否符合语法规则。</strong></li>
-<li><strong>语义分析阶段</strong>：<strong>在语义分析阶段，MySQL 对语法树进行进一步的分析和验证。这个阶段主要是检查语句的语义正确性，包括验证列和表的存在性、数据类型的匹配、约束条件的合法性等。</strong>在执行 SQL 查询时，MySQL 需要确保查询中使用的列和表是存在的。</li>
-</ol>
-<p>当执行语句 “SELECT * FROM T WHERE k&#x3D;1” 时，MySQL 会在<strong>语义分析阶段尝试解析和验证其中的列名</strong>。如果表 T 中不存在名为 ‘k’ 的列，MySQL 将报告 “Unknown column ‘k’ in ‘where clause’” 错误，表示查询中引用了不存在的列。</p>
-<p>因此，<strong>该错误是在语义分析阶段报出的，即在验证查询语句的语义正确性时发现的</strong>。在这个阶段，MySQL 检查查询语句是否符合数据库模式的定义和约束条件。</p>
-</blockquote>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>事务隔离：为什么你改了我还看不见？</title>
-    <url>/2024/09/09/MySQL03/</url>
-    <content><![CDATA[<p>提到事务，你肯定不陌生，和数据库打交道的时候，我们总是会用到事务。最经典的例子就是转账，你要给朋友小王转100块钱，而此时你的银行卡只有100块钱。</p>
-<p>转账过程具体到程序里会有一系列的操作，比如查询余额、做加减法、更新余额等，这些操作必须保证是一体的，不然等程序查完之后，还没做减法之前，你这100块钱，完全可以借着这个时间差再查一次，然后再给另外一个朋友转账，如果银行这么整，不就乱了么？这时就要用到“事务”这个概念了。</p>
-<p><strong>简单来说，事务就是要保证一组数据库操作，要么全部成功，要么全部失败。</strong>在MySQL中，<strong>事务支持是在引擎层实现的。</strong>你现在知道，MySQL是一个支持多引擎的系统，但并不是所有的引擎都支持事务。<strong>比如MySQL原生的MyISAM引擎就不支持事务，这也是MyISAM被InnoDB取代的重要原因之一。</strong></p>
-<p>今天的文章里，我将会以InnoDB为例，剖析MySQL在事务支持方面的特定实现，并基于原理给出相应的实践建议，希望这些案例能加深你对MySQL事务原理的理解。</p>
-<h3 id="隔离性与隔离级别"><a href="#隔离性与隔离级别" class="headerlink" title="隔离性与隔离级别"></a>隔离性与隔离级别</h3><p>提到事务，你肯定会想到<strong>ACID（Atomicity、Consistency、Isolation、Durability，即原子性、一致性、隔离性、持久性）</strong>，今天我们就来说说其中I，也就是“隔离性”。</p>
-<p>当数据库上有多个事务同时执行的时候，就可能出现<strong>脏读（dirty read）、不可重复读（non-repeatable read）、幻读（phantom read）的问题</strong>，为了解决这些问题，就有了“隔离级别”的概念。（简单的说，隔离级别是对于事务而言的，隔离的是事务不是其他的东西）</p>
-<p>在谈隔离级别之前，你首先要知道，你<strong>隔离得越严实，效率就会越低</strong>。因此很多时候，我们都要在二者之间寻找一个平衡点。<strong>SQL标准的事务隔离级别包括：读未提交（read uncommitted）、读提交（read committed）、可重复读（repeatable read）和串行化（serializable ）。</strong>下面我逐一为你解释：</p>
-<ul>
-<li><strong>读未提交</strong>是指：一个事务还<strong>没提交</strong>时，它做的变更<strong>就能被别的事务看到</strong>。（可以读到别人没有提交的事务，等同于考试的时候可以直接看到别人试卷的答案）</li>
-<li><strong>读提交</strong>是指：一个事务提交之后，它做的变更才会被其他事务看到。（你提交试卷之后我才能看到你的答案）</li>
-<li><strong>可重复读</strong>是指：<strong>一个事务执行过程中看到的数据，总是跟这个事务在启动时看到的数据是一致的</strong>。当然在可重复读隔离级别下，未提交变更对其他事务也是不可见的。（始终相信自己最开始见到的数据是不会变化的，可以重复读取到最开始的值。<strong>这个其实底层是靠undo log的回滚指针不停往前找的</strong>）</li>
-<li><strong>串行化</strong>：顾名思义是对于同一行记录，“写”会加“写锁”，“读”会加“读锁”。<strong>当出现读写锁冲突的时候，后访问的事务必须等前一个事务执行完成，才能继续执行。</strong>（<strong>串行就是排队等待，排成一行</strong>）</li>
-</ul>
-<p>其中“读提交”和“可重复读”比较难理解，所以我用一个例子说明这几种隔离级别。假设数据表T中只有一列，其中一行的值为1，下面是按照时间顺序执行两个事务的行为。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; create table T(c int) engine=InnoDB;</span><br><span class="line">insert into T(c) values(1);</span><br></pre></td></tr></table></figure>
-
-<p>我们来看看在不同的隔离级别下，事务A会有哪些不同的返回结果，也就是图里面V1、V2、V3的返回值分别是什么。</p>
-<p><img src="/2024/09/09/MySQL03/image-20240909200825360.png" alt="image-20240909200825360"></p>
-<ul>
-<li><strong>若隔离级别是“读未提交”， 则V1的值就是2。这时候事务B虽然还没有提交，但是结果已经被A看到了。</strong>因此，V2、V3也都是2。</li>
-<li>若隔离级别是“读提交”，则V1是1，V2的值是2。<strong>事务B的更新在提交后才能被A看到。</strong>所以， V3的值也是2。</li>
-<li>若隔离级别是“可重复读”，则V1、V2是1，V3是2。之所以V2还是1，遵循的就是这个要求：<strong>事务在执行期间看到的数据前后必须是一致的。</strong></li>
-<li>若隔离级别是“串行化”，<strong>则在事务B执行“将1改成2”的时候，会被锁住。直到事务A提交后，事务B才可以继续执行。</strong>所以从A的角度看， V1、V2值是1，V3的值是2。</li>
-</ul>
-<p>在实现上，数据库里面会<strong>创建一个视图</strong>，访问的时候<strong>以视图的逻辑结果为准</strong>。（视图的作用体现在这里了）</p>
-<ul>
-<li>在“可重复读”隔离级别下，<strong>这个视图是在事务启动时创建的，整个事务存在期间都用这个视图。</strong></li>
-<li>在“读提交”隔离级别下，<strong>这个视图是在每个SQL语句开始执行的时候创建的。</strong></li>
-<li>这里需要注意的是，<strong>“读未提交”隔离级别下直接返回记录上的最新值，没有视图概念。</strong></li>
-<li>而“串行化”隔离级别下<strong>直接用加锁的方式来避免并行访问。</strong></li>
-</ul>
-<p>我们可以看到在不同的隔离级别下，数据库行为是有所不同的。<strong>Oracle数据库的默认隔离级别其实就是“读提交”，因此对于一些从Oracle迁移到MySQL的应用，为保证数据库隔离级别的一致，你一定要记得将MySQL的隔离级别设置为“读提交”。（MySQL 的默认事务隔离级别是 <strong>REPEATABLE READ</strong>（可重复读））</strong></p>
-<p>配置的方式是，<strong>将启动参数transaction-isolation的值设置成READ-COMMITTED</strong>。你可以用show variables来查看当前的值。（这个输出的东西很多，你可以指定输出流输入到一个文件中看看）</p>
-<p><img src="/2024/09/09/MySQL03/image-20240909201622812.png" alt="image-20240909201622812"></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; show variables like &#x27;transaction_isolation&#x27;;</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br><span class="line"></span><br><span class="line">| Variable_name | Value |</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br><span class="line"></span><br><span class="line">| transaction_isolation | READ-COMMITTED |</span><br><span class="line"></span><br><span class="line">+-----------------------+----------------+</span><br></pre></td></tr></table></figure>
-
-<p>总结来说，存在即合理，哪个隔离级别都有它自己的使用场景，你要根据自己的业务情况来定。我想<strong>你可能会问那什么时候需要“可重复读”的场景呢</strong>？我们来看一个数据校对逻辑的案例。</p>
-<p>假设你在管理一个个人银行账户表。一个表存了每个月月底的余额，一个表存了账单明细。<strong>这时候你要做数据校对，也就是判断上个月的余额和当前余额的差额，是否与本月的账单明细一致。你一定希望在校对过程中，即使有用户发生了一笔新的交易，也不影响你的校对结果。</strong></p>
-<p><strong>这时候使用“可重复读”隔离级别就很方便。事务启动时的视图可以认为是静态的，不受其他事务更新的影响。</strong></p>
-<h3 id="事务隔离的实现"><a href="#事务隔离的实现" class="headerlink" title="事务隔离的实现"></a>事务隔离的实现</h3><p>理解了事务的隔离级别，我们再来看看事务隔离具体是怎么实现的。这里我们展开说明“可重复读”。</p>
-<p><strong>在MySQL中，实际上每条记录在更新的时候都会同时记录一条回滚操作。记录上的最新值，通过回滚操作，都可以得到前一个状态的值。（这就是Undo log用于回滚的。Undo Log（撤销日志）在数据库管理系统中用于实现回滚操作，确保数据的完整性和一致性）</strong></p>
-<p>建议先看完这篇博客再看下面的内容</p>
-<p><a href="https://blog.csdn.net/Weixiaohuai/article/details/117867353">MySQL回滚日志（undo log）总结_mysql undo log-CSDN博客</a></p>
-<p>下面是这篇文章比较重要的部分：</p>
-<p>MVCC（Multi-Version Concurrency Control，<strong>多版本并发控制</strong>）是一种用于数据库管理系统的并发控制机制，旨在允许<strong>多个事务同时读取和写入数据，而不互相阻塞</strong>。</p>
-<p>在MySQL数据库InnoDB存储引擎中，用undo Log来实现多版本并发控制(MVCC)。</p>
-<p><strong>当读取的某一行被其他事务锁定时，它可以从undo log中分析出该行记录以前的数据版本是怎样的，从而让用户能够读取到当前事务操作之前的数据【快照读】。</strong></p>
-<p>下面解释一下什么是快照读，与之对应的还有一个是—当前读。</p>
-<ul>
-<li>快照读：<br>SQL读取的数据是快照版本【可见版本】，<strong>也就是历史版本</strong>，不用加锁，普通的SELECT就是快照读。</li>
-<li>当前读：<br><strong>SQL读取的数据是最新版本。</strong>通过锁机制来保证读取的数据无法通过其他事务进行修改UPDATE、DELETE、INSERT、SELECT … LOCK IN SHARE MODE、SELECT … FOR UPDATE都是当前读。</li>
-</ul>
-<p>说实话，这个玩意的底层实现很类似于Git的底层实现</p>
-<p>undo log的存储机制</p>
-<p>undo log的存储<strong>由InnoDB存储引擎</strong>实现，<strong>数据保存在InnoDB的数据文件中</strong>。</p>
-<p>在InnoDB存储引擎中，undo log是<strong>采用分段(segment)的方式进行存储的</strong>。<strong>rollback segment称为回滚段，每个回滚段中有1024个undo log segment。</strong></p>
-<p>在MySQL5.5之前，只支持1个rollback segment，也就是<strong>只能记录1024个undo操作</strong>。（这个记录的方式和Redis的AOF很类似）</p>
-<p><strong>在MySQL5.5之后，可以支持128个rollback segment，分别从resg slot0 - resg slot127，每一个resg slot，也就是每一个回滚段，内部由1024个undo segment 组成，即总共可以记录128 * 1024个undo操作。（这个又有一点像Redis分片集群的slot槽）</strong></p>
-<p><img src="/2024/09/09/MySQL03/image-20240909210933285.png" alt="image-20240909210933285"></p>
-<p><strong>undo log日志里面不仅存放着数据更新前的记录，还记录着RowID、事务ID、回滚指针。（这个玩意和Git底层很类似）</strong>其中事务ID每次递增，回滚指针第一次如果是insert语句的话，回滚指针为NULL，第二次update之后的undo log的回滚指针就会指向刚刚那一条undo log日志，依次类推，就会形成一条undo log的回滚链，方便找到该条记录的历史版本。</p>
-<p>undo log的工作原理</p>
-<p>在更新数据之前，MySQL会<strong>提前</strong>生成undo log日志，当<strong>事务提交</strong>的时候，并<strong>不会立即删除undo log</strong>，要执行回滚（rollback）操作时，从缓存中读取数据。<strong>undo log日志的删除是通过通过后台purge线程进行回收处理的。</strong></p>
-<p><img src="/2024/09/09/MySQL03/image-20240909211811977.png" alt="image-20240909211811977"></p>
-<p>如上图：</p>
-<ul>
-<li>1、事务A执行update操作，此时事务还没提交，<strong>会将数据进行备份到对应的undo buffer，然后由undo buffer持久化到磁盘中的undo log文件中，此时undo log保存了未提交之前的操作日志</strong>，接着将操作的数据，也就是Teacher表的数据持久保存到<strong>InnoDB的数据文件IBD。</strong>（注意是先在缓存中记录到undo buffer再持久化到undo log日志中，最后才是将数据持久化到存储引擎的IBD文件中）</li>
-<li>2、此时事务B进行查询操作，直接从undo buffer缓存中进行读取，这时事务A还没提交事务。如果要回滚（rollback）事务，是不读磁盘的，<strong>先直接从undo buffer缓存读取。</strong></li>
-</ul>
-<p>用undo log实现原子性和持久化的事务的简化过程：</p>
-<p>假设有A、B两个数据，值分别为1,2。</p>
-<ul>
-<li>A. 事务开始</li>
-<li>B. 记录A&#x3D;1到undo log中</li>
-<li>C. 修改A&#x3D;3</li>
-<li>D. 记录B&#x3D;2到undo log中</li>
-<li>E. 修改B&#x3D;4</li>
-<li>F. 将undo log写到磁盘 ——-<strong>undo log持久化</strong></li>
-<li>G. 将数据写到磁盘 ——-<strong>数据持久化</strong></li>
-<li>H. 事务提交 ——-<strong>提交事务</strong></li>
-</ul>
-<p>之所以能同时保证原子性和持久化，是因为以下特点：</p>
-<ul>
-<li><strong>更新数据前</strong>记录undo log。</li>
-<li>为了保证持久性，<strong>必须将数据在事务提交前写到磁盘，只要事务成功提交，数据必然已经持久化到磁盘。</strong></li>
-<li><strong>undo log必须先于数据持久化到磁盘。</strong>如果在G,H之间发生<strong>系统崩溃</strong>，undo log是完整的，<strong>可以用来回滚。</strong></li>
-<li>如果在A - F之间发生系统崩溃，因为数据没有持久化到磁盘，所以磁盘上的数据还是保持在事务开始前的状态。</li>
-</ul>
-<p>缺陷：每个事务提交前将数据和undo log写入磁盘，这样会导致大量的磁盘IO，因此性能较差。 <strong>如果能够将数据缓存一段时间，就能减少IO提高性能，但是这样就会失去事务的持久性。</strong></p>
-<blockquote>
-<p><strong>undo日志属于逻辑日志，redo（recovery）是物理日志</strong>，所谓逻辑日志是undo log<strong>是记录一个操作过程</strong>，不会物理删除</p>
-<p><strong>binlog也是逻辑日志，AOF也是逻辑日志</strong></p>
-<p>undo log，sql执行delete或者update操作都会记录一条undo日志</p>
-<p><strong>undo是应对数据库回滚的情况，redo是应对数据库执行到一半故障继续执行的情况，binlog是应对恢复数据库的情况</strong></p>
-</blockquote>
-<p>再看一篇试试</p>
-<p><a href="https://cloud.tencent.com/developer/article/2220871">图文结合带你搞定MySQL日志之Undo log(回滚日志)-腾讯云开发者社区-腾讯云 (tencent.com)</a></p>
-<p>下面提取了部分重点内容：</p>
-<p><strong>如何理解Undo Log</strong></p>
-<p>事务需要保证<strong>原子性</strong>，也就是事务中的操作要么全部完成，要么什么也不做。但有时候事务执行到一半会出现一些情况，比如：</p>
-<ul>
-<li>情况一：事务执行过程中可能遇到<strong>各种错误</strong>，比如<a href="https://cloud.tencent.com/act/pro/promotion-cvm?from_column=20065&from=20065">服务器</a>本身的错误，操作系统错误，甚至是突然断电导致的错误。</li>
-<li>情况二：DBA可以在事务执行过程中手动输入ROLLBACK语句结束当前事务的执行。以上情况出现，我们需要把数据改回原先的样子，这个过程称之为回滚。</li>
-</ul>
-<p>每当我们要对一条记录做改动时**(这里的改动可以指<code>INSERT、DELETE、UPDATE</code>)，都需要把回滚时所需的东西记下来。**比如:</p>
-<ul>
-<li>你插入一条记录时，至少要把这条记录的主键值记下来，之后回滚的时候只需要把这个主键值对应的记录删掉就好了。**(对于每个<code>INSERT</code>, InnoDB存储引擎会完成一个<code>DELETE</code>)**</li>
-<li>你删除了一条记录，至少要把这条记录中的内容都记下来，这样之后回滚时再把由这些内容组成的记录插入到表中就好了。**(对于每个<code>DELETE</code>,InnoDB存储引擎会执行一个<code>INSERT</code>)**</li>
-<li>你修改了一条记录，至少要把修改这条记录前的旧值都记录下来，这样之后回滚时再把这条记录更新为旧值就好了。**(对于每个<code>UPDATE</code>，InnoDB存储引擎会执行一个<code>相反的UPDATE</code>，将修改前的行放回去)**</li>
-</ul>
-<p><a href="https://cloud.tencent.com/product/cdb?from_column=20065&from=20065">MySQL</a>把这些为了回滚而记录的这些内容称之为<code>撤销日志</code>或者<code>回滚日志</code>(即Undo Log)。<strong>注意，由于查询操作(SELECT）并不会修改任何用户记录，所以在杳询操作行时，并不需要记录相应的Undo日志</strong></p>
-<p><strong>此外，Undo Log会产生<code>Redo Log</code>，也就是Undo Log的产生会伴随着Redo Log的产生，这是因为Undo Log也需要持久性的保护。</strong></p>
-<p>这里解释一下，为什么它们是相辅相成的，这里简单的说一下，本来我们执行到一半挂了，undo是回到开始，redo是继续执行完</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在数据库管理系统中，Undo Log 和 Redo Log 是用于实现数据一致性和事务管理的两种重要日志，它们通常会一起生成，以确保在事务过程中能够安全地恢复数据。以下是详细解释：</span><br><span class="line"></span><br><span class="line">### 1. **Undo Log 的作用**</span><br><span class="line"></span><br><span class="line">- **回滚功能**: Undo Log 记录了事务对数据的修改前状态，允许在事务失败或被中断时将数据恢复到修改之前的状态。</span><br><span class="line">- **持久性保护**: 为了确保在系统崩溃或故障后仍能进行数据恢复，Undo Log 必须被持久化到磁盘。</span><br><span class="line"></span><br><span class="line">### 2. **Redo Log 的作用**</span><br><span class="line"></span><br><span class="line">- **恢复功能**: Redo Log 记录了已提交事务的修改操作，用于在系统崩溃后重放这些操作，从而恢复数据到最新状态。</span><br><span class="line">- **事务的完整性**: Redo Log 确保即使在故障发生时，已提交的事务也不会丢失。</span><br><span class="line"></span><br><span class="line">### 3. **二者的关系**</span><br><span class="line"></span><br><span class="line">- **同时生成**: 在事务执行过程中，每当数据库修改数据时，系统会同时生成 Undo Log 和 Redo Log。</span><br><span class="line">  - **Undo Log**: 记录修改前的状态，以便在需要回滚时使用。</span><br><span class="line">  - **Redo Log**: 记录修改后的状态，以便在系统重启时重放已提交的事务。</span><br><span class="line">- **持久性需求**:</span><br><span class="line">  - Undo Log 需要被持久化，以确保在崩溃后能够恢复未完成的事务或回滚操作。</span><br><span class="line">  - Redo Log 则确保已完成的事务能够在故障后恢复。</span><br><span class="line"></span><br><span class="line">### 4. **总结**</span><br><span class="line"></span><br><span class="line">因此，Undo Log 和 Redo Log 的产生是相辅相成的。Undo Log 提供了回滚的能力，而 Redo Log 确保了已提交事务的持久性。两者的结合使得数据库能够在发生故障时，既能恢复到一致的状态，又能保证数据的完整性和安全性。</span><br></pre></td></tr></table></figure>
-
-<p><strong>Undo Log的存储结构</strong></p>
-<p>InnoDB对Undo Log的管理采用段的方式，也就是<code>回滚段（rollback segment）</code>。每个回滚段记录了<code>1024 个Undo Log segment</code>，而在每个Undo Log segment段中进行<code>Undo页</code>的申请。</p>
-<p>在<code>InnoDB1.1版本</code>之前（不包括1.1版本），只有一个<code>rollback segment</code>，因此支持<strong>同时在线</strong>的事务限制为 <strong>1024</strong>。虽然对绝大多数的应用来说都已经够用。</p>
-<p>从1.1版本开始InnoDB支持最大<code>128个rollback segment</code>，故其支持<strong>同时在线的事务</strong>限制提高到了<code>128*1024</code>。</p>
-<p>虽然InnoDB1.1版本支持了128个<code>rollback segment</code>，但是这些<code>rollback segment</code>都存储于共享表空间<strong>ibdata（上面提到的IBD文件）</strong>中。从lnnoDB1.2版本开始，可通过参数对<code>rollback segment</code>做进一步的设置。这些参数包括:</p>
-<ul>
-<li><code>innodb_undo_directory:</code>设置rollback segment文件所在的路径。这意味着rollback segment可以存放在共享表空间以外的位置，即可以设置为独立表空间。该参数的默认值为“.&#x2F;”，表示当前InnoDB存储引擎的目录。</li>
-<li><code>innodb_undo_logs:</code>设置rollback segment的个数，默认值为128。在InnoDB1.2版本中，该参数用来替换之前版本的参数innodb_rollback_segments。</li>
-<li><code>innodb_undo_tablespaces:</code>设置构成rollback segment文件的数量，这样rollback segment可以较为平均地分布在多个文件中。设置该参数后，会在路径innodb_undo_directory看到undo为前缀的文件，该文件就代表rollback segment文件。</li>
-</ul>
-<p>当事务提交时，InnoDB存储引擎会做以下两件事情：    </p>
-<ul>
-<li>1.将Undo Log放入列表中，<strong>以供之后的purge(清洗、清除)操作</strong>    </li>
-<li>2.判断Undo Log所在的页是否可以重用(低于3&#x2F;4可以重用)，若可以分配给下个事务使用</li>
-</ul>
-<p><strong>Undo页的重用</strong></p>
-<p>当我们开启一个事务需要写Undo log的时候，就得先去<code>Undo Log segment</code>中去找到一个空闲的位置，当有空位的时候，就去申请Undo页，在这个申请到的Undo页中进行Undo Log的写入。<strong>我们知道MySQL默认一页的大小是<code>16k</code>。</strong></p>
-<p>为每一个事务分配一个页，<strong>是非常浪费的</strong>(除非你的事务非常长)，假设你的应用的TPS(每秒处理的事务数目)为1000，那么1s就需要1000个页，大概需要16M的存储，1分钟大概需要1G的存储。<strong>如果照这样下去除非MySQL清理的非常勤快，否则随着时间的推移，磁盘空间会增长的非常快</strong>，而且很多空间都是浪费的。</p>
-<p><strong>于是Undo页就被设计的可以重用了</strong>，当事务提交时，并<strong>不会立刻删除</strong>Undo页。因为重用，所以这个Undo页可能混杂着其他事务的Undo Log。<strong>Undo Log在commit后，会被放到一个链表中，然后判断Undo页的使用空间是否小于3&#x2F;4，如果小于3&#x2F;4的话，则表示当前的Undo页可以被重用，那么它就不会被回收，其他事务的Undo Log可以记录在当前Undo页的后面。</strong>由于Undo Log是离散的，所以清理对应的磁盘空间时，效率不高。</p>
-<p><strong>Undo Log的类型</strong></p>
-<p>在InnoDB存储引擎中，Undo Log分为：</p>
-<ul>
-<li><p><strong>insert Undo Log</strong> </p>
-<p>insert Undo Log是指在insert操作中产生的Undo Log。<strong>因为insert操作的记录，只对事务本身可见，对其他事务不可见(这是事务隔离性的要求)，故该Undo Log可以在事务提交后直接删除。不需要进行purge操作。</strong></p>
-</li>
-<li><p><strong>update Undo Log</strong></p>
-<p>update Undo Log记录的是对delete和update操作产生的Undo Log。该Undo Log可能需要提供MVCC机制，因此<strong>不能在事务提交时就进行删除</strong>。提交时放入Undo Log链表，等待purge线程进行最后的删除。</p>
-</li>
-</ul>
-<p><strong>Undo Log的生命周期</strong></p>
-<p>以下是Undo+Redo事务的简化过程: 假设有2个数值，分别为 A&#x3D;1 和 B&#x3D;2 ，然后将A修改为3，B修改为4</p>
-<figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="number">1.</span> start transaction;</span><br><span class="line"><span class="number">2</span>．记录A=<span class="number">1</span>到<span class="title class_">Undo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">3.</span> update A = <span class="number">3</span>;</span><br><span class="line"><span class="number">4</span>．记录A=<span class="number">3</span> 到<span class="title class_">Redo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">5</span>．记录B=<span class="number">2</span>到<span class="title class_">Undo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">6.</span> update B = <span class="number">4</span>;</span><br><span class="line"><span class="number">7</span>．记录B=<span class="number">4</span>到<span class="title class_">Redo</span> <span class="title class_">Log</span>;</span><br><span class="line"><span class="number">8</span>．将<span class="title class_">Redo</span> <span class="title class_">Log</span>刷新到磁盘;</span><br><span class="line"><span class="number">9.</span> commit</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li>在1-8步骤的任意一步系统宕机，<strong>事务未提交，该事务就不会对磁盘上的数据做任何影响</strong>。</li>
-<li>如果在8-9之间宕机。<ul>
-<li>Redo Log 进行恢复</li>
-<li>Undo Log 发现有事务没完成进行回滚。</li>
-</ul>
-</li>
-<li>若在9之后系统宕机，内存映射中变更的数据<strong>还来不及刷回磁盘</strong>，那么系统恢复之后，<strong>可以根据Redo Log把数据刷回磁盘。</strong></li>
-</ul>
-<p>流程图：</p>
-<p><strong>这里还有一个binlog没有画，突然想起来之前使用Seata的时候好像就出现过这个redo，undo，binlog了</strong></p>
-<p><strong>又想起来了，之前使用ShardingSphere的时候就是使用的它的binlog来实现主从复制的</strong></p>
-<p><img src="/2024/09/09/MySQL03/image-20240909220208902.png" alt="image-20240909220208902"></p>
-<p>接下来再继续看</p>
-<p>假设一个值从1被按顺序改成了2、3、4，在回滚日志里面就会有类似下面的记录。</p>
-<p>当前值是4，但是在查询这条记录的时候，不同时刻启动的事务会有不同的read-view。如图中看到的，在视图A、B、C里面，这一个记录的值分别是1、2、4，<strong>同一条记录在系统中可以存在多个版本，就是数据库的多版本并发控制（MVCC）</strong>。对于read-view A，要得到1，就必须将当前值依次执行图中所有的回滚操作得到。</p>
-<p><img src="/2024/09/09/MySQL03/image-20240909204425101.png" alt="image-20240909204425101"></p>
-<p>同时你会发现，即使现在有另外一个事务正在将4改成5，这个事务跟read-view A、B、C对应的事务是不会冲突的，因为只要是修改没有commit，看的都是undo log中的备份数据。</p>
-<p><strong>你一定会问，回滚日志总不能一直保留吧，什么时候删除呢？答案是，在不需要的时候才删除。也就是说，系统会判断，当没有事务再需要用到这些回滚日志时，回滚日志会被删除。</strong></p>
-<p>什么时候才不需要了呢？<strong>就是当系统里没有比这个回滚日志更早的read-view的时候。（这里的回收机制有点类似GCRoot）</strong></p>
-<p>基于上面的说明，我们来讨论一下为什么建议你尽量不要使用长事务。</p>
-<p>长事务意味着<strong>系统里面会存在很老的事务视图</strong>。由于这些事务随时可能访问数据库里面的任何数据，所以这个事务提交之前，数据库里面它可能用到的回滚记录都必须保留，这就会<strong>导致大量占用存储空间</strong>。</p>
-<p>这里简单提一下为什么会有那么长的事务</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1. 业务逻辑复杂</span><br><span class="line">复杂的处理流程: 某些业务逻辑涉及多个步骤，可能需要长时间才能完成。例如，涉及审批、审核或多方协作的事务。</span><br><span class="line">2. 用户交互</span><br><span class="line">等待用户输入: 在许多应用中，事务可能需要等待用户的输入或确认。例如，在线购物中的支付过程，用户可能需要时间来确认付款。</span><br><span class="line">3. 网络延迟</span><br><span class="line">网络问题: 在分布式系统中，网络延迟可能导致事务处理时间延长。如果事务需要访问多个服务或数据库，网络问题可能导致长时间未提交。</span><br><span class="line">4. 锁竞争</span><br><span class="line">资源争用: 长事务可能会持有锁，导致其他事务无法执行。为了避免死锁，开发者可能选择不立即提交事务，而是等待某个条件满足。</span><br><span class="line">5. 性能问题</span><br><span class="line">数据库性能瓶颈: 如果数据库性能较差，查询或写入操作可能会耗时较长，导致事务延迟提交。</span><br><span class="line">6. 故障恢复</span><br><span class="line">故障处理: 如果系统或应用在处理事务时遇到故障，可能会导致事务未能及时提交，处于挂起状态。</span><br><span class="line">7. 设计缺陷</span><br><span class="line">系统设计不当: 如果系统设计没有考虑到事务的合理管理，可能会导致长时间持有未提交的事务。</span><br><span class="line">8. 长时间运行的报告或查询</span><br><span class="line">复杂查询: 某些查询可能需要长时间执行，尤其是在大数据集上进行复杂的分析和报告时，可能会导致事务维持较长时间。</span><br><span class="line">总结</span><br><span class="line">长事务未提交的原因可能涉及业务逻辑、用户交互、网络延迟、锁竞争等多种因素。长时间存在的事务视图会导致存储空间占用增加，影响数据库性能，因此在设计时应该尽量避免长事务，及时提交或回滚事务，以提高系统的效率和稳定性。</span><br></pre></td></tr></table></figure>
-
-<p>在MySQL 5.5及以前的版本，<strong>回滚日志是跟数据字典一起放在ibdata文件里的</strong>，即使<strong>长事务最终提交，回滚段被清理，文件也不会变小</strong>。我见过数据只有20GB，而回滚段有200GB的库。最终只好为了清理回滚段，重建整个库。</p>
-<p>除了对回滚段的影响，长事务还占用锁资源，也可能拖垮整个库，这个我们会在后面讲锁的时候展开。</p>
-<h3 id="事务的启动方式"><a href="#事务的启动方式" class="headerlink" title="事务的启动方式"></a>事务的启动方式</h3><p>如前面所述，长事务有这些潜在风险，我当然是建议你尽量避免。其实很多时候业务开发同学并不是有意使用长事务，通常是由于误用所致。MySQL的事务启动方式有以下几种：</p>
-<ol>
-<li><p>显式启动事务语句， begin 或 start transaction。配套的提交语句是commit，回滚语句是rollback。</p>
-</li>
-<li><p>set autocommit&#x3D;0，<strong>这个命令会将这个线程的自动提交关掉。意味着如果你只执行一个select语句，这个事务就启动了，而且并不会自动提交</strong>。这个事务持续存在直到你<strong>主动执行commit 或 rollback 语句</strong>，或者断开连接。</p>
-</li>
-</ol>
-<p>有些客户端连接框架会默认连接成功后先执行一个set autocommit&#x3D;0的命令。<strong>这就导致接下来的查询都在事务中，如果是长连接，就导致了意外的长事务。</strong></p>
-<p><strong>因此，我会建议你总是使用set autocommit&#x3D;1, 通过显式语句的方式来启动事务。</strong></p>
-<p>但是有的开发同学会纠结“多一次交互”的问题。对于一个需要频繁使用事务的业务，第二种方式每个事务在开始时都不需要主动执行一次 “begin”，减少了语句的交互次数。如果你也有这个顾虑，我建议你使用commit work and chain语法。</p>
-<p>在autocommit为1的情况下，用begin显式启动的事务，如果执行commit则提交事务。<strong>如果执行 commit work and chain，则是提交事务并自动启动下一个事务，这样也省去了再次执行begin语句的开销。同时带来的好处是从程序开发的角度明确地知道每个语句是否处于事务中。（详细的可以看看这篇文章<a href="https://juejin.cn/post/6987373561836994590">带你看看事务的分类和在MySQL中使用链式事务 | SQL全面教程七：事务(3)事务分类和MySQL中的commit work and chain - 掘金 (juejin.cn)</a>）</strong></p>
-<p>你可以在information_schema库的innodb_trx这个表中查询长事务，比如下面这个语句，用于查找持续时间超过60s的事务。</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> information_schema.innodb_trx <span class="keyword">where</span> TIME_TO_SEC(timediff(now(),trx_started))<span class="operator">&gt;</span><span class="number">60</span></span><br></pre></td></tr></table></figure>
-
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>主要介绍了MySQL的事务隔离级别的现象和实现，根据实现原理分析了长事务存在的风险，以及如何用正确的方式避免长事务。希望我举的例子能够帮助你理解事务，并更好地使用MySQL的事务特性。</p>
-<p>现在知道了系统里面应该避免长事务，如果你是业务开发负责人同时也是数据库负责人，你会有什么方案来避免出现或者处理这种情况呢？</p>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>在上期文章的最后，留下的问题是一天一备跟一周一备的对比。</p>
-<p>好处是“最长恢复时间”更短。</p>
-<p>在一天一备的模式里，最坏情况下需要应用一天的binlog。比如，你每天0点做一次全量备份，而要恢复出一个到昨天晚上23点的备份。</p>
-<p>一周一备最坏情况就要应用一周的binlog了。</p>
-<p><strong>系统的对应指标就是RTO（恢复目标时间）。</strong></p>
-<p>当然这个是有成本的，因为更频繁全量备份需要消耗更多存储空间，所以这个RTO是成本换来的，就需要你根据业务重要性来评估了。</p>
+<p>你心里要有个概念，<strong>数据库底层存储的核心就是基于这些数据模型的。每碰到一个新数据库，我们需要先关注它的数据模型，这样才能从理论上分析出这个数据库的适用场景（这个说的确实很在理啊，不要一直闷着用，还是要学会分析的）</strong>。</p>
+<p>截止到这里，我用了半篇文章的篇幅和你介绍了不同的数据结构，以及它们的适用场景，你可能会觉得有些枯燥。但是，我建议你还是要多花一些时间来理解这部分内容，毕竟这是数据库处理数据的核心概念之一，在分析问题的时候会经常用到。<strong>当你理解了索引的模型后，就会发现在分析问题的时候会有一个更清晰的视角，体会到引擎设计的精妙之处。</strong></p>
+<p>现在，我们一起进入相对偏实战的内容吧。</p>
+<p>在MySQL中，索引是在存储引擎层实现的，所以并没有统一的索引标准，即不同存储引擎的索引的工作方式并不一样。而即使多个存储引擎支持同一种类型的索引，其底层的实现也可能不同。由于InnoDB存储引擎在MySQL数据库中使用最为广泛，所以下面我就以InnoDB为例，和你分析一下其中的索引模型。</p>
 ]]></content>
       <categories>
         <category>MySQL</category>

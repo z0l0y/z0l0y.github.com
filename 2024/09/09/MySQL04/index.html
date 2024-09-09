@@ -4,9 +4,9 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="日志系统：一条SQL更新语句是如何执行的？, zoloy">
-    <meta name="description" content="日志系统：一条SQL更新语句是如何执行的？前面我们系统了解了一个查询语句的执行流程，并介绍了执行过程中涉及的处理模块。相信你还记得，一条查询语句的执行过程一般是经过连接器、分析器、优化器、执行器等功能模块，最后到达存储引擎。
-那么，一条更新">
+    <meta name="keywords" content="深入浅出索引（上）, zoloy">
+    <meta name="description" content="提到数据库索引，我想你并不陌生，在日常工作中会经常接触到。比如某一个SQL查询比较慢，分析完原因之后，你可能就会说“给某个字段加个索引吧”之类的解决方案。但到底什么是索引，索引又是如何工作的呢？今天就让我们一起来聊聊这个话题吧。
+数据库索引">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -18,7 +18,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>日志系统：一条SQL更新语句是如何执行的？ | zoloy&#39;s blog</title>
+    <title>深入浅出索引（上） | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -291,12 +291,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/19.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/3.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">日志系统：一条SQL更新语句是如何执行的？</h1>
+                    <h1 class="description center-align post-title">深入浅出索引（上）</h1>
                 </div>
             </div>
         </div>
@@ -359,14 +359,14 @@
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    5.6k
+                    2.5k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    19 分
+                    8 分
                 </div>
                 
 
@@ -389,131 +389,47 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <h1 id="日志系统：一条SQL更新语句是如何执行的？"><a href="#日志系统：一条SQL更新语句是如何执行的？" class="headerlink" title="日志系统：一条SQL更新语句是如何执行的？"></a>日志系统：一条SQL更新语句是如何执行的？</h1><p>前面我们系统了解了一个查询语句的执行流程，并介绍了执行过程中涉及的处理模块。相信你还记得，<strong>一条查询语句的执行过程一般是经过连接器、分析器、优化器、执行器等功能模块，最后到达存储引擎。</strong></p>
-<p>那么，<strong>一条更新语句</strong>的执行流程又是怎样的呢？</p>
-<p>之前你可能经常听DBA同事说，MySQL可以恢复到半个月内任意一秒的状态，惊叹的同时，你是不是心中也会不免会好奇，这是怎样做到的呢？</p>
-<p>我们还是从一个表的一条更新语句说起，下面是这个表的创建语句，这个表有一个主键ID和一个整型字段c：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; create table T(ID int primary key, c int);</span><br></pre></td></tr></table></figure>
-
-<p>如果要将ID&#x3D;2这一行的值加1，SQL语句就会这么写：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; update T set c=c+1 where ID=2;</span><br></pre></td></tr></table></figure>
-
-<p>前面介绍过SQL语句基本的执行链路，这里我再把那张图拿过来，你也可以先简单看看这个图回顾下。首先，可以确定的说，查询语句的那一套流程，更新语句也是同样会走一遍。</p>
-<p><img src="/2024/09/09/MySQL02/image-20240909163544965.png" alt="image-20240909163544965"></p>
-<p>你执行语句前要<strong>先连接数据库，这是连接器的工作</strong>。</p>
-<p>前面我们说过，在一个表上有更新的时候，跟这个表有关的查询缓存会失效，<strong>所以这条语句就会把表T上所有缓存结果都清空。这也就是我们一般不建议使用查询缓存的原因</strong>。</p>
-<p>接下来，<strong>分析器</strong>会通过词法和语法解析知道这是一条更新语句。<strong>优化器</strong>决定要使用ID这个索引。然后，<strong>执行器</strong>负责具体执行，找到这一行，然后更新。</p>
-<p>与查询流程不一样的是，<strong>更新流程还涉及两个重要的日志模块</strong>，它们正是我们今天要讨论的主角：<strong>redo log（重做日志）和 binlog（归档日志）</strong>。如果接触MySQL，那这两个词肯定是绕不过的，我后面的内容里也会不断地和你强调。不过话说回来，redo log和binlog在设计上有很多有意思的地方，这些设计思路也可以用到你自己的程序里。</p>
-<h3 id="重要的日志模块：redo-log"><a href="#重要的日志模块：redo-log" class="headerlink" title="重要的日志模块：redo log"></a>重要的日志模块：redo log</h3><p>不知道你还记不记得《孔乙己》这篇文章，酒店掌柜有一个粉板，专门用来记录客人的赊账记录。如果赊账的人不多，那么他可以把顾客名和账目写在板上。但如果赊账的人多了，粉板总会有记不下的时候，这个时候掌柜一定还有一个专门记录赊账的账本。</p>
-<p>如果有人要赊账或者还账的话，掌柜一般有两种做法：</p>
+                <p>提到数据库索引，我想你并不陌生，在日常工作中会经常接触到。<strong>比如某一个SQL查询比较慢，分析完原因之后，你可能就会说“给某个字段加个索引吧”之类的解决方案</strong>。但到底什么是索引，索引又是如何工作的呢？今天就让我们一起来聊聊这个话题吧。</p>
+<p>数据库索引的内容比较多，我分成了上下两篇文章。<strong>索引是数据库系统里面最重要的概念之一</strong>，所以希望你能够耐心看完。在后面的实战文章中，我也会经常引用这两篇文章中提到的知识点，加深你对数据库索引的理解。</p>
+<p><strong>一句话简单来说，索引的出现其实就是为了提高数据查询的效率，就像书的目录一样。</strong>一本500页的书，如果你想快速找到其中的某一个知识点，在不借助目录的情况下，那我估计你可得找一会儿。<strong>同样，对于数据库的表而言，索引其实就是它的“目录”。（这个索引还有一个兄弟，叫做倒排索引，是ES中的一个概念）</strong></p>
+<h3 id="索引的常见模型"><a href="#索引的常见模型" class="headerlink" title="索引的常见模型"></a>索引的常见模型</h3><p>索引的出现是为了<strong>提高查询效率</strong>，但是实现索引的方式却有很多种，所以这里也就引入了索引模型的概念。<strong>可以用于提高读写效率的数据结构很多，这里我先给你介绍三种常见、也比较简单的数据结构，它们分别是哈希表、有序数组和搜索树。</strong></p>
+<p>下面我主要从使用的角度，为你简单分析一下这三种模型的区别。</p>
+<p><strong>哈希表是一种以键-值（key-value）存储数据的结构，我们只要输入待查找的值即key，就可以找到其对应的值即Value。哈希的思路很简单，把值放在数组里，用一个哈希函数把key换算成一个确定的位置，然后把value放在数组的这个位置。（这里是直接将HashMap的下标当作索引了）</strong></p>
+<p>不可避免地，多个key值经过哈希函数的换算，会出现同一个值的情况。<strong>处理这种情况的一种方法是，拉出一个链表。（当然在一定的情况下会升级为红黑树）</strong></p>
+<p>假设，你现在维护着一个身份证信息和姓名的表，需要根据身份证号查找对应的名字，这时对应的哈希索引的示意图如下所示：</p>
+<p><img src="/2024/09/09/MySQL04/image-20240909233015979.png" alt="image-20240909233015979"></p>
+<p>图中，User2和User4根据身份证号算出来的值都是N，但没关系，后面还跟了一个链表。假设，这时候你要查ID_card_n2对应的名字是什么，处理步骤就是：首先，将ID_card_n2通过哈希函数算出N；然后，按顺序遍历，找到User2。</p>
+<p>需要注意的是，图中四个ID_card_n的值<strong>并不是递增的</strong>，这样做的好处是<strong>增加新的User时速度会很快</strong>，只需要往后追加。但缺点是，因为不是有序的，所以<strong>哈希索引做区间查询的速度是很慢的</strong>。</p>
+<p>你可以设想下，如果你现在要找身份证号在[ID_card_X, ID_card_Y]这个区间的所有用户，就必须全部扫描一遍了。</p>
+<p>所以，<strong>哈希表这种结构适用于只有等值查询的场景</strong>，比如<strong>Memcached及其他一些NoSQL引擎</strong>。</p>
+<p>而<strong>有序数组在等值查询和范围查询场景中的性能就都非常优秀</strong>。还是上面这个根据身份证号查名字的例子，如果我们使用有序数组来实现的话，示意图如下所示：</p>
+<p><img src="/2024/09/09/MySQL04/image-20240909233223301.png" alt="image-20240909233223301"></p>
+<p>这里我们假设身份证号没有重复，这个数组就是按照身份证号递增的顺序保存的。这时候如果你要查ID_card_n2对应的名字，<strong>用二分法就可以快速得到，这个时间复杂度是O(log(N))。</strong></p>
+<p>同时很显然，这个索引结构支持范围查询。你要查身份证号在[ID_card_X, ID_card_Y]区间的User，可以先用二分法找到ID_card_X（如果不存在ID_card_X，就找到大于ID_card_X的第一个User），然后向右遍历，直到查到第一个大于ID_card_Y的身份证号，退出循环。</p>
+<p><strong>如果仅仅看查询效率，有序数组就是最好的数据结构了。但是，在需要更新数据的时候就麻烦了，你往中间插入一个记录就必须得挪动后面所有的记录，成本太高。</strong></p>
+<p>所以，<strong>有序数组索引只适用于静态存储引擎</strong>，比如你要保存的是2017年某个城市的所有人口信息，这类<strong>不会再修改的数据</strong>。</p>
+<p>二叉搜索树也是课本里的经典数据结构了。还是上面根据身份证号查名字的例子，如果我们用二叉搜索树来实现的话，示意图如下所示：</p>
+<p><img src="/2024/09/09/MySQL04/image-20240909233347671.png" alt="image-20240909233347671"></p>
+<p><strong>二叉搜索树的特点是：每个节点的左儿子小于父节点，父节点又小于右儿子。</strong>这样如果你要查ID_card_n2的话，按照图中的搜索顺序就是按照UserA -&gt; UserC -&gt; UserF -&gt; User2这个路径得到。这个时间复杂度是O(log(N))。</p>
+<p><strong>当然为了维持O(log(N))的查询复杂度，你就需要保持这棵树是平衡二叉树。为了做这个保证，更新的时间复杂度也是O(log(N))。</strong></p>
+<p>树可以有二叉，也可以有多叉。多叉树就是每个节点有多个儿子，儿子之间的大小保证从左到右递增。<strong>二叉树是搜索效率最高的，但是实际上大多数的数据库存储却并不使用二叉树。其原因是，索引不止存在内存中，还要写到磁盘上。</strong></p>
+<p>你可以想象一下一棵100万节点的平衡二叉树，树高20。一次查询可能需要访问20个数据块。<strong>在机械硬盘时代，从磁盘随机读一个数据块需要10 ms左右的寻址时间。也就是说，对于一个100万行的表，如果使用二叉树来存储，单独访问一个行可能需要20个10 ms的时间，这个查询可真够慢的。</strong></p>
+<p>为了让一个查询尽量少地读磁盘，就必须让查询过程访问尽量少的数据块。那么，我们就不应该使用二叉树，<strong>而是要使用“N叉”树。这里，“N叉”树中的“N”取决于数据块的大小</strong>。</p>
+<p><strong>以InnoDB的一个整数字段索引为例，这个N差不多是1200。这棵树高是4的时候，就可以存1200的3次方个值，这已经17亿了。考虑到树根的数据块总是在内存中的，一个10亿行的表上一个整数字段的索引，查找一个值最多只需要访问3次磁盘。其实，树的第二层也有很大概率在内存中，那么访问磁盘的平均次数就更少了。</strong></p>
+<p><strong>N叉树由于在读写上的性能优点，以及适配磁盘的访问模式，已经被广泛应用在数据库引擎中了。</strong></p>
+<p><strong>不管是哈希还是有序数组，或者N叉树，它们都是不断迭代、不断优化的产物或者解决方案</strong>。数据库技术发展到今天，跳表、LSM树等数据结构也被用于引擎设计中，这里我就不再一一展开了。</p>
+<p>这里补充一下关于红黑树，跳表，LSM树的资料：</p>
 <ul>
-<li>一种做法是直接把账本翻出来，把这次赊的账加上去或者扣除掉；</li>
-<li>另一种做法是先在粉板上记下这次的账，等打烊以后再把账本翻出来核算。</li>
+<li><a target="_blank" rel="noopener" href="https://www.cnblogs.com/henuliulei/p/15114440.html">b树，b+树，b-树,红黑树详解一锅端 - 你的雷哥 - 博客园 (cnblogs.com)</a></li>
+<li><a target="_blank" rel="noopener" href="https://blog.csdn.net/cy973071263/article/details/122543826">【数据结构】史上最好理解的红黑树讲解，让你彻底搞懂红黑树-CSDN博客</a></li>
+<li><a target="_blank" rel="noopener" href="https://cloud.tencent.com/developer/article/2392723">【全网最易懂的红黑树讲解】一眼看懂二叉树、平衡树、红黑树，一文打尽-腾讯云开发者社区-腾讯云 (tencent.com)</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.jianshu.com/p/9d8296562806">Skip List–跳表（全网最详细的跳表文章没有之一） - 简书 (jianshu.com)</a></li>
+<li><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/415799237">深入浅出分析LSM树（日志结构合并树） - 知乎 (zhihu.com)</a></li>
 </ul>
-<p>在生意红火柜台很忙时，掌柜一定会选择后者，因为前者操作实在是太麻烦了。首先，你得找到这个人的赊账总额那条记录。你想想，密密麻麻几十页，掌柜要找到那个名字，可能还得带上老花镜慢慢找，找到之后再拿出算盘计算，最后再将结果写回到账本上。</p>
-<p>这整个过程想想都麻烦。相比之下，还是先在粉板上记一下方便。你想想，如果掌柜没有粉板的帮助，每次记账都得翻账本，效率是不是低得让人难以忍受？</p>
-<p>同样，在MySQL里也有这个问题，<strong>如果每一次的更新操作都需要写进磁盘，然后磁盘也要找到对应的那条记录，然后再更新，整个过程IO成本、查找成本都很高</strong>。为了解决这个问题，MySQL的设计者就用了类似酒店掌柜粉板的思路来提升更新效率。</p>
-<p><strong>而粉板和账本配合的整个过程，其实就是MySQL里经常说到的WAL技术，WAL的全称是Write-Ahead Logging，它的关键点就是先写日志，再写磁盘，也就是先写粉板，等不忙的时候再写账本。（这个其实也是为了避免写了磁盘之后没有时间来得急写日志，导致Log不一致的问题）</strong></p>
-<p>具体来说，当有一条记录需要更新的时候，<strong>InnoDB引擎就会先把记录写到redo log（粉板）里面，并更新内存，这个时候更新就算完成了</strong>。同时，InnoDB引擎会在<strong>适当</strong>的时候，将这个操作记录<strong>更新到磁盘</strong>里面，<strong>而这个更新往往是在系统比较空闲的时候做，这就像打烊以后掌柜做的事</strong>。</p>
-<p>如果今天赊账的不多，掌柜可以等打烊后再整理。但如果某天赊账的特别多，粉板写满了，又怎么办呢？这个时候掌柜只好放下手中的活儿，把粉板中的一部分赊账记录更新到账本中，然后把这些记录从粉板上擦掉，为记新账腾出空间。</p>
-<p>与此类似，<strong>InnoDB的redo log是固定大小的，比如可以配置为一组4个文件，每个文件的大小是1GB，那么这块“粉板”总共就可以记录4GB的操作。从头开始写，写到末尾就又回到开头循环写，如下面这个图所示。</strong></p>
-<p><img src="/2024/09/09/MySQL02/image-20240909164238628.png" alt="image-20240909164238628"></p>
-<p><strong>write pos是当前记录的位置</strong>，一边写一边后移，写到第3号文件末尾后就回到0号文件开头。<strong>checkpoint是当前要擦除的位置，也是往后推移并且循环的，擦除记录前要把记录更新到数据文件。（我记得之前好像看过一个类似的环形更新方法，反正Redis分布式采用的方法有一个是环形的）</strong></p>
-<p><strong>write pos和checkpoint之间的是“粉板”上还空着的部分，可以用来记录新的操作。如果write pos追上checkpoint，表示“粉板”满了，这时候不能再执行新的更新，得停下来先擦掉一些记录，把checkpoint推进一下。（有一点像JVM的STW）</strong></p>
-<p>有了redo log，<strong>InnoDB就可以保证即使数据库发生异常重启，之前提交的记录都不会丢失</strong>，这个能力称为<strong>crash-safe</strong>。（这玩意经常在面试中问，大概就是什么MySQL数据库突然断电了，怎么找回数据的）</p>
-<p>要理解crash-safe这个概念，可以想想我们前面赊账记录的例子。只要赊账记录记在了粉板上或写在了账本上，之后即使掌柜忘记了，比如突然<strong>停业</strong>几天，<strong>恢复</strong>生意后<strong>依然</strong>可以通过账本和粉板上的数据明确赊账账目。</p>
-<h3 id="重要的日志模块：binlog"><a href="#重要的日志模块：binlog" class="headerlink" title="重要的日志模块：binlog"></a>重要的日志模块：binlog</h3><p>前面我们讲过，MySQL整体来看，其实就有两块：一块是Server层，它主要做的是<strong>MySQL功能层面</strong>的事情；还有一块是引擎层，<strong>负责存储</strong>相关的具体事宜。上面我们聊到的粉板redo log是<strong>InnoDB引擎特有的日志</strong>，而<strong>Server层也有自己的日志，称为binlog（归档日志）</strong>。</p>
-<p>我想你肯定会问，为什么会有两份日志呢？</p>
-<p>因为<strong>最开始</strong>MySQL里<strong>并没有InnoDB引擎</strong>。<strong>MySQL自带的引擎是MyISAM</strong>，但是MyISAM<strong>没有</strong>crash-safe的能力，binlog日志只能用于归档。而InnoDB是另一个公司以插件形式引入MySQL的，既然只依靠binlog是没有crash-safe能力的，所以InnoDB使用另外一套日志系统——也就是redo log来实现crash-safe能力。</p>
-<p>这两种日志有以下三点不同。</p>
-<ol>
-<li>从引擎来看：<strong>redo log是InnoDB引擎特有的</strong>；<strong>binlog是MySQL的Server层实现的，所有引擎都可以使用。</strong></li>
-<li>从日志类型来看：<strong>redo log是物理日志</strong>，记录的是“在某个数据页上做了什么修改”；<strong>binlog是逻辑日志</strong>，记录的是这个语句的原始逻辑，比如“给ID&#x3D;2这一行的c字段加1 ”。<strong>（这个binlog记录的逻辑日志和Redis的AOF（Append Only File）挺类似的）</strong></li>
-<li>从空间使用来看：<strong>redo log是循环写的，空间固定会用完；binlog是可以追加写入的。“追加写”是指binlog文件写到一定大小后会切换到下一个，并不会覆盖以前的日志。</strong></li>
-</ol>
-<p>有了对这两个日志的概念性理解，我们再来看执行器和InnoDB引擎在执行这个简单的update语句时的内部流程。</p>
-<ol>
-<li>执行器先找引擎取ID&#x3D;2这一行。ID是主键，<strong>引擎直接用树（B+树）搜索找到这一行</strong>。如果ID&#x3D;2这一行所在的数据页本来就在内存中，就直接返回给执行器；否则，需要先从磁盘读入内存，然后再返回。</li>
-<li>执行器拿到引擎给的行数据，把这个值加上1，比如原来是N，现在就是N+1，得到新的一行数据，再调用引擎接口写入这行新数据。<strong>（这个有点类似用户态和内核态，写入之类的不安全操作交给操作系统内核执行）</strong></li>
-<li>引擎将这行新数据<strong>更新到内存</strong>中，同时将这个<strong>更新操作记录到redo log</strong>里面，<strong>此时redo log处于prepare状态</strong>。<strong>然后告知执行器执行完成了，随时可以提交事务</strong>。</li>
-<li><strong>执行器生成这个操作的binlog，并把binlog写入磁盘。</strong></li>
-<li>执行器调用引擎的提交事务接口，<strong>引擎把刚刚写入的redo log改成提交（commit）状态</strong>，更新完成。</li>
-</ol>
-<p>这里我给出这个update语句的执行流程图，图中浅色框表示是在InnoDB内部执行的<strong>（反正只要是执行写操作就一定是在InnoDB中执行的，它这里深色表示只是代表调用了引擎的接口）</strong>，<strong>深色框表示是在执行器</strong>中执行的。</p>
-<p><img src="/2024/09/09/MySQL02/image-20240909165928810.png" alt="image-20240909165928810"></p>
-<p>你可能注意到了，最后三步看上去有点“绕”，<strong>将redo log的写入拆成了两个步骤</strong>：<strong>prepare和commit</strong>，这就是”两阶段提交”。（搞半天原来后面讲了）</p>
-<h3 id="两阶段提交"><a href="#两阶段提交" class="headerlink" title="两阶段提交"></a>两阶段提交</h3><p>为什么必须有“两阶段提交”呢？<strong>这是为了让两份日志之间的逻辑一致。</strong>要说明这个问题，我们得从文章开头的那个问题说起：<strong>怎样让数据库恢复到半个月内任意一秒的状态？</strong></p>
-<p>前面我们说过了，binlog会记录所有的逻辑操作，并且是采用“追加写”的形式。如果你的DBA承诺说半个月内可以恢复，那么备份系统中一定会保存最近半个月的所有binlog，<strong>同时系统会定期做整库备份。这里的“定期”取决于系统的重要性，可以是一天一备，也可以是一周一备。</strong></p>
-<p>当需要恢复到指定的某一秒时，比如某天下午两点发现中午十二点有一次误删表，<strong>需要找回数据</strong>，那你可以这么做：</p>
-<ul>
-<li>首先，找到最近的一次全量备份，如果你运气好，可能就是昨天晚上的一个备份，<strong>从这个备份恢复到临时库</strong>；</li>
-<li><strong>然后，从备份的时间点开始，将备份的binlog依次取出来，重放到中午误删表之前的那个时刻。</strong></li>
-</ul>
-<p><strong>这里的思路挺像Docker的镜像构建方式的，都是将一个基础的东西作为我们的基石，然后再在上面加东西</strong></p>
-<p><strong>这样你的临时库就跟误删之前的线上库一样了，然后你可以把表数据从临时库取出来，按需要恢复到线上库去。</strong></p>
-<p>好了，说完了数据恢复过程，我们回来说说，为什么日志需要“两阶段提交”。这里不妨用反证法来进行解释。</p>
-<p>由于redo log和binlog是两个独立的逻辑，如果不用两阶段提交，<strong>要么就是先写完redo log再写binlog</strong>，或者采用反过来的顺序。我们看看这两种方式会有什么问题。</p>
-<p>仍然用前面的update语句来做例子。假设当前ID&#x3D;2的行，字段c的值是0，再假设执行update语句过程中在写完第一个日志后，第二个日志还没有写完期间发生了crash，会出现什么情况呢？</p>
-<ol>
-<li><strong>先写redo log后写binlog</strong>。假设在redo log写完，binlog还没有写完的时候，MySQL进程异常重启。由于我们前面说过的，redo log写完之后，系统即使崩溃，仍然能够把数据恢复回来，所以恢复后这一行c的值是1。 <strong>但是由于binlog没写完就crash了，这时候binlog里面就没有记录这个语句。因此，之后备份日志的时候，存起来的binlog里面就没有这条语句。 然后你会发现，如果需要用这个binlog来恢复临时库的话，由于这个语句的binlog丢失，这个临时库就会少了这一次更新，恢复出来的这一行c的值就是0，与原库的值不同</strong>。</li>
-<li><strong>先写binlog后写redo log</strong>。如果在binlog写完之后crash，由于redo log还没写，崩溃恢复以后这个事务无效，所以这一行c的值是0。但是binlog里面已经记录了“把c从0改成1”这个日志。所以，在之后用binlog来恢复的时候就多了一个事务出来，恢复出来的这一行c的值就是1，<strong>与原库的值不同</strong>。</li>
-</ol>
-<p><strong>看样子意思是binlog才能恢复一个完整的数据库，redo log一般用于恢复数据库突然故障丢失的数据</strong></p>
-<p><strong>可以看到，如果不使用“两阶段提交”，那么数据库的状态就有可能和用它的日志恢复出来的库的状态不一致。</strong></p>
-<p>你可能会说，这个概率是不是很低，平时也没有什么动不动就需要<strong>恢复临时库</strong>的场景呀？</p>
-<p>其实不是的，<strong>不只是误操作后需要用这个过程来恢复数据</strong>。当你需要<strong>扩容</strong>的时候，也就是需要<strong>再多搭建一些备库来增加系统的读能力的时候</strong>，现在常见的做法也是用<strong>全量备份</strong>加上<strong>应用binlog</strong>来实现的，<strong>这个“不一致”就会导致你的线上出现主从数据库不一致的情况</strong>。</p>
-<p><strong>简单说，redo log和binlog都可以用于表示事务的提交状态，而两阶段提交就是让这两个状态保持逻辑上的一致。</strong></p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>介绍了MySQL里面最重要的两个日志，<strong>即物理日志redo log和逻辑日志binlog</strong>。</p>
-<p><strong>redo log用于保证crash-safe能力</strong>。<strong>innodb_flush_log_at_trx_commit</strong>这个参数设置成1的时候，表示每次事务的redo log都直接持久化到磁盘。<strong>这个参数我建议你设置成1，这样可以保证MySQL异常重启之后数据不丢失。</strong></p>
-<p><strong>sync_binlog这个参数设置成1的时候，表示每次事务的binlog都持久化到磁盘。这个参数也建议你设置成1，这样可以保证MySQL异常重启之后binlog不丢失。</strong></p>
-<p>此外还介绍了与MySQL日志系统密切相关的“两阶段提交”。两阶段提交是跨系统<strong>维持数据逻辑一致性</strong>时<strong>常用</strong>的一个方案，即使你不做数据库内核开发，<strong>日常开发</strong>中也有可能会用到。</p>
-<p>前面说到定期全量备份的周期“取决于系统重要性，有的是一天一备，有的是一周一备”。那么在什么场景下，一天一备会比一周一备更有优势呢？或者说，它影响了这个数据库系统的哪个指标？</p>
-<p>补充资料：（小林Coding写的还是比较详细的）</p>
-<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_63566550/article/details/129819638">【MySQL】一文彻底搞懂 Redo-log 为什么要两阶段提交？_mysql redolog两阶段提交-CSDN博客</a></p>
-<p>把这篇文章比较重要的东西提取到下面了：</p>
-<p>两阶段提交的过程是怎样的？</p>
-<p>相信大家应该听说过<code>MySQL</code>事务两阶段提交方案，啥叫做事务两阶段提交呢？实则是指<code>Redo-log</code>分两次写入，如下：</p>
-<p><img src="/2024/09/09/MySQL02/image-20240909191851549.png" alt="image-20240909191851549"></p>
-<p>从图中可看出，事务的提交过程有两个阶段，<strong>就是将 redo log 的写入拆成了两个步骤：prepare 和 commit</strong>，<strong>中间再穿插写入binlog</strong>，具体如下：</p>
-<ul>
-<li><strong>prepare 阶段：</strong>将 XID（内部 XA 事务的 ID） 写入到 redo log，<strong>同时将 redo log 对应的事务状态设置为 prepare，然后将 redo log 持久化到磁盘（innodb_flush_log_at_trx_commit &#x3D; 1 的作用）；</strong></li>
-<li><strong>commit 阶段：</strong>把 XID 写入到 binlog，然后<strong>将 binlog 持久化到磁盘（sync_binlog &#x3D; 1 的作用），</strong>接着调用引擎的提交事务接口，<strong>将 redo log 状态设置为 commit</strong>，此时该状态并<strong>不需要持久化</strong>到磁盘，<strong>只需要 write 到文件系统的 page cache 中就够了</strong>，因为只要 binlog 写磁盘成功，就算 redo log 的状态还是 prepare 也没有关系，<strong>一样会被认为事务已经执行成功；</strong></li>
-</ul>
-<p>为什么需要两阶段提交？</p>
-<blockquote>
-<p>其实想要弄明白这个问题，要结合bin-log日志一起来聊。</p>
-</blockquote>
-<p>如果只写一次的话，那到底先写bin-log还是redo-log呢？</p>
-<ul>
-<li><strong>先写bin-log，再写redo-log：</strong>当事务提交后，先写bin-log成功，结果在写redo-log时断电宕机了，再重启后由于redo-log中没有该事务的日志记录，因此不会恢复该事务提交的数据。但要注意，主从架构中同步数据是使用bin-log来实现的，而宕机前bin-log写入成功了，就代表这个事务提交的数据会被同步到从机，<strong>也就意味着从机会比主机多出一条数据。</strong></li>
-<li><strong>先写redo-log，再写bin-log：</strong>当事务提交后，先写redo-log成功，但在写bin-log时宕机了，主节点重启后，会根据redo-log恢复数据，但从机依旧是依赖bin-log来同步数据的，因此从机无法将这个事务提交的数据同步过去，毕竟bin-log中没有撒，<strong>最终从机会比主机少一条数据。</strong></li>
-</ul>
-<p>经过上述分析后可得知：如果redo-log<strong>只写一次</strong>，那不管谁先写，<strong>都有可能造成主从同步数据时的不一致问题</strong>出现，<strong>为了解决该问题，redo-log就被设计成了两阶段提交模式</strong>，设置成两阶段提交后，整个执行过程有三处崩溃点：</p>
-<ul>
-<li>redo-log(prepare)：在写入准备状态的redo记录时宕机，事务还未提交，<strong>不会影响一致性</strong>。</li>
-<li>bin-log：在写bin记录时崩溃，重启后会根据redo记录中的事务ID，<strong>回滚</strong>前面已写入的数据。（然后会继续执行这个过程）</li>
-<li>redo-log(commit)：在bin-log写入成功后，<strong>写redo(commit)记录时崩溃</strong>，因为bin-log中已经写入成功了，<strong>所以从机也可以同步数据，因此重启时直接再次提交事务</strong>，写入一条redo(commit)记录即可。（这种commit一半没有成功的，之后再commit一次就行了）</li>
-</ul>
-<p>通过这种两阶段提交的方案，就能够确保redo-log、bin-log两者的日志数据是相同的，<strong>bin-log中有的主机再恢复，如果bin-log没有则直接回滚主机上写入的数据，确保整个数据库系统的数据一致性。</strong></p>
-<blockquote>
-<p>OK~,最后再简单补充一点：为什么bin-log又被叫做二进制日志呢？因为记录日志时，MySQL写入的是二进制数据，而并非字符数据，也就意味着直接用cat&#x2F;vim这类工具是无法打开的，必须要通过MySQL提供的mysqlbinlog工具解析查看。</p>
-</blockquote>
-<p>两阶段提交有什么问题？</p>
-<p>两阶段提交虽然保证了两个日志文件的数据一致性，但是性能很差，主要有两个方面的影响：</p>
-<ul>
-<li>磁盘 I&#x2F;O 次数高：对于“双1”配置，<strong>每个事务提交都会进行两次 fsync（刷盘），一次是 redo log 刷盘，另一次是 binlog 刷盘。</strong></li>
-<li>锁竞争激烈：两阶段提交虽然能够保证「单事务」两个日志的内容一致，但在「多事务」的情况下，却不能保证两者的提交顺序一致，因此，在两阶段提交的流程基础上，还需要加一个锁来保证提交的原子性，从而保证多事务的情况下，两个日志的提交顺序一致。</li>
-</ul>
-<p>为什么两阶段提交的磁盘 <strong>I&#x2F;O 次数会很高</strong>？</p>
-<p>binlog 和 redo log 在内存中都对应的缓存空间，binlog 会缓存在 binlog cache，redo log 会缓存在 redo log buffer，它们持久化到磁盘的时机分别由下面这两个参数控制。一般我们为了避免日志丢失的风险，会将这两个参数设置为 1：</p>
-<ul>
-<li>当 sync_binlog &#x3D; 1 的时候，表示每次提交事务都会将 binlog cache 里的 binlog 直接持久到磁盘；</li>
-<li>当 innodb_flush_log_at_trx_commit &#x3D; 1 时，表示每次事务提交时，都将缓存在 redo log buffer 里的 redo log 直接持久化到磁盘；</li>
-</ul>
-<p><strong>可以看到，如果 sync_binlog 和 当 innodb_flush_log_at_trx_commit 都设置为 1，那么在每个事务提交过程中， 都会至少调用 2 次刷盘操作，一次是 redo log 刷盘，一次是 binlog 落盘，所以这会成为性能瓶颈。</strong></p>
-<p>为什么锁竞争激烈？</p>
-<p>在早期的 MySQL 版本中，通过使用 prepare_commit_mutex 互斥锁来保证事务提交的顺序，<strong>在一个事务获取到锁时才能进入 prepare 阶段，一直到 commit 阶段结束才能释放锁，下个事务才可以继续进行 prepare 操作。</strong></p>
-<p><strong>通过加锁虽然完美地解决了顺序一致性的问题，但在并发量较大的时候，就会导致对锁的争用，性能不佳。</strong></p>
+<p>你心里要有个概念，<strong>数据库底层存储的核心就是基于这些数据模型的。每碰到一个新数据库，我们需要先关注它的数据模型，这样才能从理论上分析出这个数据库的适用场景（这个说的确实很在理啊，不要一直闷着用，还是要学会分析的）</strong>。</p>
+<p>截止到这里，我用了半篇文章的篇幅和你介绍了不同的数据结构，以及它们的适用场景，你可能会觉得有些枯燥。但是，我建议你还是要多花一些时间来理解这部分内容，毕竟这是数据库处理数据的核心概念之一，在分析问题的时候会经常用到。<strong>当你理解了索引的模型后，就会发现在分析问题的时候会有一个更清晰的视角，体会到引擎设计的精妙之处。</strong></p>
+<p>现在，我们一起进入相对偏实战的内容吧。</p>
+<p>在MySQL中，索引是在存储引擎层实现的，所以并没有统一的索引标准，即不同存储引擎的索引的工作方式并不一样。而即使多个存储引擎支持同一种类型的索引，其底层的实现也可能不同。由于InnoDB存储引擎在MySQL数据库中使用最为广泛，所以下面我就以InnoDB为例，和你分析一下其中的索引模型。</p>
 
                 
             </div>
@@ -540,7 +456,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/09/MySQL02/">http://example.com/2024/09/09/MySQL02/</a>
+                    <a href="http://example.com/2024/09/09/MySQL04/">http://example.com/2024/09/09/MySQL04/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -925,17 +841,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/09/MySQL03/">
+                <a href="/2024/09/09/MySQL04/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/9.jpg" class="responsive-img" alt="事务隔离：为什么你改了我还看不见？">
+                        <img src="/medias/featureimages/3.jpg" class="responsive-img" alt="深入浅出索引（上）">
                         
-                        <span class="card-title">事务隔离：为什么你改了我还看不见？</span>
+                        <span class="card-title">深入浅出索引（上）</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -945,9 +862,9 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-09
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-09
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
@@ -960,6 +877,7 @@
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
@@ -978,13 +896,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/09/MySQL01/">
+                <a href="/2024/09/09/MySQL03/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/16.jpg" class="responsive-img" alt="一条SQL查询语句是如何执行的？">
+                        <img src="/medias/featureimages/9.jpg" class="responsive-img" alt="事务隔离：为什么你改了我还看不见？">
                         
-                        <span class="card-title">一条SQL查询语句是如何执行的？</span>
+                        <span class="card-title">事务隔离：为什么你改了我还看不见？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
