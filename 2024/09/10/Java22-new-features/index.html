@@ -1,0 +1,1651 @@
+<!DOCTYPE HTML>
+<html lang="zh-CN">
+
+
+<head>
+    <meta charset="utf-8">
+    <meta name="keywords" content="Java9到22的一些新特性, zoloy">
+    <meta name="description" content="Java9新特性接口里面可以声明私有方法了在JDK9中新增了接口私有方法，我们可以在接口中声明private修饰的方法了。
+123456public interface Test &amp;#123;    // 定义私有方法    private">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="renderer" content="webkit|ie-stand|ie-comp">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+
+
+    <title>Java9到22的一些新特性 | zoloy&#39;s blog</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    
+
+
+    <!-- bg-cover style     -->
+
+
+
+<link rel="stylesheet" type="text/css" href="/libs/awesome/css/all.min.css">
+<link rel="stylesheet" type="text/css" href="/libs/materialize/materialize.min.css">
+<link rel="stylesheet" type="text/css" href="/libs/aos/aos.css">
+<link rel="stylesheet" type="text/css" href="/libs/animate/animate.min.css">
+<link rel="stylesheet" type="text/css" href="/libs/lightGallery/css/lightgallery.min.css">
+<link rel="stylesheet" type="text/css" href="/css/matery.css">
+<link rel="stylesheet" type="text/css" href="/css/my.css">
+<link rel="stylesheet" type="text/css" href="/css/dark.css" media="none" onload="if(media!='all')media='all'">
+
+
+
+
+    <link rel="stylesheet" href="/libs/tocbot/tocbot.css">
+    <link rel="stylesheet" href="/css/post.css">
+
+
+
+
+    
+        <link rel="stylesheet" type="text/css" href="/css/reward.css">
+    
+
+
+
+    <script src="/libs/jquery/jquery-3.6.0.min.js"></script>
+
+<meta name="generator" content="Hexo 7.0.0"></head>
+
+
+<body>
+    <header class="navbar-fixed">
+    <nav id="headNav" class="bg-color nav-transparent">
+        <div id="navContainer" class="nav-wrapper container">
+            <div class="brand-logo">
+                <a href="/" class="waves-effect waves-light">
+                    
+                    <img src="/medias/logo.png" class="logo-img" alt="LOGO">
+                    
+                    <span class="logo-span">zoloy&#39;s blog</span>
+                </a>
+            </div>
+            
+
+<a href="#" data-target="mobile-nav" class="sidenav-trigger button-collapse"><i class="fas fa-bars"></i></a>
+<ul class="right nav-menu">
+  
+  <li class="hide-on-med-and-down nav-item">
+    
+    <a href="/" class="waves-effect waves-light">
+      
+      <i class="fas fa-home" style="zoom: 0.6;"></i>
+      
+      <span>首页</span>
+    </a>
+    
+  </li>
+  
+  <li class="hide-on-med-and-down nav-item">
+    
+    <a href="/tags" class="waves-effect waves-light">
+      
+      <i class="fas fa-tags" style="zoom: 0.6;"></i>
+      
+      <span>标签</span>
+    </a>
+    
+  </li>
+  
+  <li class="hide-on-med-and-down nav-item">
+    
+    <a href="/categories" class="waves-effect waves-light">
+      
+      <i class="fas fa-bookmark" style="zoom: 0.6;"></i>
+      
+      <span>分类</span>
+    </a>
+    
+  </li>
+  
+  <li class="hide-on-med-and-down nav-item">
+    
+    <a href="/archives" class="waves-effect waves-light">
+      
+      <i class="fas fa-archive" style="zoom: 0.6;"></i>
+      
+      <span>归档</span>
+    </a>
+    
+  </li>
+  
+  <li class="hide-on-med-and-down nav-item">
+    
+    <a href="/about" class="waves-effect waves-light">
+      
+      <i class="fas fa-user-circle" style="zoom: 0.6;"></i>
+      
+      <span>关于</span>
+    </a>
+    
+  </li>
+  
+  <li>
+    <a href="#searchModal" class="modal-trigger waves-effect waves-light">
+      <i id="searchIcon" class="fas fa-search" title="搜索" style="zoom: 0.85;"></i>
+    </a>
+  </li>
+  <li>
+    <a href="javascript:;" class="waves-effect waves-light" onclick="switchNightMode()" title="深色/浅色模式" >
+      <i id="sum-moon-icon" class="fas fa-sun" style="zoom: 0.85;"></i>
+    </a>
+  </li>
+</ul>
+
+
+<div id="mobile-nav" class="side-nav sidenav">
+
+    <div class="mobile-head bg-color">
+        
+        <img src="/medias/logo.png" class="logo-img circle responsive-img">
+        
+        <div class="logo-name">zoloy&#39;s blog</div>
+        <div class="logo-desc">
+            
+            Study notes
+            
+        </div>
+    </div>
+
+    <ul class="menu-list mobile-menu-list">
+        
+        <li class="m-nav-item">
+	  
+		<a href="/" class="waves-effect waves-light">
+			
+			    <i class="fa-fw fas fa-home"></i>
+			
+			首页
+		</a>
+          
+        </li>
+        
+        <li class="m-nav-item">
+	  
+		<a href="/tags" class="waves-effect waves-light">
+			
+			    <i class="fa-fw fas fa-tags"></i>
+			
+			标签
+		</a>
+          
+        </li>
+        
+        <li class="m-nav-item">
+	  
+		<a href="/categories" class="waves-effect waves-light">
+			
+			    <i class="fa-fw fas fa-bookmark"></i>
+			
+			分类
+		</a>
+          
+        </li>
+        
+        <li class="m-nav-item">
+	  
+		<a href="/archives" class="waves-effect waves-light">
+			
+			    <i class="fa-fw fas fa-archive"></i>
+			
+			归档
+		</a>
+          
+        </li>
+        
+        <li class="m-nav-item">
+	  
+		<a href="/about" class="waves-effect waves-light">
+			
+			    <i class="fa-fw fas fa-user-circle"></i>
+			
+			关于
+		</a>
+          
+        </li>
+        
+        
+        <li><div class="divider"></div></li>
+        <li>
+            <a href="https://github.com/z0l0y" class="waves-effect waves-light" target="_blank">
+                <i class="fab fa-github-square fa-fw"></i>Fork Me
+            </a>
+        </li>
+        
+    </ul>
+</div>
+
+
+        </div>
+
+        
+            <style>
+    .nav-transparent .github-corner {
+        display: none !important;
+    }
+
+    .github-corner {
+        position: absolute;
+        z-index: 10;
+        top: 0;
+        right: 0;
+        border: 0;
+        transform: scale(1.1);
+    }
+
+    .github-corner svg {
+        color: #0f9d58;
+        fill: #fff;
+        height: 64px;
+        width: 64px;
+    }
+
+    .github-corner:hover .octo-arm {
+        animation: a 0.56s ease-in-out;
+    }
+
+    .github-corner .octo-arm {
+        animation: none;
+    }
+
+    @keyframes a {
+        0%,
+        to {
+            transform: rotate(0);
+        }
+        20%,
+        60% {
+            transform: rotate(-25deg);
+        }
+        40%,
+        80% {
+            transform: rotate(10deg);
+        }
+    }
+</style>
+
+<a href="https://github.com/z0l0y" class="github-corner tooltipped hide-on-med-and-down" target="_blank"
+   data-tooltip="Fork Me" data-position="left" data-delay="50">
+    <svg viewBox="0 0 250 250" aria-hidden="true">
+        <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
+        <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2"
+              fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path>
+        <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z"
+              fill="currentColor" class="octo-body"></path>
+    </svg>
+</a>
+        
+    </nav>
+
+</header>
+
+    
+
+
+
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/8.jpg')">
+    <div class="container" style="right: 0px;left: 0px;">
+        <div class="row">
+            <div class="col s12 m12 l12">
+                <div class="brand">
+                    <h1 class="description center-align post-title">Java9到22的一些新特性</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+<main class="post-container content">
+
+    
+    <div class="row">
+    <div id="main-content" class="col s12 m12 l9">
+        <!-- 文章内容详情 -->
+<div id="artDetail">
+    <div class="card">
+        <div class="card-content article-info">
+            <div class="row tag-cate">
+                <div class="col s7">
+                    
+                    <div class="article-tag">
+                        
+                            <a href="/tags/Java%E6%96%B0%E7%89%B9%E6%80%A7/">
+                                <span class="chip bg-color">Java新特性</span>
+                            </a>
+                        
+                    </div>
+                    
+                </div>
+                <div class="col s5 right-align">
+                    
+                    <div class="post-cate">
+                        <i class="fas fa-bookmark fa-fw icon-category"></i>
+                        
+                            <a href="/categories/Java/" class="post-category">
+                                Java
+                            </a>
+                        
+                    </div>
+                    
+                </div>
+            </div>
+
+            <div class="post-info">
+                
+                <div class="post-date info-break-policy">
+                    <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
+                    2024-09-10
+                </div>
+                
+
+                
+                <div class="post-date info-break-policy">
+                    <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
+                    2024-09-11
+                </div>
+                
+
+                
+                <div class="info-break-policy">
+                    <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
+                    7.9k
+                </div>
+                
+
+                
+                <div class="info-break-policy">
+                    <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
+                    32 分
+                </div>
+                
+
+                
+                    <div id="busuanzi_container_page_pv" class="info-break-policy">
+                        <i class="far fa-eye fa-fw"></i>阅读次数:&nbsp;&nbsp;
+                        <span id="busuanzi_value_page_pv"></span>
+                    </div>
+				
+            </div>
+        </div>
+        <hr class="clearfix">
+
+        
+        <!-- 是否加载使用自带的 prismjs. -->
+        <link rel="stylesheet" href="/libs/prism/prism.min.css">
+        
+
+        
+
+        <div class="card-content article-card-content">
+            <div id="articleContent">
+                <h2 id="Java9新特性"><a href="#Java9新特性" class="headerlink" title="Java9新特性"></a>Java9新特性</h2><h3 id="接口里面可以声明私有方法了"><a href="#接口里面可以声明私有方法了" class="headerlink" title="接口里面可以声明私有方法了"></a>接口里面可以声明私有方法了</h3><p>在JDK9中新增了接口私有方法，我们可以在接口中声明private修饰的方法了。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title class_">Test</span> &#123;</span><br><span class="line">    <span class="comment">// 定义私有方法</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">void</span> <span class="title function_">solution</span><span class="params">()</span> &#123;</span><br><span class="line">        System.out.println(<span class="string">&quot;Hello Java!&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="改进try-with-resource"><a href="#改进try-with-resource" class="headerlink" title="改进try with resource"></a>改进try with resource</h3><p>Java7中新增了try with resource语法用来自动关闭资源文件，在IO流和JDBC部分使用的比较多。</p>
+<p><strong>使用方式是将需要自动关闭的资源对象的创建放到try后面的小括号中，在JDK9中我们可以将这些资源对象的创建代码放到小括号外面，然后将需要关闭的对象名放到try后面的小括号中即可</strong>，示例：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment">    改进了try-with-resources语句，可以在try外进行初始化，在括号内填写引用名，即可实现资源自动关闭</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">TryWithResource</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> FileNotFoundException &#123;</span><br><span class="line">        <span class="comment">// JDK8以前</span></span><br><span class="line">        <span class="keyword">try</span> (<span class="type">FileInputStream</span> <span class="variable">fileInputStream</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">FileInputStream</span>(<span class="string">&quot;&quot;</span>);</span><br><span class="line">             <span class="type">FileOutputStream</span> <span class="variable">fileOutputStream</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">FileOutputStream</span>(<span class="string">&quot;&quot;</span>)) &#123;</span><br><span class="line"></span><br><span class="line">        &#125; <span class="keyword">catch</span> (IOException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// JDK9</span></span><br><span class="line">        <span class="type">FileInputStream</span> <span class="variable">fis</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">FileInputStream</span>(<span class="string">&quot;&quot;</span>);</span><br><span class="line">        <span class="type">FileOutputStream</span> <span class="variable">fos</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">FileOutputStream</span>(<span class="string">&quot;&quot;</span>);</span><br><span class="line">        <span class="comment">// 多资源用分号隔开</span></span><br><span class="line">        <span class="keyword">try</span> (fis; fos) &#123;</span><br><span class="line">        &#125; <span class="keyword">catch</span> (IOException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="不能使用下划线命名变量"><a href="#不能使用下划线命名变量" class="headerlink" title="不能使用下划线命名变量 __"></a>不能使用下划线命名变量 __</h3><p>下面语句在JDK9之前可以正常编译通过，但是在JDK9（含）之后编译报错，在后面的版本中会将下划线作为关键字来使用。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">_</span> <span class="operator">=</span> <span class="string">&quot;Java&quot;</span>;</span><br></pre></td></tr></table></figure>
+
+<h3 id="String字符串的变化"><a href="#String字符串的变化" class="headerlink" title="String字符串的变化"></a>String字符串的变化</h3><p>写程序的时候会经常用到String字符串，在以前的版本中String内部使用了char数组存储，对于使用英语的人来说，一个字符用一个字节就能存储，使用char存储字符会浪费一半的内存空间，因此在JDK9中将String内部的char数组改成了byte数组，这样就节省了一半的内存占用。</p>
+<p>String中增加了下面2个成员变量</p>
+<ul>
+<li>COMPACT_STRINGS：判断是否压缩，默认是true，若为false，则不压缩，使用UTF16编码</li>
+<li>coder用来区分使用的字符编码，分别为LATIN1（值为0）和UTF16（值为1）</li>
+</ul>
+<p>byte数组如何存储中文呢？通过源码（StringUTF16类中的toBytes方法）得知，<strong>在使用中文字符串时，1个中文会被存储到byte数组中的两个元素上</strong>，即存储1个中文，<strong>byte数组长度为2，存储2个中文，byte数组长度为4</strong>。</p>
+<p>以如下代码为例进行分析：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">str</span> <span class="operator">=</span> <span class="string">&quot;好&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>好对应的Unicode码二进制为0101100101111101，**分别取出高8位和低8位，放入到byte数组中{01011001,01111101}**，这样就利用byte数组的2个元素保存了1个中文。</p>
+<p>当字符串中存储了<strong>中英混合的内容时，1个英文字符会占用2个byte数组位置</strong>。</p>
+<p>在获取字符串长度时，若存储的内容存在中文，是不能直接获取byte数组的长度作为字符串长度的，String源码中有向右移动1位的操作（即除以2），这样才能获取正确的字符串长度。</p>
+<h3 id="Deprecated注解的变化"><a href="#Deprecated注解的变化" class="headerlink" title="@Deprecated注解的变化"></a>@Deprecated注解的变化</h3><p>该注解用于标识废弃的内容，在JDK9中新增了2个内容：</p>
+<ul>
+<li>String since() default “”：标识是从哪个版本开始废弃</li>
+<li>boolean forRemoval() default false：标识该废弃的内容会在未来的某个版本中移除</li>
+</ul>
+<h3 id="jshell"><a href="#jshell" class="headerlink" title="jshell"></a>jshell</h3><p>在一些编程语言中，例如：python，Ruby等，都提供了REPL（Read Eval Print Loop 简单的交互式编程环境）。jshell就是Java语言平台中的REPL。</p>
+<p>有的时候我们只是想写一段简单的代码，例如HelloWorld，按照以前的方式，还需要自己创建Java文件，创建class，编写main方法，但实际上里面的代码其实就是一个打印语句，此时还是比较麻烦的。在JDK9中新增了jshell工具，可以帮助我们快速的运行一些简单的代码。</p>
+<p>从命令提示符里面输入jshell，进入到jshell之后输入：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">System.out.println(<span class="string">&quot;HelloWorld&quot;</span>);</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2024/09/10/Java22-new-features/image-20240911000358964.png" alt="image-20240911000358964"></p>
+<p>如果要退出jshell的话，输入&#x2F;exit即可。</p>
+<h2 id="Java10新特性"><a href="#Java10新特性" class="headerlink" title="Java10新特性"></a>Java10新特性</h2><h3 id="局部变量类型推断-var"><a href="#局部变量类型推断-var" class="headerlink" title="局部变量类型推断 var"></a>局部变量类型推断 var</h3><p>在JDK10以前声明变量的时候，我们会像下面这样：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">oldName</span> <span class="operator">=</span> <span class="string">&quot;jack&quot;</span>;</span><br><span class="line"><span class="type">int</span> <span class="variable">oldAge</span> <span class="operator">=</span> <span class="number">10</span>;</span><br><span class="line"><span class="type">long</span> <span class="variable">oldMoney</span> <span class="operator">=</span> <span class="number">88888888L</span>;</span><br><span class="line"><span class="type">Object</span> <span class="variable">oldObj</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Object</span>();</span><br></pre></td></tr></table></figure>
+
+<p>上面我们声明的时候使用了4种不同类型的变量，在JDK10中前面的类型都可以使用var来代替，JVM会自动推断该变量是什么类型的，例如可以这样写：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">var</span> <span class="variable">newName</span> <span class="operator">=</span> <span class="string">&quot;jack&quot;</span>;</span><br><span class="line"><span class="type">var</span> <span class="variable">newAge</span> <span class="operator">=</span> <span class="number">10</span>;</span><br><span class="line"><span class="type">var</span> <span class="variable">newMoney</span> <span class="operator">=</span> <span class="number">88888888L</span>;</span><br><span class="line"><span class="type">var</span> <span class="variable">newObj</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Object</span>();</span><br></pre></td></tr></table></figure>
+
+<p>注意：</p>
+<p><strong>当然这个var的使用是有限制的，仅适用于局部变量，增强for循环的索引，以及普通for循环的本地变量；它不能使用于方法形参，构造方法形参，方法返回类型等。</strong></p>
+<p>除了上面的新特性之外，还对JVM进行了一些优化，这里就不罗列了。</p>
+<h2 id="Java11新特性"><a href="#Java11新特性" class="headerlink" title="Java11新特性"></a>Java11新特性</h2><h3 id="直接运行-java"><a href="#直接运行-java" class="headerlink" title="直接运行 java"></a>直接运行 java</h3><p>在以前的版本中，我们在命令提示下，需要先编译，生成class文件之后再运行，例如：</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">javac HelloWorld.java</span><br><span class="line">java HelloWorld</span><br></pre></td></tr></table></figure>
+
+<p>在java 11中，我们可以这样直接运行</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">java HelloWorld.java</span><br></pre></td></tr></table></figure>
+
+<p>去掉了 javac 的环节，可以直接使用java来运行代码，而且如果你的代码有其他对象的引用，也是没有任何问题的。</p>
+<p><strong>可以帮助我们做一个级联的无感知编译。</strong></p>
+<h3 id="lambda表达式中的变量类型推断"><a href="#lambda表达式中的变量类型推断" class="headerlink" title="lambda表达式中的变量类型推断"></a>lambda表达式中的变量类型推断</h3><p>JDK11中允许在lambda表达式的参数中使用var修饰</p>
+<p>函数式接口：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@FunctionalInterface</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title class_">MyInterface</span> &#123;</span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">m1</span><span class="params">(String a, <span class="type">int</span> b)</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>测试类：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 支持lambda表达式参数中使用var</span></span><br><span class="line"><span class="type">MyInterface</span> <span class="variable">mi</span> <span class="operator">=</span> (<span class="keyword">var</span> a,<span class="keyword">var</span> b)-&gt;&#123;</span><br><span class="line">    System.out.println(a);</span><br><span class="line">    System.out.println(b);</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">mi.m1(<span class="string">&quot;monkey&quot;</span>,<span class="number">1024</span>);</span><br></pre></td></tr></table></figure>
+
+<h2 id="Java12新特性"><a href="#Java12新特性" class="headerlink" title="Java12新特性"></a>Java12新特性</h2><h3 id="升级的switch语句"><a href="#升级的switch语句" class="headerlink" title="升级的switch语句"></a>升级的switch语句</h3><p>在JDK12之前的switch语句中，如果没有写break，则会出现case穿透现象，下面是对case穿透的一个应用，根据输入的月份打印相应的季节。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="variable">month</span> <span class="operator">=</span> <span class="number">3</span>;</span><br><span class="line"><span class="keyword">switch</span> (month) &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="number">3</span>:</span><br><span class="line">    <span class="keyword">case</span> <span class="number">4</span>:</span><br><span class="line">    <span class="keyword">case</span> <span class="number">5</span>:</span><br><span class="line">        System.out.println(<span class="string">&quot;spring&quot;</span>);</span><br><span class="line">    <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="number">6</span>:</span><br><span class="line">    <span class="keyword">case</span> <span class="number">7</span>:</span><br><span class="line">    <span class="keyword">case</span> <span class="number">8</span>:</span><br><span class="line">        System.out.println(<span class="string">&quot;summer&quot;</span>);</span><br><span class="line">    <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="number">9</span>:</span><br><span class="line">    <span class="keyword">case</span> <span class="number">10</span>:</span><br><span class="line">    <span class="keyword">case</span> <span class="number">11</span>:</span><br><span class="line">        System.out.println(<span class="string">&quot;autumn&quot;</span>);</span><br><span class="line">    <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="number">12</span>:</span><br><span class="line">    <span class="keyword">case</span> <span class="number">1</span>:</span><br><span class="line">    <span class="keyword">case</span> <span class="number">2</span>:</span><br><span class="line">        System.out.println(<span class="string">&quot;winter&quot;</span>);</span><br><span class="line">    <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">default</span>:</span><br><span class="line">        System.out.println(<span class="string">&quot;wrong&quot;</span>);</span><br><span class="line">    <span class="keyword">break</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在JDK12之后我们可以省略全部的break和部分case，这样使用</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="variable">month</span> <span class="operator">=</span> <span class="number">3</span>;</span><br><span class="line">    <span class="keyword">switch</span> (month) &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span> -&gt; System.out.println(<span class="string">&quot;spring&quot;</span>);</span><br><span class="line">        <span class="keyword">case</span> <span class="number">6</span>,<span class="number">7</span>,<span class="number">8</span> -&gt; System.out.println(<span class="string">&quot;summer&quot;</span>);</span><br><span class="line">        <span class="keyword">case</span> <span class="number">9</span>,<span class="number">10</span>,<span class="number">11</span> -&gt; System.out.println(<span class="string">&quot;autumn&quot;</span>);</span><br><span class="line">        <span class="keyword">case</span> <span class="number">12</span>, <span class="number">1</span>,<span class="number">2</span> -&gt; System.out.println(<span class="string">&quot;winter&quot;</span>);</span><br><span class="line">        <span class="keyword">default</span> -&gt; System.out.println(<span class="string">&quot;wrong&quot;</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个是预览功能，如果需要编译和运行的话需要使用下面命令，预览功能在2个版本之后会成为正式版，即如果你使用的是JDK14以上的版本，正常的编译和运行即可。否则需要使用预览功能来编译和运行</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">编译:</span><br><span class="line">javac --enable-preview -source 12 Test.java</span><br><span class="line"></span><br><span class="line">运行：</span><br><span class="line">java --enable-preview Test</span><br></pre></td></tr></table></figure>
+
+<h2 id="Java13新特性"><a href="#Java13新特性" class="headerlink" title="Java13新特性"></a>Java13新特性</h2><h3 id="升级的switch语句-1"><a href="#升级的switch语句-1" class="headerlink" title="升级的switch语句"></a>升级的switch语句</h3><p>JDK13中对switch语句又进行了升级，<strong>可以switch的获取返回值</strong></p>
+<p>示例：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="variable">month</span> <span class="operator">=</span> <span class="number">3</span>;</span><br><span class="line">   <span class="type">String</span> <span class="variable">result</span> <span class="operator">=</span> <span class="keyword">switch</span> (month) &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span> -&gt; <span class="string">&quot;spring&quot;</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">6</span>,<span class="number">7</span>,<span class="number">8</span> -&gt; <span class="string">&quot;summer&quot;</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">9</span>,<span class="number">10</span>,<span class="number">11</span> -&gt; <span class="string">&quot;autumn&quot;</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">12</span>, <span class="number">1</span>,<span class="number">2</span> -&gt; <span class="string">&quot;winter&quot;</span>;</span><br><span class="line">        <span class="keyword">default</span> -&gt; <span class="string">&quot;wrong&quot;</span>;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    System.out.println(result);</span><br></pre></td></tr></table></figure>
+
+<p>对于JDK15之后的版本可以直接编译和运行，否则需要使用下面命令执行该预览功能</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">编译:</span><br><span class="line">    javac --enable-preview -source 13 Test.java</span><br><span class="line"></span><br><span class="line">运行：</span><br><span class="line">    java --enable-preview Test</span><br></pre></td></tr></table></figure>
+
+<h3 id="文本块的变化-Python的插值表达式-fstring"><a href="#文本块的变化-Python的插值表达式-fstring" class="headerlink" title="文本块的变化 Python的插值表达式 fstring"></a>文本块的变化 Python的插值表达式 fstring</h3><p>在JDK13之前的版本中如果输入的字符串中有换行的话，需要添加换行符</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">s</span> <span class="operator">=</span> <span class="string">&quot;Hello\nWorld\nLearn\nJava&quot;</span>;</span><br><span class="line">    System.out.println(s);</span><br></pre></td></tr></table></figure>
+
+<p>JDK13之后可以直接这样写：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">s</span> <span class="operator">=</span> <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">            Hello</span></span><br><span class="line"><span class="string">            World</span></span><br><span class="line"><span class="string">            Learn</span></span><br><span class="line"><span class="string">            Java</span></span><br><span class="line"><span class="string">           &quot;&quot;&quot;</span>;</span><br><span class="line">  System.out.println(s);</span><br></pre></td></tr></table></figure>
+
+<p>这样的字符串更加一目了然。</p>
+<h2 id="Java14新特性"><a href="#Java14新特性" class="headerlink" title="Java14新特性"></a><strong>Java14新特性</strong></h2><p>java 14 新增了很多特性，我们针对较为突出的特性进行说明。JDK12和JDK13中预览版的switch特性，在JDK14中已经是正式的语法了。</p>
+<h3 id="instanceof模式匹配"><a href="#instanceof模式匹配" class="headerlink" title="instanceof模式匹配"></a>instanceof模式匹配</h3><p><strong>该特性可以减少强制类型转换的操作</strong>，简化了代码，代码示例：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">TestInstanceof</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span>&#123;</span><br><span class="line">    </span><br><span class="line">        <span class="comment">// JDK14之前的写法</span></span><br><span class="line">        <span class="type">Object</span> <span class="variable">obj</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Integer</span>(<span class="number">1</span>);</span><br><span class="line">        <span class="keyword">if</span>(obj <span class="keyword">instanceof</span> Integer)&#123;</span><br><span class="line">            <span class="type">Integer</span> <span class="variable">i</span> <span class="operator">=</span> (Integer)obj;</span><br><span class="line">            <span class="type">int</span> <span class="variable">result</span> <span class="operator">=</span> i + <span class="number">10</span>;</span><br><span class="line">            System.out.println(i);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// JDK14新特性  不用再强制转换了</span></span><br><span class="line">        <span class="comment">// 这里相当于是将obj强制为Integer之后赋值给i了</span></span><br><span class="line">        <span class="keyword">if</span>(obj <span class="keyword">instanceof</span> Integer i)&#123;</span><br><span class="line">            <span class="type">int</span> <span class="variable">result</span> <span class="operator">=</span> i + <span class="number">10</span>;</span><br><span class="line">            System.out.println(i);</span><br><span class="line">        &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">            <span class="comment">// 作用域问题，这里是无法访问i的</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个是预览版的功能所以需要使用下面命令编译和运行</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">编译:</span><br><span class="line">    javac --enable-preview -source 14 TestInstanceof.java</span><br><span class="line"></span><br><span class="line">运行：</span><br><span class="line">    java --enable-preview TestInstanceof</span><br></pre></td></tr></table></figure>
+
+<h3 id="友好的空指针（NullPointerException）提示"><a href="#友好的空指针（NullPointerException）提示" class="headerlink" title="友好的空指针（NullPointerException）提示"></a>友好的空指针（NullPointerException）提示</h3><p>JDK14中添加了对于空指针异常友好的提示，便于开发者快速定位空指针的对象。示例代码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Machine</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">start</span><span class="params">()</span>&#123;</span><br><span class="line">        System.out.println(<span class="string">&quot;启动&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Engine</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> Machine machine;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Car</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> Engine engine;</span><br><span class="line">    </span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">TestNull</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span>&#123;</span><br><span class="line">        <span class="comment">// 这里会报出空指针，但是哪个对象是null呢？</span></span><br><span class="line">        <span class="keyword">new</span> <span class="title class_">Car</span>().engine.machine.start();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们在运行上面代码的时候，错误信息就可以明确的指出那个对象为null了。此外，还可以使用下面参数来查看:</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">java -XX:+ShowCodeDetailsInExceptionMessages TestNull</span><br></pre></td></tr></table></figure>
+
+<p>这样编译器会明确的告诉开发者哪个对象是null。</p>
+<h3 id="record类型"><a href="#record类型" class="headerlink" title="record类型"></a>record类型</h3><p>之前在编写javabean类的时候，<strong>需要编写成员变量，get方法，构造方法，toString方法，hashcode方法，equals方法。这些方法通常会通过开发工具来生成，在JDK14中新增了record类型，通过该类型可以省去这些代码的编写。</strong></p>
+<p>JDK14编写User</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">record</span> <span class="title class_">User</span><span class="params">(String name,Integer age)</span>&#123;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>通过反编译命令可以看到该字节码文件中的内容，<strong>User类</strong>是继承了Record类型：</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">javap -p -private user</span><br></pre></td></tr></table></figure>
+
+<p>编写测试类：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">TestUser</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span>&#123;</span><br><span class="line">        <span class="type">User</span> <span class="variable">u</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">User</span>(<span class="string">&quot;jack&quot;</span>,<span class="number">15</span>);</span><br><span class="line">        System.out.println(u);</span><br><span class="line">        System.out.println(u.name());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个是预览版的功能所以需要使用下面命令编译和运行</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">编译:</span><br><span class="line">javac --enable-preview -source 14 TestUser.java</span><br><span class="line"></span><br><span class="line">运行：</span><br><span class="line">java --enable-preview TestUser</span><br></pre></td></tr></table></figure>
+
+<p>记录类型有自动生成的成员，包括：</p>
+<ul>
+<li><strong>状态描述中的每个组件都有对应的private final字段。</strong></li>
+<li><strong>状态描述中的每个组件都有对应的public访问方法。方法的名称与组件名称相同。</strong></li>
+<li><strong>一个包含全部组件的公开构造器，用来初始化对应组件。</strong></li>
+<li><strong>实现了equals()和hashCode()方法。equals()要求全部组件都必须相等。</strong></li>
+<li><strong>实现了toString()，输出全部组件的信息。</strong></li>
+</ul>
+<h2 id="Java15新特性"><a href="#Java15新特性" class="headerlink" title="Java15新特性"></a><strong>Java15新特性</strong></h2><p>java 15中更新了一些新的内容，这里仅列出对于写代码方面的新特性。</p>
+<h3 id="Sealed-Classes"><a href="#Sealed-Classes" class="headerlink" title="Sealed Classes"></a>Sealed Classes</h3><p>密封类和接口，作用是限制一个类可以由哪些子类继承或者实现。</p>
+<ol>
+<li>如果指定模块的话，sealed class和其子类必须在同一个模块下。如果没有指定模块，则需要在同一个包下。</li>
+<li><strong>sealed class指定的子类必须直接继承该sealed class。</strong></li>
+<li>sealed class的<strong>子类要用final修饰。</strong></li>
+<li>sealed class的<strong>子类如果不想用final修饰的话，可以将子类声明为sealed class。</strong></li>
+</ol>
+<p>Animal类，在指定允许继承的子类时可以使用全限定名</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">sealed</span> <span class="keyword">class</span> <span class="title class_">Animal</span> <span class="keyword">permits</span> Cat, Dog&#123;<span class="comment">// 多个子类之间用,隔开</span></span><br><span class="line"></span><br><span class="line">        <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">eat</span><span class="params">()</span>&#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Cat类</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">class</span> <span class="title class_">Cat</span> <span class="keyword">extends</span> <span class="title class_">Animal</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">eat</span><span class="params">()</span>&#123;</span><br><span class="line">        System.out.println(<span class="string">&quot;123&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Dog类</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">sealed</span> <span class="keyword">class</span> <span class="title class_">Dog</span> <span class="keyword">extends</span> <span class="title class_">Animal</span></span><br><span class="line">    <span class="keyword">permits</span> Husky &#123;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Husky类</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">class</span> <span class="title class_">Husky</span> <span class="keyword">extends</span> <span class="title class_">Dog</span>&#123;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Test类</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Test</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span>&#123;</span><br><span class="line">        <span class="type">Cat</span> <span class="variable">c</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Cat</span>();</span><br><span class="line">        c.eat();</span><br><span class="line">        <span class="type">Dog</span> <span class="variable">d</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Dog</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="Java16新特性"><a href="#Java16新特性" class="headerlink" title="Java16新特性"></a>Java16新特性</h2><p>这里只介绍一些跟开发关联度较大的特性，除此之外JDK16还更新了许多其他新特性，感兴趣的同学可以去Oracle官网查看</p>
+<h3 id="包装类构造方法的警告"><a href="#包装类构造方法的警告" class="headerlink" title="包装类构造方法的警告"></a>包装类构造方法的警告</h3><p><strong>使用包装类的构造方法在编译的时候会出现警告，不建议再使用包装类的构造方法。</strong>下面代码在javac编译之后会出现警告。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">Integer</span> <span class="variable">i</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Integer</span>(<span class="number">8</span>);</span><br></pre></td></tr></table></figure>
+
+<p><strong>不建议使用包装类作为锁对象，倘若使用包装类作为锁对象，在编译时会出现警告。</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">Integer</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">8</span>;</span><br><span class="line">    <span class="keyword">synchronized</span>(i)&#123;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="新增日时段"><a href="#新增日时段" class="headerlink" title="新增日时段"></a>新增日时段</h3><p>在DateTimeFormatter.ofPattern传入B可以获取现在时间对应的日时段，上午，下午等</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">System.out.println(DateTimeFormatter.ofPattern(<span class="string">&quot;B&quot;</span>).format(LocalDateTime.now()));</span><br></pre></td></tr></table></figure>
+
+<p>在之前JDK版本中作为预览功能的Record类，模式匹配的instanceof，打包工具jpackage，已成为正式版。JDK16对GC，JVM运行时内存等内容有一些变化，例如：<strong>ZGC并发栈处理</strong>，<strong>弹性meta space</strong></p>
+<h2 id="Java17新特性"><a href="#Java17新特性" class="headerlink" title="Java17新特性"></a>Java17新特性</h2><p>java17是一个LTS（long term support）长期支持的版本，根据计划来看java17会支持到2029年（java8会支持到2030年，OMG），同时Oracle提议下一个LTS版本是java21，在2023年9月发布，这样讲LST版本的发布周期由之前的3年变为了2年。这里只介绍一些跟开发关联度较大的特性，除此之外JDK17还更新了一些其他新特性，感兴趣的同学可以从这里查看：<a target="_blank" rel="noopener" href="https://www.oracle.com/news/announcement/oracle-releases-java-17-2021-09-14/">https://www.oracle.com/news/announcement/oracle-releases-java-17-2021-09-14/</a></p>
+<h3 id="switch语法的变化-预览"><a href="#switch语法的变化-预览" class="headerlink" title="switch语法的变化(预览)"></a>switch语法的变化(预览)</h3><p>在之前版本中新增的instanceof模式匹配的特性在switch中也支持了，即我们可以在switch中减少强转的操作。比如下面的代码：</p>
+<p>Rabbit和Bird均实现了Animal接口</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">interface</span> <span class="title class_">Animal</span>&#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Rabbit</span> <span class="keyword">implements</span> <span class="title class_">Animal</span>&#123;</span><br><span class="line">    <span class="comment">//特有的方法</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span><span class="params">()</span>&#123;</span><br><span class="line">        System.out.println(<span class="string">&quot;run&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Bird</span> <span class="keyword">implements</span> <span class="title class_">Animal</span>&#123;</span><br><span class="line">    <span class="comment">//特有的方法</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">fly</span><span class="params">()</span>&#123;</span><br><span class="line">        System.out.println(<span class="string">&quot;fly&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>新特性可以减少Animal强转操作代码的编写：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Switch01</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">Animal</span> <span class="variable">a</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Rabbit</span>();</span><br><span class="line">        animalEat(a);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">animalEat</span><span class="params">(Animal a)</span>&#123;</span><br><span class="line">        <span class="keyword">switch</span>(a)&#123;</span><br><span class="line">            <span class="comment">//如果a是Rabbit类型，则在强转之后赋值给r，然后再调用其特有的run方法</span></span><br><span class="line">            <span class="keyword">case</span> Rabbit r -&gt; r.run();</span><br><span class="line">            <span class="comment">//如果a是Bird类型，则在强转之后赋值给b，然后调用其特有的fly方法</span></span><br><span class="line">            <span class="keyword">case</span> Bird b -&gt; b.fly();</span><br><span class="line">            <span class="comment">//支持null的判断</span></span><br><span class="line">            <span class="keyword">case</span> <span class="literal">null</span> -&gt; System.out.println(<span class="string">&quot;null&quot;</span>);</span><br><span class="line">            <span class="keyword">default</span> -&gt; System.out.println(<span class="string">&quot;no animal&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>该功能在java17中是预览的，编译和运行需要加上额外的参数:</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">javac --enable-preview -source 17 Switch01.java</span><br><span class="line">java  --enable-preview Switch01</span><br></pre></td></tr></table></figure>
+
+<h3 id="去除了AOT和JIT"><a href="#去除了AOT和JIT" class="headerlink" title="去除了AOT和JIT"></a>去除了AOT和JIT</h3><p>AOT（Ahead-of-Time）是java9中新增的功能，可以先将应用中中的字节码编译成机器码。</p>
+<p>Graal编译器作为使用java开发的JIT（just-in-time ）即时编译器在java10中加入（注意这里的JIT不是之前java中的JIT，在JEP 317中有说明<a target="_blank" rel="noopener" href="https://openjdk.java.net/jeps/317"><strong>https://openJDK.java.net/jeps/317</strong></a>）。</p>
+<p>以上两项功能由于使用量较少，且需要花费很多精力来维护，因此在java17中被移除了。当然你可以通过Graal VM来继续使用这些功能。</p>
+<h2 id="Java18新特性"><a href="#Java18新特性" class="headerlink" title="Java18新特性"></a>Java18新特性</h2><p>这里只介绍一些跟开发关联度较大的特性，除此之外JDK18还更新了许多其他新特性，感兴趣的同学可以去Oracle官网查看：</p>
+<p><a target="_blank" rel="noopener" href="https://www.oracle.com/java/technologies/javase/18-relnote-issues.html#NewFeature">https://www.oracle.com/java/technologies/javase/18-relnote-issues.html#NewFeature</a></p>
+<h3 id="默认使用UTF-8字符编码"><a href="#默认使用UTF-8字符编码" class="headerlink" title="默认使用UTF-8字符编码"></a>默认使用UTF-8字符编码</h3><p>从JDK18开始，默认使用UTF-8字符编码。我们可以通过如下参数修改其他字符编码：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">-Dfile.encoding=UTF-8</span><br></pre></td></tr></table></figure>
+
+<h3 id="将被移除的方法"><a href="#将被移除的方法" class="headerlink" title="将被移除的方法"></a>将被移除的方法</h3><p><strong>在JDK18中标记了Object中的finalize方法，Thread中的stop方法将在未来被移除。</strong></p>
+<h3 id="简单的web服务器"><a href="#简单的web服务器" class="headerlink" title="简单的web服务器"></a>简单的web服务器</h3><p>可以通过jwebserver命令启动JDK18中提供的静态web服务器，可以利用该工具查看一些原型，做简单的测试。在命令提示符中输入jwebserver命令后会启动，然后在浏览器中输入:<a target="_blank" rel="noopener" href="http://127.0.0.1:8000/">http://127.0.0.1:8000/</a> 即可看到当前命令提示符路径下的文件了。</p>
+<h3 id="snippet注解"><a href="#snippet注解" class="headerlink" title="@snippet注解"></a>@snippet注解</h3><p>以前在文档注释中编写代码时需要添加code标签，使用较为不便，通过**@snippet注解可以更方便的将文档注释中的代码展示在api文档中。**</p>
+<h2 id="Java19新特性"><a href="#Java19新特性" class="headerlink" title="Java19新特性"></a><strong>Java19新特性</strong></h2><h3 id="Virtual-Threads-Preview-（虚拟线程）"><a href="#Virtual-Threads-Preview-（虚拟线程）" class="headerlink" title="Virtual Threads (Preview)（虚拟线程）"></a>Virtual Threads (Preview)（虚拟线程）</h3><p>该特性在java19中是预览版，<strong>虚拟线程是一种用户态下的线程，类似go语言中的goroutines 和Erlang中的processes</strong>，虚拟线程并非比线程快，<strong>而是提高了应用的吞吐量，相比于传统的线程是由操作系统调度来看，虚拟线程是我们自己程序调度的线程</strong>。如果你对之前java提供的线程API比较熟悉了，那么在学习虚拟线程的时候会比较轻松，<strong>传统线程能运行的代码，虚拟线程也可以运行。虚拟线程的出现，并没有修改java原有的并发模型，也不会替代原有的线程</strong>。<strong>虚拟线程主要作用是提升服务器端的吞吐量。</strong></p>
+<h4 id="吞吐量的瓶颈"><a href="#吞吐量的瓶颈" class="headerlink" title="吞吐量的瓶颈"></a>吞吐量的瓶颈</h4><p>服务器应用程序的伸缩性受<strong>利特尔法则（Little’s Law）</strong>的制约，与下面3点有关</p>
+<ol>
+<li>延迟：请求处理的耗时</li>
+<li>并发量：同一时刻处理的请求数量</li>
+<li>吞吐量：单位时间内处理的数据数量</li>
+</ol>
+<p>比如一个服务器应用程序的延迟是50ms，处理10个并发请求，则吞吐量是200请求&#x2F;秒（10 &#x2F; 0.05），如果吞吐量要达到2000请求&#x2F;秒，则处理的并发请求数量是100。<strong>按照1个请求对应一个线程的比例来看，要想提高吞吐量，线程数量也要增加。</strong></p>
+<p><strong>java中的线程是在操作系统线程（OS thread）进行了一层包装，而操作系统中线程是重量级资源，在硬件配置确定的前提下，我们就不能创建更多的线程了，此时线程数量就限制了系统性能，为了解决该问题，虚拟线程就出现了。</strong></p>
+<p><img src="/2024/09/10/Java22-new-features/image-20240911004144255.png" alt="image-20240911004144255"></p>
+<p><strong>与虚拟地址可以映射到物理内存类似，java是将大量的虚拟线程映射到少量的操作系统线程，多个虚拟线程可以使用同一个操作系统线程，其创建所耗费的资源也是极其低廉的，无需系统调用和系统级别的上下文切换，且虚拟线程的生命周期短暂，不会有很深的栈的调用，一个虚拟线程的生命周期中只运行一个任务，因此我们可以创建大量的虚拟线程，且虚拟线程无需池化。</strong></p>
+<h4 id="虚拟线程的应用场景"><a href="#虚拟线程的应用场景" class="headerlink" title="虚拟线程的应用场景"></a>虚拟线程的应用场景</h4><p>在服务器端的应用程序中，<strong>可能会有大量的并发任务需要执行，而虚拟线程能够明显的提高应用的吞吐量。下面的场景能够显著的提高程序的吞吐量</strong>：</p>
+<ul>
+<li>至少几千的并发任务量</li>
+<li>任务为io密集型</li>
+</ul>
+<p>下面代码中为每个任务创建一个线程，当任务量较多的时候，你的电脑可以感受到明显的卡顿（如果没有，可以增加任务数量试下）：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ExecutorService实现了AutoCloseable接口，可以自动关闭了</span></span><br><span class="line"><span class="keyword">try</span> (<span class="type">ExecutorService</span> <span class="variable">executor</span> <span class="operator">=</span> Executors.newCachedThreadPool()) &#123;</span><br><span class="line">    <span class="comment">// 向executor中提交1000000个任务</span></span><br><span class="line">    IntStream.range(<span class="number">0</span>, <span class="number">1000000</span>).forEach(</span><br><span class="line">        i -&gt; &#123;</span><br><span class="line">            executor.submit(() -&gt; &#123;</span><br><span class="line">                <span class="keyword">try</span> &#123;</span><br><span class="line">                    <span class="comment">// 睡眠1秒，模拟耗时操作</span></span><br><span class="line">                    Thread.sleep(Duration.ofSeconds(<span class="number">1</span>));</span><br><span class="line">                    System.out.println(<span class="string">&quot;执行任务:&quot;</span> + i);</span><br><span class="line">                &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</span><br><span class="line">                    e.printStackTrace();</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">            &#125;);</span><br><span class="line">        &#125;);</span><br><span class="line">&#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">    e.printStackTrace();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>将上面的代码改成虚拟线程之后，电脑不会感受到卡顿了：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// newVirtualThreadPerTaskExecutor为每个任务创建一个虚拟线程</span></span><br><span class="line"><span class="keyword">try</span> (<span class="type">ExecutorService</span> <span class="variable">executor</span> <span class="operator">=</span> Executors.newVirtualThreadPerTaskExecutor()) &#123;</span><br><span class="line">    IntStream.range(<span class="number">0</span>, <span class="number">1000_000</span>).forEach(i -&gt; &#123;</span><br><span class="line">        executor.submit(() -&gt; &#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                <span class="comment">// 睡眠1秒，模拟耗时操作</span></span><br><span class="line">                Thread.sleep(Duration.ofSeconds(<span class="number">1</span>));</span><br><span class="line">                System.out.println(<span class="string">&quot;执行任务:&quot;</span> + i);</span><br><span class="line">            &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</span><br><span class="line">                e.printStackTrace();</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="平台线程和虚拟线程"><a href="#平台线程和虚拟线程" class="headerlink" title="平台线程和虚拟线程"></a>平台线程和虚拟线程</h4><p>平台线程（platform thread）：<strong>指java中的线程，比如通过Executors.newFixedThreadPool()创建出来的线程，我们称之为平台线程。</strong></p>
+<p>虚拟线程并不会直接分配给cpu去执行，而是通过调度器分配给平台线程，平台线程再被调度器管理。java中虚拟线程的调度器采用了工作窃取的模式进行FIFO的操作，调度器的并行数默认是JVM获取的处理器数量（通过该方法获取的数量Runtime.getRuntime().availableProcessors()），调度器并非分时（time sharing）的。在使用虚拟线程编写程序时，不能控制虚拟线程何时分配给平台线程，也不能控制平台线程何时分配给cpu。</p>
+<p>以前任务和平台线程的关系：</p>
+<p><img src="/2024/09/10/Java22-new-features/image-20240911004612979.png" alt="image-20240911004612979"></p>
+<p>使用虚拟线程之后，任务-虚拟线程-调度器-平台线程的关系，1个平台线程可以被调度器分配不同的虚拟线程：</p>
+<p><img src="/2024/09/10/Java22-new-features/image-20240911004633649.png" alt="image-20240911004633649"></p>
+<h4 id="创建虚拟线程的方式"><a href="#创建虚拟线程的方式" class="headerlink" title="创建虚拟线程的方式"></a>创建虚拟线程的方式</h4><p>java中创建的虚拟线程本质都是通过Thread.Builder.OfVirtual对象进行创建的，我们后面再来讨论这个对象，下面先看下创建虚拟线程的三种方式：</p>
+<p><strong>1.通过Thread.startVirtualThread直接创建一个虚拟线程</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 创建任务</span></span><br><span class="line"><span class="type">Runnable</span> <span class="variable">task</span> <span class="operator">=</span> () -&gt; &#123;</span><br><span class="line">    System.out.println(<span class="string">&quot;执行任务&quot;</span>);</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 创建虚拟线程将任务task传入并启动</span></span><br><span class="line">Thread.startVirtualThread(task);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 主线程睡眠，否则可能看不到控制台的打印</span></span><br><span class="line">TimeUnit.SECONDS.sleep(<span class="number">1</span>);</span><br></pre></td></tr></table></figure>
+
+<p><strong>2.使用Thread.ofVirtual()方法创建</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 创建任务</span></span><br><span class="line"><span class="type">Runnable</span> <span class="variable">task</span> <span class="operator">=</span> () -&gt; &#123;</span><br><span class="line">    System.out.println(Thread.currentThread().getName());</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 创建虚拟线程命名为诺手，将任务task传入</span></span><br><span class="line"><span class="type">Thread</span> <span class="variable">vt1</span> <span class="operator">=</span> Thread.ofVirtual().name(<span class="string">&quot;诺手&quot;</span>).unstarted(task);</span><br><span class="line">vt1.start();<span class="comment">// 启动虚拟线程</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 主线程睡眠，否则可能看不到控制台的打印</span></span><br><span class="line">TimeUnit.SECONDS.sleep(<span class="number">1</span>);</span><br></pre></td></tr></table></figure>
+
+<p>也可以在创建虚拟线程的时候直接启动</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 创建任务</span></span><br><span class="line"><span class="type">Runnable</span> <span class="variable">task</span> <span class="operator">=</span> () -&gt; &#123;</span><br><span class="line">    System.out.println(Thread.currentThread().getName());</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 创建虚拟线程命名为诺手，将任务task传入并启动</span></span><br><span class="line"><span class="type">Thread</span> <span class="variable">vt1</span> <span class="operator">=</span> Thread.ofVirtual().name(<span class="string">&quot;诺手&quot;</span>).start(task);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 主线程睡眠，否则可能看不到控制台的打印</span></span><br><span class="line">TimeUnit.SECONDS.sleep(<span class="number">1</span>);</span><br></pre></td></tr></table></figure>
+
+<p><strong>3.通过ExecutorService创建</strong>，为每个任务分配一个虚拟线程，下面代码中提交了100个任务，对应会有100个虚拟线程进行处理。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment">    通过ExecutorService创建虚拟线程</span></span><br><span class="line"><span class="comment">    ExecutorService实现了AutoCloseable接口，可以自动关闭了</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="keyword">try</span> (<span class="type">ExecutorService</span> <span class="variable">executor</span> <span class="operator">=</span> Executors.newVirtualThreadPerTaskExecutor()) &#123;</span><br><span class="line">    <span class="comment">// 向executor中提交100个任务</span></span><br><span class="line">    IntStream.range(<span class="number">0</span>, <span class="number">100</span>).forEach(i -&gt; &#123;</span><br><span class="line">        executor.submit(() -&gt; &#123;</span><br><span class="line">            <span class="comment">// 睡眠1秒</span></span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                Thread.sleep(Duration.ofSeconds(<span class="number">1</span>));</span><br><span class="line">                System.out.println(i);</span><br><span class="line">            &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</span><br><span class="line">                e.printStackTrace();</span><br><span class="line">            &#125;                    </span><br><span class="line">        &#125;);</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>现在平台线程和虚拟线程都是Thread的对象，那该如何区分该对象是平台线程还是虚拟线程？可以利用Thread中的isVirtual()方法进行判断，返回true表示虚拟线程：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 创建任务</span></span><br><span class="line"><span class="type">Runnable</span> <span class="variable">task</span> <span class="operator">=</span> () -&gt; &#123;</span><br><span class="line">    System.out.println(<span class="string">&quot;执行任务&quot;</span>);</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 创建虚拟线程将任务task传入并启动</span></span><br><span class="line"><span class="type">Thread</span> <span class="variable">vt</span> <span class="operator">=</span> Thread.startVirtualThread(task);</span><br><span class="line">System.out.println(vt.isVirtual());</span><br></pre></td></tr></table></figure>
+
+<h2 id="Java21新特性"><a href="#Java21新特性" class="headerlink" title="Java21新特性"></a><strong>Java21新特性</strong></h2><p>java20中没有太大的变化，这里主要聊下java21的新特性，21是继java17之后，最新的LTS版本，该版本中虚拟线程称为了正式版，对虚拟线程不了解的同学可以看下之前的java19中的介绍。接下来我们看下java21中一些新特性。</p>
+<h3 id="字符串模板-STR"><a href="#字符串模板-STR" class="headerlink" title="字符串模板 STR"></a>字符串模板 STR</h3><p>字符串模板可以让开发者更简洁的进行字符串拼接（例如拼接sql，xml，json等）。该特性并不是为字符串拼接运算符+提供的语法糖，也并非为了替换SpringBuffer和StringBuilder。</p>
+<p>这个和<strong>Python的插值表达式很类似，可以做变量的替换</strong>，多行文本的变量替换，还可以做一些计算 。 </p>
+<p>利用STR模板进行字符串与变量的拼接：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">sport</span> <span class="operator">=</span> <span class="string">&quot;basketball&quot;</span>;</span><br><span class="line"><span class="type">String</span> <span class="variable">msg</span> <span class="operator">=</span> STR.<span class="string">&quot;i like \&#123;sport&#125;&quot;</span>;</span><br><span class="line"></span><br><span class="line">System.out.println(msg);<span class="comment">// i like basketball</span></span><br></pre></td></tr></table></figure>
+
+<p>这个特性目前是预览版，编译和运行需要添加额外的参数：</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">javac --enable-preview -source 21 Test.java</span><br><span class="line">java --enable-preview Test</span><br></pre></td></tr></table></figure>
+
+<p>在js中字符串进行拼接时会采用下面的字符串插值写法</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">let</span> sport = <span class="string">&quot;basketball&quot;</span></span><br><span class="line"><span class="keyword">let</span> msg = <span class="string">`i like <span class="subst">$&#123;sport&#125;</span>`</span></span><br></pre></td></tr></table></figure>
+
+<p>看起来字符串插值写法更简洁移动，<strong>不过若在java中使用这种字符串插值的写法拼接sql，可能会出现sql注入的问题，为了防止该问题，java提供了字符串模板表达式的方式</strong>。</p>
+<p>上面使用的STR是java中定义的模板处理器，<strong>它可以将变量的值取出，完成字符串的拼接。在每个java源文件中都引入了一个public static final修饰的STR属性，因此我们可以直接使用STR</strong>，STR通过打印STR可以知道它是java.lang.StringTemplate，是一个接口。</p>
+<p>在StringTemplate中是通过调用interpolate方法来执行的，该方法分别传入了两个参数：</p>
+<ul>
+<li>fragements：包含字符串模板中所有的字面量，是一个List</li>
+<li>values：包含字符串模板中所有的变量，是一个List</li>
+</ul>
+<p>而该方法又调用了JavaTemplateAccess中的interpolate方法，经过分析可以得知，它最终<strong>是通过String中的join方法将字面量和变量进行的拼接</strong>。</p>
+<h3 id="scoped-values-传递参数时无需声明形参"><a href="#scoped-values-传递参数时无需声明形参" class="headerlink" title="scoped values 传递参数时无需声明形参"></a>scoped values 传递参数时无需声明形参</h3><h4 id="ThreadLocal的问题"><a href="#ThreadLocal的问题" class="headerlink" title="ThreadLocal的问题"></a>ThreadLocal的问题</h4><p>scoped values 是一个隐藏的方法参数，<strong>只有方法可以访问scoped values，它可以让两个方法之间传递参数时无需声明形参</strong>。例如在UserDao类中编写了saveUser方法，LogDao类中编写了saveLog方法，那么在保存用户的时候需要保证事务，此时就需要在service层获取Connection对象，然后将该对象分别传入到两个Dao的方法中，但对于saveUser方法来说并不是直接使用Connection对象，却又不得不在方法的形参中写上该对象，其实仅从业务上来看，该方法中只要传入User对象就可以了。</p>
+<p>int saveUser(Connection connection,User user);</p>
+<p><strong>对于上面的问题，开发者通常会使用ThreadLocal解决，但由于ThreadLocal在设计上的瑕疵，导致下面问题：</strong></p>
+<ol>
+<li><strong>内存泄漏，在用完ThreadLocal之后若没有调用remove，这样就会出现内存泄漏。</strong></li>
+<li><strong>增加开销，在具有继承关系的线程中，子线程需要为父线程中ThreadLocal里面的数据分配内存。</strong></li>
+<li><strong>混乱的可变，任何可以调用ThreadLocal中get方法的代码都可以随时调用set方法，这样就不易辨别哪些方法是按照什么顺序来更新的共享数据。</strong></li>
+</ol>
+<p><strong>随着虚拟线程的到来，内存泄漏问题就不用担心了，由于虚拟线程会很快的终止，此时会自动删除ThreadLocal中的数据，这样就不用调用remove方法了</strong>。但虚拟线程的数量通常是多的，试想下上百万个虚拟线程都要拷贝一份ThreadLocal中的变量，这会使内存承受更大的压力。为了解决这些问题，scoped values就出现了。</p>
+<h4 id="ScopeValue初体验"><a href="#ScopeValue初体验" class="headerlink" title="ScopeValue初体验"></a>ScopeValue初体验</h4><p>在java21中新增了ScopeValue类，为了便于多个方法使用，通常会将该类的对象声明为static final ，每个线程都能访问自己的scope value，与ThreadLocal不同的是，它只会被write 1次且仅在线程绑定的期间内有效。</p>
+<p>下面代码模拟了送礼和收礼的场景</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Test</span>&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> ScopedValue&lt;String&gt; GIFT = ScopedValue.newInstance();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">Test</span> <span class="variable">t</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Test</span>();</span><br><span class="line">        t.giveGift();</span><br><span class="line">    &#125;     </span><br><span class="line"></span><br><span class="line">    <span class="comment">//送礼</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">giveGift</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="comment">/*</span></span><br><span class="line"><span class="comment">            在对象GIFT中增加字符串手机，当run方法执行时，</span></span><br><span class="line"><span class="comment">            会拷贝一份副本与当前线程绑定，当run方法结束时解绑。</span></span><br><span class="line"><span class="comment">            由此可见，这里GIFT中的字符串仅在收礼方法中可以取得。</span></span><br><span class="line"><span class="comment">         */</span></span><br><span class="line">        ScopedValue.where(GIFT, <span class="string">&quot;手机&quot;</span>).run(() -&gt; receiveGift());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//收礼</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">receiveGift</span><span class="params">()</span> &#123;</span><br><span class="line">        System.out.println(GIFT.get()); <span class="comment">// 手机</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="多线程操作相同的ScopeValue"><a href="#多线程操作相同的ScopeValue" class="headerlink" title="多线程操作相同的ScopeValue"></a>多线程操作相同的ScopeValue</h4><p>不同的线程在操作同一个ScopeValue时，相互间不会影响，其本质是利用了Thread类中scopedValueBindings属性进行的线程绑定。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> java.util.concurrent.ExecutorService;</span><br><span class="line"><span class="keyword">import</span> java.util.concurrent.Executors;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Test</span>&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> ScopedValue&lt;String&gt; GIFT = ScopedValue.newInstance();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">Test</span> <span class="variable">t</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Test</span>();</span><br><span class="line"></span><br><span class="line">        <span class="type">ExecutorService</span> <span class="variable">pool</span> <span class="operator">=</span> Executors.newCachedThreadPool();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</span><br><span class="line">            pool.submit(()-&gt;&#123;</span><br><span class="line">                t.giveGift();</span><br><span class="line">            &#125;);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        pool.shutdown();</span><br><span class="line">    &#125;     </span><br><span class="line"></span><br><span class="line">    <span class="comment">//向ScopedValue中添加当前线程的名字</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">giveGift</span><span class="params">()</span> &#123;</span><br><span class="line">        ScopedValue.where(GIFT, Thread.currentThread().getName()).run(() -&gt; receiveGift());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">receiveGift</span><span class="params">()</span> &#123;</span><br><span class="line">        System.out.println(GIFT.get()); </span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="record-pattern-解构"><a href="#record-pattern-解构" class="headerlink" title="record pattern 解构"></a>record pattern 解构</h3><p>通过该特性可以解构record类型中的值，例如</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Test</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">Student</span> <span class="variable">s</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Student</span>(<span class="number">10</span>, <span class="string">&quot;jordan&quot;</span>);</span><br><span class="line">        printSum(s);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">printSum</span><span class="params">(Object obj)</span> &#123;</span><br><span class="line">        <span class="comment">//这里的Student(int a, String b)就是 record pattern</span></span><br><span class="line">        <span class="keyword">if</span> (obj <span class="keyword">instanceof</span> <span class="title function_">Student</span><span class="params">(<span class="type">int</span> a, String b)</span>) &#123;</span><br><span class="line">            System.out.println(<span class="string">&quot;id:&quot;</span> + a);</span><br><span class="line">            System.out.println(<span class="string">&quot;name:&quot;</span> + b);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">record</span> <span class="title class_">Student</span><span class="params">(<span class="type">int</span> id, String name)</span> &#123;&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="switch格式匹配"><a href="#switch格式匹配" class="headerlink" title="switch格式匹配"></a>switch格式匹配</h3><p>之前的写法</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Test</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">Integer</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">10</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">str</span> <span class="operator">=</span> getObjInstance(i);</span><br><span class="line">        System.out.println(str);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> String <span class="title function_">getObjInstance</span><span class="params">(Object obj)</span> &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">objInstance</span> <span class="operator">=</span> <span class="string">&quot;&quot;</span>;</span><br><span class="line">        <span class="keyword">if</span>(obj == <span class="literal">null</span>)&#123;</span><br><span class="line">            objInstance = <span class="string">&quot;空对象&quot;</span></span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (obj <span class="keyword">instanceof</span> Integer i) &#123;</span><br><span class="line">            objInstance = <span class="string">&quot;Integer 对象：&quot;</span> + i;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (obj <span class="keyword">instanceof</span> Double d) &#123;</span><br><span class="line">            objInstance = <span class="string">&quot;Double 对象：&quot;</span> + d;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (obj <span class="keyword">instanceof</span> String s) &#123;</span><br><span class="line">            objInstance = <span class="string">&quot;String 对象：&quot;</span> + s;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> objInstance;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>新的写法，代码更加简洁</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Test</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">Integer</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">10</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">str</span> <span class="operator">=</span> getObjInstance(i);</span><br><span class="line">        System.out.println(str);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> String <span class="title function_">getObjInstance</span><span class="params">(Object obj)</span> &#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">switch</span>(obj)&#123;</span><br><span class="line">            <span class="keyword">case</span> <span class="literal">null</span> -&gt; <span class="string">&quot;空对象&quot;</span>;</span><br><span class="line">            <span class="keyword">case</span> Integer i -&gt; <span class="string">&quot;Integer 对象：&quot;</span> + i;</span><br><span class="line">            <span class="keyword">case</span> Double d -&gt; <span class="string">&quot;Double对象：&quot;</span> + d;</span><br><span class="line">            <span class="keyword">case</span> String s -&gt; <span class="string">&quot;String对象：&quot;</span> + s;</span><br><span class="line">            <span class="keyword">default</span> -&gt; obj.toString();</span><br><span class="line">        &#125;;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以在switch中使用when</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Test</span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        yesOrNo(<span class="string">&quot;yes&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">yesOrNo</span><span class="params">(String obj)</span> &#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">switch</span>(obj)&#123;</span><br><span class="line">            <span class="keyword">case</span> <span class="literal">null</span> -&gt; &#123;System.out.println(<span class="string">&quot;空对象&quot;</span>);&#125;</span><br><span class="line">            <span class="keyword">case</span> String s</span><br><span class="line">                when s.equalsIgnoreCase(<span class="string">&quot;yes&quot;</span>) -&gt; &#123;</span><br><span class="line">                System.out.println(<span class="string">&quot;确定&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">case</span> String s</span><br><span class="line">                when s.equalsIgnoreCase(<span class="string">&quot;no&quot;</span>) -&gt; &#123;</span><br><span class="line">                System.out.println(<span class="string">&quot;取消&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">                <span class="comment">//最后的case要写，否则编译回报错</span></span><br><span class="line">            <span class="keyword">case</span> String s -&gt; &#123;</span><br><span class="line">                System.out.println(<span class="string">&quot;请输入yes或no&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="Unnamed-Classes-and-Instance-Main-Methods"><a href="#Unnamed-Classes-and-Instance-Main-Methods" class="headerlink" title="Unnamed Classes and Instance Main Methods"></a>Unnamed Classes and Instance Main Methods</h3><p>对于初学者来说，写的第一个HelloWorld代码有太多的概念，为了方便初学者快速编写第一段java代码，这里提出了无名类和实例main方法，下面代码可以直接运行编译，相当于是少了类的定义，main方法的修饰符和形参也省略掉了</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    System.out.println(<span class="string">&quot;Hello, World!&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="Structured-Concurrency"><a href="#Structured-Concurrency" class="headerlink" title="Structured Concurrency"></a>Structured Concurrency</h3><p>该特性主要作用是在使用虚拟线程时，可以使任务和子任务的代码编写起来可读性更强，维护性更高，更加可靠。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> java.util.concurrent.ExecutionException;</span><br><span class="line"><span class="keyword">import</span> java.util.concurrent.StructuredTaskScope;</span><br><span class="line"><span class="keyword">import</span> java.util.function.Supplier;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Test</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> ExecutionException, InterruptedException &#123;</span><br><span class="line">        <span class="type">Food</span> <span class="variable">f</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Test</span>().handle();</span><br><span class="line">        System.out.println(f);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    Food <span class="title function_">handle</span><span class="params">()</span> <span class="keyword">throws</span> ExecutionException, InterruptedException &#123;</span><br><span class="line">        <span class="keyword">try</span> (<span class="type">var</span> <span class="variable">scope</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">StructuredTaskScope</span>.ShutdownOnFailure()) &#123;</span><br><span class="line">            Supplier&lt;String&gt; yaoZi = scope.fork(() -&gt; <span class="string">&quot;新鲜大腰子烤好了&quot;</span>);<span class="comment">// 烤腰子的任务</span></span><br><span class="line">            Supplier&lt;String&gt; drink = scope.fork(() -&gt; <span class="string">&quot;奶茶做好了&quot;</span>);<span class="comment">// 买饮料的任务</span></span><br><span class="line"></span><br><span class="line">            scope.join() <span class="comment">// 将2个子任务都加入</span></span><br><span class="line">            .throwIfFailed(); <span class="comment">// 失败传播</span></span><br><span class="line"></span><br><span class="line">            <span class="comment">// 当两个子任务都成功后，最终才能吃上饭</span></span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Food</span>(yaoZi.get(), drink.get());</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">record</span> <span class="title class_">Food</span><span class="params">(String yaoZi, String drink)</span> &#123;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="Java22新特性"><a href="#Java22新特性" class="headerlink" title="Java22新特性"></a>Java22新特性</h2><h3 id="无名变量"><a href="#无名变量" class="headerlink" title="无名变量 __"></a>无名变量 __</h3><p>这个和Go的下划线挺类似的，<strong>一般使用在try-catch中，直接将e，变为下划线</strong>。主要是<strong>区分出需要使用的变量和不需要使用的变量</strong>，因为不是所有的返回值都是你需要的，这样可以<strong>使代码逻辑更加清晰</strong>。</p>
+<p>以下场景可以使用Unnamed Variables</p>
+<ul>
+<li><p>局部变量</p>
+</li>
+<li><p>try-with-resource</p>
+</li>
+<li><p>循环头中声明的变量</p>
+</li>
+<li><p>catch中声明的变量</p>
+</li>
+<li><p>lambda表达式中的参数</p>
+</li>
+</ul>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://www.yuque.com/monkey1024/javase/uhzrnnl2ragygqfm">1.java9新特性 (yuque.com)</a></p>
+
+                
+            </div>
+            <hr/>
+
+            
+
+    <div class="reprint" id="reprint-statement">
+        
+            <div class="reprint__author">
+                <span class="reprint-meta" style="font-weight: bold;">
+                    <i class="fas fa-user">
+                        文章作者:
+                    </i>
+                </span>
+                <span class="reprint-info">
+                    <a href="/about" rel="external nofollow noreferrer">zoloy</a>
+                </span>
+            </div>
+            <div class="reprint__type">
+                <span class="reprint-meta" style="font-weight: bold;">
+                    <i class="fas fa-link">
+                        文章链接:
+                    </i>
+                </span>
+                <span class="reprint-info">
+                    <a href="http://example.com/2024/09/10/Java22-new-features/">http://example.com/2024/09/10/Java22-new-features/</a>
+                </span>
+            </div>
+            <div class="reprint__notice">
+                <span class="reprint-meta" style="font-weight: bold;">
+                    <i class="fas fa-copyright">
+                        版权声明:
+                    </i>
+                </span>
+                <span class="reprint-info">
+                    本博客所有文章除特別声明外，均采用
+                    <a href="https://creativecommons.org/licenses/by/4.0/deed.zh" rel="external nofollow noreferrer" target="_blank">CC BY 4.0</a>
+                    许可协议。转载请注明来源
+                    <a href="/about" target="_blank">zoloy</a>
+                    !
+                </span>
+            </div>
+        
+    </div>
+
+    <script async defer>
+      document.addEventListener("copy", function (e) {
+        let toastHTML = '<span>复制成功，请遵循本文的转载规则</span><button class="btn-flat toast-action" onclick="navToReprintStatement()" style="font-size: smaller">查看</a>';
+        M.toast({html: toastHTML})
+      });
+
+      function navToReprintStatement() {
+        $("html, body").animate({scrollTop: $("#reprint-statement").offset().top - 80}, 800);
+      }
+    </script>
+
+
+
+            <div class="tag_share" style="display: block;">
+                <div class="post-meta__tag-list" style="display: inline-block;">
+                    
+                        <div class="article-tag">
+                            
+                                <a href="/tags/Java%E6%96%B0%E7%89%B9%E6%80%A7/">
+                                    <span class="chip bg-color">Java新特性</span>
+                                </a>
+                            
+                        </div>
+                    
+                </div>
+                <div class="post_share" style="zoom: 80%; width: fit-content; display: inline-block; float: right; margin: -0.15rem 0;">
+                    <link rel="stylesheet" type="text/css" href="/libs/share/css/share.min.css">
+<div id="article-share">
+
+    
+    <div class="social-share" data-sites="twitter,facebook,google,qq,qzone,wechat,weibo,douban,linkedin" data-wechat-qrcode-helper="<p>微信扫一扫即可分享！</p>"></div>
+    <script src="/libs/share/js/social-share.min.js"></script>
+    
+
+    
+
+</div>
+
+                </div>
+            </div>
+            
+                <div id="reward">
+    <a href="#rewardModal" class="reward-link modal-trigger btn-floating btn-medium waves-effect waves-light red">赏</a>
+
+    <!-- Modal Structure -->
+    <div id="rewardModal" class="modal">
+        <div class="modal-content">
+            <a class="close modal-close"><i class="fas fa-times"></i></a>
+            <h4 class="reward-title">你的赏识是我前进的动力</h4>
+            <div class="reward-content">
+                <div class="reward-tabs">
+                    <ul class="tabs row">
+                        <li class="tab col s6 alipay-tab waves-effect waves-light"><a href="#alipay">支付宝</a></li>
+                        <li class="tab col s6 wechat-tab waves-effect waves-light"><a href="#wechat">微 信</a></li>
+                    </ul>
+                    <div id="alipay">
+                        <img src="/medias/reward/alipay.jpg" class="reward-img" alt="支付宝打赏二维码">
+                    </div>
+                    <div id="wechat">
+                        <img src="/medias/reward/wechat.png" class="reward-img" alt="微信打赏二维码">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        $('.tabs').tabs();
+    });
+</script>
+
+            
+        </div>
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+        <style>
+    .valine-card {
+        margin: 1.5rem auto;
+    }
+
+    .valine-card .card-content {
+        padding: 20px 20px 5px 20px;
+    }
+
+    #vcomments textarea {
+        box-sizing: border-box;
+        background: url("/medias/comment_bg.png") 100% 100% no-repeat;
+    }
+
+    #vcomments p {
+        margin: 2px 2px 10px;
+        font-size: 1.05rem;
+        line-height: 1.78rem;
+    }
+
+    #vcomments blockquote p {
+        text-indent: 0.2rem;
+    }
+
+    #vcomments a {
+        padding: 0 2px;
+        color: #4cbf30;
+        font-weight: 500;
+        text-decoration: none;
+    }
+
+    #vcomments img {
+        max-width: 100%;
+        height: auto;
+        cursor: pointer;
+    }
+
+    #vcomments ol li {
+        list-style-type: decimal;
+    }
+
+    #vcomments ol,
+    ul {
+        display: block;
+        padding-left: 2em;
+        word-spacing: 0.05rem;
+    }
+
+    #vcomments ul li,
+    ol li {
+        display: list-item;
+        line-height: 1.8rem;
+        font-size: 1rem;
+    }
+
+    #vcomments ul li {
+        list-style-type: disc;
+    }
+
+    #vcomments ul ul li {
+        list-style-type: circle;
+    }
+
+    #vcomments table, th, td {
+        padding: 12px 13px;
+        border: 1px solid #dfe2e5;
+    }
+
+    #vcomments table, th, td {
+        border: 0;
+    }
+
+    table tr:nth-child(2n), thead {
+        background-color: #fafafa;
+    }
+
+    #vcomments table th {
+        background-color: #f2f2f2;
+        min-width: 80px;
+    }
+
+    #vcomments table td {
+        min-width: 80px;
+    }
+
+    #vcomments h1 {
+        font-size: 1.85rem;
+        font-weight: bold;
+        line-height: 2.2rem;
+    }
+
+    #vcomments h2 {
+        font-size: 1.65rem;
+        font-weight: bold;
+        line-height: 1.9rem;
+    }
+
+    #vcomments h3 {
+        font-size: 1.45rem;
+        font-weight: bold;
+        line-height: 1.7rem;
+    }
+
+    #vcomments h4 {
+        font-size: 1.25rem;
+        font-weight: bold;
+        line-height: 1.5rem;
+    }
+
+    #vcomments h5 {
+        font-size: 1.1rem;
+        font-weight: bold;
+        line-height: 1.4rem;
+    }
+
+    #vcomments h6 {
+        font-size: 1rem;
+        line-height: 1.3rem;
+    }
+
+    #vcomments p {
+        font-size: 1rem;
+        line-height: 1.5rem;
+    }
+
+    #vcomments hr {
+        margin: 12px 0;
+        border: 0;
+        border-top: 1px solid #ccc;
+    }
+
+    #vcomments blockquote {
+        margin: 15px 0;
+        border-left: 5px solid #42b983;
+        padding: 1rem 0.8rem 0.3rem 0.8rem;
+        color: #666;
+        background-color: rgba(66, 185, 131, .1);
+    }
+
+    #vcomments pre {
+        font-family: monospace, monospace;
+        padding: 1.2em;
+        margin: .5em 0;
+        background: #272822;
+        overflow: auto;
+        border-radius: 0.3em;
+        tab-size: 4;
+    }
+
+    #vcomments code {
+        font-family: monospace, monospace;
+        padding: 1px 3px;
+        font-size: 0.92rem;
+        color: #e96900;
+        background-color: #f8f8f8;
+        border-radius: 2px;
+    }
+
+    #vcomments pre code {
+        font-family: monospace, monospace;
+        padding: 0;
+        color: #e8eaf6;
+        background-color: #272822;
+    }
+
+    #vcomments pre[class*="language-"] {
+        padding: 1.2em;
+        margin: .5em 0;
+    }
+
+    #vcomments code[class*="language-"],
+    pre[class*="language-"] {
+        color: #e8eaf6;
+    }
+
+    #vcomments [type="checkbox"]:not(:checked), [type="checkbox"]:checked {
+        position: inherit;
+        margin-left: -1.3rem;
+        margin-right: 0.4rem;
+        margin-top: -1px;
+        vertical-align: middle;
+        left: unset;
+        visibility: visible;
+    }
+
+    #vcomments b,
+    strong {
+        font-weight: bold;
+    }
+
+    #vcomments dfn {
+        font-style: italic;
+    }
+
+    #vcomments small {
+        font-size: 85%;
+    }
+
+    #vcomments cite {
+        font-style: normal;
+    }
+
+    #vcomments mark {
+        background-color: #fcf8e3;
+        padding: .2em;
+    }
+
+    #vcomments table, th, td {
+        padding: 12px 13px;
+        border: 1px solid #dfe2e5;
+    }
+
+    table tr:nth-child(2n), thead {
+        background-color: #fafafa;
+    }
+
+    #vcomments table th {
+        background-color: #f2f2f2;
+        min-width: 80px;
+    }
+
+    #vcomments table td {
+        min-width: 80px;
+    }
+
+    #vcomments [type="checkbox"]:not(:checked), [type="checkbox"]:checked {
+        position: inherit;
+        margin-left: -1.3rem;
+        margin-right: 0.4rem;
+        margin-top: -1px;
+        vertical-align: middle;
+        left: unset;
+        visibility: visible;
+    }
+</style>
+
+<div class="card valine-card" data-aos="fade-up">
+    <div class="comment_headling" style="font-size: 20px; font-weight: 700; position: relative; padding-left: 20px; top: 15px; padding-bottom: 5px;">
+        <i class="fas fa-comments fa-fw" aria-hidden="true"></i>
+        <span>评论</span>
+    </div>
+    <div id="vcomments" class="card-content" style="display: grid">
+    </div>
+</div>
+
+<script src="/libs/valine/av-min.js"></script>
+<script src="/libs/valine/Valine.min.js"></script>
+<script>
+    new Valine({
+        el: '#vcomments',
+        appId: 'Pd1dPt3xNG0BSsk4Q6n7B4Py-MdYXbMMI',
+        appKey: 'DJdISLrYCotymGS7nKBgM7zE',
+        serverURLs: 'https://pd1dpt3x.api.lncldglobal.com',
+        notify: 'false' === 'true',
+        verify: 'false' === 'true',
+        visitor: 'true' === 'true',
+        avatar: 'mm',
+        pageSize: '10',
+        lang: 'zh-cn',
+        placeholder: 'just go go'
+    });
+</script>
+
+<!--酷Q推送-->
+
+
+    
+
+    
+
+    
+
+    
+
+    
+
+<article id="prenext-posts" class="prev-next articles">
+    <div class="row article-row">
+        
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
+            <div class="article-badge left-badge text-color">
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
+            <div class="card">
+                <a href="/2024/09/10/Java22-new-features/">
+                    <div class="card-image">
+                        
+                        
+                        <img src="/medias/featureimages/8.jpg" class="responsive-img" alt="Java9到22的一些新特性">
+                        
+                        <span class="card-title">Java9到22的一些新特性</span>
+                    </div>
+                </a>
+                <div class="card-content article-content">
+                    <div class="summary block-with-text">
+                        
+                            
+                        
+                    </div>
+                    <div class="publish-info">
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
+                            </span>
+                        <span class="publish-author">
+                            
+                            <i class="fas fa-bookmark fa-fw icon-category"></i>
+                            
+                            <a href="/categories/Java/" class="post-category">
+                                    Java
+                                </a>
+                            
+                            
+                        </span>
+                    </div>
+                </div>
+
+                
+                <div class="card-action article-tags">
+                    
+                    <a href="/tags/Java%E6%96%B0%E7%89%B9%E6%80%A7/">
+                        <span class="chip bg-color">Java新特性</span>
+                    </a>
+                    
+                </div>
+                
+            </div>
+        </div>
+        
+        
+        <div class="article col s12 m6" data-aos="fade-up">
+            <div class="article-badge right-badge text-color">
+                下一篇&nbsp;<i class="fas fa-chevron-right"></i>
+            </div>
+            <div class="card">
+                <a href="/2024/09/10/MySQL10/">
+                    <div class="card-image">
+                        
+                        
+                        <img src="/medias/featureimages/22.jpg" class="responsive-img" alt="MySQL为什么有时候会选错索引？">
+                        
+                        <span class="card-title">MySQL为什么有时候会选错索引？</span>
+                    </div>
+                </a>
+                <div class="card-content article-content">
+                    <div class="summary block-with-text">
+                        
+                            
+                        
+                    </div>
+                    <div class="publish-info">
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
+                            </span>
+                        <span class="publish-author">
+                            
+                            <i class="fas fa-bookmark fa-fw icon-category"></i>
+                            
+                            <a href="/categories/MySQL/" class="post-category">
+                                    MySQL
+                                </a>
+                            
+                            
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="card-action article-tags">
+                    
+                    <a href="/tags/MySQL/">
+                        <span class="chip bg-color">MySQL</span>
+                    </a>
+                    
+                </div>
+                
+            </div>
+        </div>
+        
+    </div>
+</article>
+
+</div>
+
+
+
+<!-- 代码块功能依赖 -->
+<script type="text/javascript" src="/libs/codeBlock/codeBlockFuction.js"></script>
+
+
+  <!-- 是否加载使用自带的 prismjs. -->
+  <script type="text/javascript" src="/libs/prism/prism.min.js"></script>
+
+
+<!-- 代码语言 -->
+
+<script type="text/javascript" src="/libs/codeBlock/codeLang.js"></script>
+
+
+<!-- 代码块复制 -->
+
+<script type="text/javascript" src="/libs/codeBlock/codeCopy.js"></script>
+
+
+<!-- 代码块收缩 -->
+
+<script type="text/javascript" src="/libs/codeBlock/codeShrink.js"></script>
+
+
+
+    </div>
+    <div id="toc-aside" class="expanded col l3 hide-on-med-and-down">
+        <div class="toc-widget card" style="background-color: white;">
+            <div class="toc-title"><i class="far fa-list-alt"></i>&nbsp;&nbsp;目录</div>
+            <div id="toc-content"></div>
+        </div>
+    </div>
+</div>
+
+<!-- TOC 悬浮按钮. -->
+
+<div id="floating-toc-btn" class="hide-on-med-and-down">
+    <a class="btn-floating btn-large bg-color">
+        <i class="fas fa-list-ul"></i>
+    </a>
+</div>
+
+
+<script src="/libs/tocbot/tocbot.min.js"></script>
+<script>
+    $(function () {
+        tocbot.init({
+            tocSelector: '#toc-content',
+            contentSelector: '#articleContent',
+            headingsOffset: -($(window).height() * 0.4 - 45),
+            collapseDepth: Number('0'),
+            headingSelector: 'h2, h3, h4'
+        });
+
+        // Set scroll toc fixed.
+        let tocHeight = parseInt($(window).height() * 0.4 - 64);
+        let $tocWidget = $('.toc-widget');
+        $(window).scroll(function () {
+            let scroll = $(window).scrollTop();
+            /* add post toc fixed. */
+            if (scroll > tocHeight) {
+                $tocWidget.addClass('toc-fixed');
+            } else {
+                $tocWidget.removeClass('toc-fixed');
+            }
+        });
+
+        
+        /* 修复文章卡片 div 的宽度. */
+        let fixPostCardWidth = function (srcId, targetId) {
+            let srcDiv = $('#' + srcId);
+            if (srcDiv.length === 0) {
+                return;
+            }
+
+            let w = srcDiv.width();
+            if (w >= 450) {
+                w = w + 21;
+            } else if (w >= 350 && w < 450) {
+                w = w + 18;
+            } else if (w >= 300 && w < 350) {
+                w = w + 16;
+            } else {
+                w = w + 14;
+            }
+            $('#' + targetId).width(w);
+        };
+
+        // 切换TOC目录展开收缩的相关操作.
+        const expandedClass = 'expanded';
+        let $tocAside = $('#toc-aside');
+        let $mainContent = $('#main-content');
+        $('#floating-toc-btn .btn-floating').click(function () {
+            if ($tocAside.hasClass(expandedClass)) {
+                $tocAside.removeClass(expandedClass).hide();
+                $mainContent.removeClass('l9');
+            } else {
+                $tocAside.addClass(expandedClass).show();
+                $mainContent.addClass('l9');
+            }
+            fixPostCardWidth('artDetail', 'prenext-posts');
+        });
+        
+    });
+</script>
+
+    
+
+</main>
+
+
+
+
+    <footer class="page-footer bg-color">
+    
+        <link rel="stylesheet" href="/libs/aplayer/APlayer.min.css">
+<style>
+    .aplayer .aplayer-lrc p {
+        
+        display: none;
+        
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 16px !important;
+    }
+
+    .aplayer .aplayer-lrc p.aplayer-lrc-current {
+        
+        display: none;
+        
+        font-size: 15px;
+        color: #42b983;
+    }
+
+    
+    .aplayer.aplayer-fixed.aplayer-narrow .aplayer-body {
+        left: -66px !important;
+    }
+
+    .aplayer.aplayer-fixed.aplayer-narrow .aplayer-body:hover {
+        left: 0px !important;
+    }
+
+    
+</style>
+<div class="">
+    
+    <div class="row">
+        <meting-js class="col l8 offset-l2 m10 offset-m1 s12"
+                   server="netease"
+                   type="playlist"
+                   id="503838841"
+                   fixed='true'
+                   autoplay='false'
+                   theme='#42b983'
+                   loop='all'
+                   order='random'
+                   preload='auto'
+                   volume='0.7'
+                   list-folded='true'
+        >
+        </meting-js>
+    </div>
+</div>
+
+<script src="/libs/aplayer/APlayer.min.js"></script>
+<script src="/libs/aplayer/Meting.min.js"></script>
+
+    
+
+    <div class="container row center-align"
+         style="margin-bottom: 0px !important;">
+        <div class="col s12 m8 l8 copy-right">
+            Copyright&nbsp;&copy;
+            
+                <span id="year">2019-2024</span>
+            
+            <a href="/about" target="_blank">zoloy</a>
+            |&nbsp;Powered by&nbsp;<a href="https://hexo.io/" target="_blank">Hexo</a>
+            |&nbsp;Theme&nbsp;<a href="https://github.com/blinkfox/hexo-theme-matery" target="_blank">Matery</a>
+            
+            <br>
+            
+                &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
+                        class="white-color">67.6k</span>
+            
+            
+            
+                
+            
+            
+                <span id="busuanzi_container_site_pv">
+                &nbsp;|&nbsp;<i class="far fa-eye"></i>&nbsp;总访问量:&nbsp;
+                    <span id="busuanzi_value_site_pv" class="white-color"></span>
+            </span>
+            
+            
+                <span id="busuanzi_container_site_uv">
+                &nbsp;|&nbsp;<i class="fas fa-users"></i>&nbsp;总访问人数:&nbsp;
+                    <span id="busuanzi_value_site_uv" class="white-color"></span>
+            </span>
+            
+            <br>
+
+            <!-- 运行天数提醒. -->
+            
+            <br>
+            
+        </div>
+        <div class="col s12 m4 l4 social-link social-statis">
+    <a href="https://github.com/z0l0y" class="tooltipped" target="_blank" data-tooltip="访问我的GitHub" data-position="top" data-delay="50">
+        <i class="fab fa-github"></i>
+    </a>
+
+
+
+    <a href="mailto:zloy0709@outlook.com" class="tooltipped" target="_blank" data-tooltip="邮件联系我" data-position="top" data-delay="50">
+        <i class="fas fa-envelope-open"></i>
+    </a>
+
+
+
+
+
+
+
+    <a href="tencent://AddContact/?fromId=50&fromSubId=1&subcmd=all&uin=807250972" class="tooltipped" target="_blank" data-tooltip="QQ联系我: 807250972" data-position="top" data-delay="50">
+        <i class="fab fa-qq"></i>
+    </a>
+
+
+
+    <a href="https://weibo.com/u/7908622014" class="tooltipped" target="_blank" data-tooltip="关注我的微博: https://weibo.com/u/7908622014" data-position="top" data-delay="50">
+        <i class="fab fa-weibo"></i>
+    </a>
+
+
+
+
+
+</div>
+    </div>
+</footer>
+
+<div class="progress-bar"></div>
+
+
+    <!-- 搜索遮罩框 -->
+<div id="searchModal" class="modal">
+    <div class="modal-content">
+        <div class="search-header">
+            <span class="title"><i class="fas fa-search"></i>&nbsp;&nbsp;搜索</span>
+            <input type="search" id="searchInput" name="s" placeholder="请输入搜索的关键字"
+                   class="search-input">
+        </div>
+        <div id="searchResult"></div>
+    </div>
+</div>
+
+<script type="text/javascript">
+$(function () {
+    var searchFunc = function (path, search_id, content_id) {
+        'use strict';
+        $.ajax({
+            url: path,
+            dataType: "xml",
+            success: function (xmlResponse) {
+                // get the contents from search data
+                var datas = $("entry", xmlResponse).map(function () {
+                    return {
+                        title: $("title", this).text(),
+                        content: $("content", this).text(),
+                        url: $("url", this).text()
+                    };
+                }).get();
+                var $input = document.getElementById(search_id);
+                var $resultContent = document.getElementById(content_id);
+                $input.addEventListener('input', function () {
+                    var str = '<ul class=\"search-result-list\">';
+                    var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                    $resultContent.innerHTML = "";
+                    if (this.value.trim().length <= 0) {
+                        return;
+                    }
+                    // perform local searching
+                    datas.forEach(function (data) {
+                        var isMatch = true;
+                        var data_title = data.title.trim().toLowerCase();
+                        var data_content = data.content.trim().replace(/<[^>]+>/g, "").toLowerCase();
+                        var data_url = data.url;
+                        data_url = data_url.indexOf('/') === 0 ? data.url : '/' + data_url;
+                        var index_title = -1;
+                        var index_content = -1;
+                        var first_occur = -1;
+                        // only match artiles with not empty titles and contents
+                        if (data_title !== '' && data_content !== '') {
+                            keywords.forEach(function (keyword, i) {
+                                index_title = data_title.indexOf(keyword);
+                                index_content = data_content.indexOf(keyword);
+                                if (index_title < 0 && index_content < 0) {
+                                    isMatch = false;
+                                } else {
+                                    if (index_content < 0) {
+                                        index_content = 0;
+                                    }
+                                    if (i === 0) {
+                                        first_occur = index_content;
+                                    }
+                                }
+                            });
+                        }
+                        // show search results
+                        if (isMatch) {
+                            str += "<li><a href='" + data_url + "' class='search-result-title'>" + data_title + "</a>";
+                            var content = data.content.trim().replace(/<[^>]+>/g, "");
+                            if (first_occur >= 0) {
+                                // cut out 100 characters
+                                var start = first_occur - 20;
+                                var end = first_occur + 80;
+                                if (start < 0) {
+                                    start = 0;
+                                }
+                                if (start === 0) {
+                                    end = 100;
+                                }
+                                if (end > content.length) {
+                                    end = content.length;
+                                }
+                                var match_content = content.substr(start, end);
+                                // highlight all keywords
+                                keywords.forEach(function (keyword) {
+                                    var regS = new RegExp(keyword, "gi");
+                                    match_content = match_content.replace(regS, "<em class=\"search-keyword\">" + keyword + "</em>");
+                                });
+
+                                str += "<p class=\"search-result\">" + match_content + "...</p>"
+                            }
+                            str += "</li>";
+                        }
+                    });
+                    str += "</ul>";
+                    $resultContent.innerHTML = str;
+                });
+            }
+        });
+    };
+
+    searchFunc('/search.xml', 'searchInput', 'searchResult');
+});
+</script>
+
+    <!-- 白天和黑夜主题 -->
+<div class="stars-con">
+    <div id="stars"></div>
+    <div id="stars2"></div>
+    <div id="stars3"></div>  
+</div>
+
+<script>
+    function switchNightMode() {
+        $('<div class="Cuteen_DarkSky"><div class="Cuteen_DarkPlanet"></div></div>').appendTo($('body')),
+        setTimeout(function () {
+            $('body').hasClass('DarkMode') 
+            ? ($('body').removeClass('DarkMode'), localStorage.setItem('isDark', '0'), $('#sum-moon-icon').removeClass("fa-sun").addClass('fa-moon')) 
+            : ($('body').addClass('DarkMode'), localStorage.setItem('isDark', '1'), $('#sum-moon-icon').addClass("fa-sun").removeClass('fa-moon')),
+            
+            setTimeout(function () {
+            $('.Cuteen_DarkSky').fadeOut(1e3, function () {
+                $(this).remove()
+            })
+            }, 2e3)
+        })
+    }
+</script>
+
+    <!-- 回到顶部按钮 -->
+<div id="backTop" class="top-scroll">
+    <a class="btn-floating btn-large waves-effect waves-light" href="#!">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+</div>
+
+
+    <script src="/libs/materialize/materialize.min.js"></script>
+    <script src="/libs/masonry/masonry.pkgd.min.js"></script>
+    <script src="/libs/aos/aos.js"></script>
+    <script src="/libs/scrollprogress/scrollProgress.min.js"></script>
+    <script src="/libs/lightGallery/js/lightgallery-all.min.js"></script>
+    <script src="/js/matery.js"></script>
+
+    
+
+    
+    
+    
+        
+        <script type="text/javascript">
+            // 只在桌面版网页启用特效
+            var windowWidth = $(window).width();
+            if (windowWidth > 768) {
+                document.write('<script type="text/javascript" src="/libs/others/sakura.js"><\/script>');
+            }
+        </script>
+    
+
+    <!-- 雪花特效 -->
+    
+
+    <!-- 鼠标星星特效 -->
+    
+
+     
+        <script src="https://ssl.captcha.qq.com/TCaptcha.js"></script>
+        <script src="/libs/others/TencentCaptcha.js"></script>
+        <button id="TencentCaptcha" data-appid="xxxxxxxxxx" data-cbfn="callback" type="button" hidden></button>
+    
+
+    <!-- Baidu Analytics -->
+
+    <!-- Baidu Push -->
+
+<script>
+    (function () {
+        var bp = document.createElement('script');
+        var curProtocol = window.location.protocol.split(':')[0];
+        if (curProtocol === 'https') {
+            bp.src = 'https://zz.bdstatic.com/linksubmit/push.js';
+        } else {
+            bp.src = 'http://push.zhanzhang.baidu.com/push.js';
+        }
+        var s = document.getElementsByTagName("script")[0];
+        s.parentNode.insertBefore(bp, s);
+    })();
+</script>
+
+    
+    
+    <script async src="/libs/others/busuanzi.pure.mini.js"></script>
+    
+
+    
+
+    
+
+    <!--腾讯兔小巢-->
+    
+    
+
+    
+
+    
+
+    
+    <script src="/libs/instantpage/instantpage.js" type="module"></script>
+    
+
+</body>
+
+</html>
