@@ -501,6 +501,7 @@
 <p>有同学问到为什么要重建索引。<strong>我们文章里面有提到，索引可能因为删除，或者页分裂等原因，导致数据页有空洞，重建索引的过程会创建一个新的索引，把数据按顺序插入，这样页面的利用率最高，也就是索引更紧凑、更省空间。（我记得之前看到别人的面经的时候就提到过空洞这个玩意，原来是在这里出现的）</strong></p>
 <p>这道题目，我给你的“参考答案”是：</p>
 <p><strong>重建索引k的做法是合理的，可以达到省空间的目的。</strong>但是，<strong>重建主键的过程不合理</strong>。不论是删除主键还是创建主键，<strong>都会将整个表重建</strong>。所以连着执行这两个语句的话，第一个语句就<strong>白做了</strong>。<strong>这两个语句，你可以用这个语句代替 ： alter table T engine&#x3D;InnoDB。</strong>在专栏的第12篇文章《为什么表数据删掉一半，表文件大小不变？》中，我会和你分析这条语句的执行流程。</p>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/05-shen-ru-qian-chu-suo-yin-xia">05 深入浅出索引（下） | MySql实战45讲 (gitbook.io)</a></p>
 
                 
             </div>
@@ -912,18 +913,17 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="far fa-dot-circle"></i>&nbsp;本篇
-            </div>
+                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
             <div class="card">
-                <a href="/2024/09/10/MySQL05/">
+                <a href="/2024/09/10/MySQL06/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/10.jpg" class="responsive-img" alt="深入浅出索引（下）">
+                        <img src="/medias/featureimages/12.jpg" class="responsive-img" alt="全局锁和表锁 ：给表加个字段怎么有这么多阻碍？">
                         
-                        <span class="card-title">深入浅出索引（下）</span>
+                        <span class="card-title">全局锁和表锁 ：给表加个字段怎么有这么多阻碍？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -933,9 +933,9 @@
                         
                     </div>
                     <div class="publish-info">
-                            <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
-                            </span>
+                        <span class="publish-date">
+                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
+                        </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
@@ -948,7 +948,6 @@
                         </span>
                     </div>
                 </div>
-
                 
                 <div class="card-action article-tags">
                     
@@ -1200,7 +1199,7 @@
             <br>
             
                 &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
-                        class="white-color">39.6k</span>
+                        class="white-color">43.6k</span>
             
             
             

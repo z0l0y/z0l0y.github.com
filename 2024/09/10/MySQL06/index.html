@@ -4,9 +4,9 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="日志系统：一条SQL更新语句是如何执行的？, zoloy">
-    <meta name="description" content="日志系统：一条SQL更新语句是如何执行的？前面我们系统了解了一个查询语句的执行流程，并介绍了执行过程中涉及的处理模块。相信你还记得，一条查询语句的执行过程一般是经过连接器、分析器、优化器、执行器等功能模块，最后到达存储引擎。
-那么，一条更新">
+    <meta name="keywords" content="全局锁和表锁 ：给表加个字段怎么有这么多阻碍？, zoloy">
+    <meta name="description" content=" 今天我要跟你聊聊MySQL的锁。数据库锁设计的初衷是处理并发问题。作为多用户共享的资源，当出现并发访问的时候，数据库需要合理地控制资源的访问规则。而锁就是用来实现这些访问规则的重要数据结构。
+根据加锁的范围，MySQL里面的锁大致可以分成">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -18,7 +18,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>日志系统：一条SQL更新语句是如何执行的？ | zoloy&#39;s blog</title>
+    <title>全局锁和表锁 ：给表加个字段怎么有这么多阻碍？ | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -291,12 +291,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/19.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/12.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">日志系统：一条SQL更新语句是如何执行的？</h1>
+                    <h1 class="description center-align post-title">全局锁和表锁 ：给表加个字段怎么有这么多阻碍？</h1>
                 </div>
             </div>
         </div>
@@ -345,7 +345,7 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-09
+                    2024-09-10
                 </div>
                 
 
@@ -359,14 +359,14 @@
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    5.6k
+                    3.9k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    19 分
+                    13 分
                 </div>
                 
 
@@ -389,132 +389,107 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <h1 id="日志系统：一条SQL更新语句是如何执行的？"><a href="#日志系统：一条SQL更新语句是如何执行的？" class="headerlink" title="日志系统：一条SQL更新语句是如何执行的？"></a>日志系统：一条SQL更新语句是如何执行的？</h1><p>前面我们系统了解了一个查询语句的执行流程，并介绍了执行过程中涉及的处理模块。相信你还记得，<strong>一条查询语句的执行过程一般是经过连接器、分析器、优化器、执行器等功能模块，最后到达存储引擎。</strong></p>
-<p>那么，<strong>一条更新语句</strong>的执行流程又是怎样的呢？</p>
-<p>之前你可能经常听DBA同事说，MySQL可以恢复到半个月内任意一秒的状态，惊叹的同时，你是不是心中也会不免会好奇，这是怎样做到的呢？</p>
-<p>我们还是从一个表的一条更新语句说起，下面是这个表的创建语句，这个表有一个主键ID和一个整型字段c：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; create table T(ID int primary key, c int);</span><br></pre></td></tr></table></figure>
-
-<p>如果要将ID&#x3D;2这一行的值加1，SQL语句就会这么写：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; update T set c=c+1 where ID=2;</span><br></pre></td></tr></table></figure>
-
-<p>前面介绍过SQL语句基本的执行链路，这里我再把那张图拿过来，你也可以先简单看看这个图回顾下。首先，可以确定的说，查询语句的那一套流程，更新语句也是同样会走一遍。</p>
-<p><img src="/2024/09/09/MySQL02/image-20240909163544965.png" alt="image-20240909163544965"></p>
-<p>你执行语句前要<strong>先连接数据库，这是连接器的工作</strong>。</p>
-<p>前面我们说过，在一个表上有更新的时候，跟这个表有关的查询缓存会失效，<strong>所以这条语句就会把表T上所有缓存结果都清空。这也就是我们一般不建议使用查询缓存的原因</strong>。</p>
-<p>接下来，<strong>分析器</strong>会通过词法和语法解析知道这是一条更新语句。<strong>优化器</strong>决定要使用ID这个索引。然后，<strong>执行器</strong>负责具体执行，找到这一行，然后更新。</p>
-<p>与查询流程不一样的是，<strong>更新流程还涉及两个重要的日志模块</strong>，它们正是我们今天要讨论的主角：<strong>redo log（重做日志）和 binlog（归档日志）</strong>。如果接触MySQL，那这两个词肯定是绕不过的，我后面的内容里也会不断地和你强调。不过话说回来，redo log和binlog在设计上有很多有意思的地方，这些设计思路也可以用到你自己的程序里。</p>
-<h3 id="重要的日志模块：redo-log"><a href="#重要的日志模块：redo-log" class="headerlink" title="重要的日志模块：redo log"></a>重要的日志模块：redo log</h3><p>不知道你还记不记得《孔乙己》这篇文章，酒店掌柜有一个粉板，专门用来记录客人的赊账记录。如果赊账的人不多，那么他可以把顾客名和账目写在板上。但如果赊账的人多了，粉板总会有记不下的时候，这个时候掌柜一定还有一个专门记录赊账的账本。</p>
-<p>如果有人要赊账或者还账的话，掌柜一般有两种做法：</p>
+                <p> 今天我要跟你聊聊MySQL的锁。<strong>数据库锁设计的初衷是处理并发问题。</strong>作为多用户共享的资源，当出现并发访问的时候，<strong>数据库需要合理地控制资源的访问规则</strong>。而锁就是用来实现这些访问规则的重要数据结构。</p>
+<p><strong>根据加锁的范围，MySQL里面的锁大致可以分成全局锁、表级锁和行锁三类</strong>。今天这篇文章，我会和你分享全局锁和表级锁。而关于行锁的内容，我会留着在下一篇文章中再和你详细介绍。</p>
+<p>这里需要说明的是，锁的设计比较复杂，这两篇文章不会涉及锁的具体实现细节，主要介绍的是碰到锁时的现象和其背后的原理。</p>
+<h3 id="全局锁"><a href="#全局锁" class="headerlink" title="全局锁"></a>全局锁</h3><p>顾名思义，全局锁就是对<strong>整个数据库实例加锁</strong>。MySQL提供了一个加全局读锁的方法，命令是 Flush tables with read lock (FTWRL)。<strong>当你需要让整个库处于只读状态的时候，可以使用这个命令，之后其他线程的以下语句会被阻塞：数据更新语句（数据的增删改）、数据定义语句（包括建表、修改表结构等）和更新类事务的提交语句。</strong></p>
+<p><strong>全局锁的典型使用场景是，做全库逻辑备份。</strong>也就是把整库每个表都select出来存成文本。</p>
+<p>以前有一种做法，是通过FTWRL确保不会有其他线程对数据库做更新，然后对整个库做备份。<strong>注意，在备份过程中整个库完全处于只读状态。</strong></p>
+<p><strong>但是让整库都只读，听上去就很危险：</strong></p>
 <ul>
-<li>一种做法是直接把账本翻出来，把这次赊的账加上去或者扣除掉；</li>
-<li>另一种做法是先在粉板上记下这次的账，等打烊以后再把账本翻出来核算。</li>
+<li>如果你在主库上备份，<strong>那么在备份期间都不能执行更新，业务基本上就得停摆；</strong></li>
+<li>如果你在从库上备份，<strong>那么备份期间从库不能执行主库同步过来的binlog，会导致主从延迟。</strong></li>
 </ul>
-<p>在生意红火柜台很忙时，掌柜一定会选择后者，因为前者操作实在是太麻烦了。首先，你得找到这个人的赊账总额那条记录。你想想，密密麻麻几十页，掌柜要找到那个名字，可能还得带上老花镜慢慢找，找到之后再拿出算盘计算，最后再将结果写回到账本上。</p>
-<p>这整个过程想想都麻烦。相比之下，还是先在粉板上记一下方便。你想想，如果掌柜没有粉板的帮助，每次记账都得翻账本，效率是不是低得让人难以忍受？</p>
-<p>同样，在MySQL里也有这个问题，<strong>如果每一次的更新操作都需要写进磁盘，然后磁盘也要找到对应的那条记录，然后再更新，整个过程IO成本、查找成本都很高</strong>。为了解决这个问题，MySQL的设计者就用了类似酒店掌柜粉板的思路来提升更新效率。</p>
-<p><strong>而粉板和账本配合的整个过程，其实就是MySQL里经常说到的WAL技术，WAL的全称是Write-Ahead Logging，它的关键点就是先写日志，再写磁盘，也就是先写粉板，等不忙的时候再写账本。（这个其实也是为了避免写了磁盘之后没有时间来得急写日志，导致Log不一致的问题）</strong></p>
-<p>具体来说，当有一条记录需要更新的时候，<strong>InnoDB引擎就会先把记录写到redo log（粉板）里面，并更新内存，这个时候更新就算完成了</strong>。同时，InnoDB引擎会在<strong>适当</strong>的时候，将这个操作记录<strong>更新到磁盘</strong>里面，<strong>而这个更新往往是在系统比较空闲的时候做，这就像打烊以后掌柜做的事</strong>。</p>
-<p>如果今天赊账的不多，掌柜可以等打烊后再整理。但如果某天赊账的特别多，粉板写满了，又怎么办呢？这个时候掌柜只好放下手中的活儿，把粉板中的一部分赊账记录更新到账本中，然后把这些记录从粉板上擦掉，为记新账腾出空间。</p>
-<p>与此类似，<strong>InnoDB的redo log是固定大小的，比如可以配置为一组4个文件，每个文件的大小是1GB，那么这块“粉板”总共就可以记录4GB的操作。从头开始写，写到末尾就又回到开头循环写，如下面这个图所示。</strong></p>
-<p><img src="/2024/09/09/MySQL02/image-20240909164238628.png" alt="image-20240909164238628"></p>
-<p><strong>write pos是当前记录的位置</strong>，一边写一边后移，写到第3号文件末尾后就回到0号文件开头。<strong>checkpoint是当前要擦除的位置，也是往后推移并且循环的，擦除记录前要把记录更新到数据文件。（我记得之前好像看过一个类似的环形更新方法，反正Redis分布式采用的方法有一个是环形的）</strong></p>
-<p><strong>write pos和checkpoint之间的是“粉板”上还空着的部分，可以用来记录新的操作。如果write pos追上checkpoint，表示“粉板”满了，这时候不能再执行新的更新，得停下来先擦掉一些记录，把checkpoint推进一下。（有一点像JVM的STW）</strong></p>
-<p>有了redo log，<strong>InnoDB就可以保证即使数据库发生异常重启，之前提交的记录都不会丢失</strong>，这个能力称为<strong>crash-safe</strong>。（这玩意经常在面试中问，大概就是什么MySQL数据库突然断电了，怎么找回数据的）</p>
-<p>要理解crash-safe这个概念，可以想想我们前面赊账记录的例子。只要赊账记录记在了粉板上或写在了账本上，之后即使掌柜忘记了，比如突然<strong>停业</strong>几天，<strong>恢复</strong>生意后<strong>依然</strong>可以通过账本和粉板上的数据明确赊账账目。</p>
-<h3 id="重要的日志模块：binlog"><a href="#重要的日志模块：binlog" class="headerlink" title="重要的日志模块：binlog"></a>重要的日志模块：binlog</h3><p>前面我们讲过，MySQL整体来看，其实就有两块：一块是Server层，它主要做的是<strong>MySQL功能层面</strong>的事情；还有一块是引擎层，<strong>负责存储</strong>相关的具体事宜。上面我们聊到的粉板redo log是<strong>InnoDB引擎特有的日志</strong>，而<strong>Server层也有自己的日志，称为binlog（归档日志）</strong>。</p>
-<p>我想你肯定会问，为什么会有两份日志呢？</p>
-<p>因为<strong>最开始</strong>MySQL里<strong>并没有InnoDB引擎</strong>。<strong>MySQL自带的引擎是MyISAM</strong>，但是MyISAM<strong>没有</strong>crash-safe的能力，binlog日志只能用于归档。而InnoDB是另一个公司以插件形式引入MySQL的，既然只依靠binlog是没有crash-safe能力的，所以InnoDB使用另外一套日志系统——也就是redo log来实现crash-safe能力。</p>
-<p>这两种日志有以下三点不同。</p>
-<ol>
-<li>从引擎来看：<strong>redo log是InnoDB引擎特有的</strong>；<strong>binlog是MySQL的Server层实现的，所有引擎都可以使用。</strong></li>
-<li>从日志类型来看：<strong>redo log是物理日志</strong>，记录的是“在某个数据页上做了什么修改”；<strong>binlog是逻辑日志</strong>，记录的是这个语句的原始逻辑，比如“给ID&#x3D;2这一行的c字段加1 ”。<strong>（这个binlog记录的逻辑日志和Redis的AOF（Append Only File）挺类似的）</strong></li>
-<li>从空间使用来看：<strong>redo log是循环写的，空间固定会用完；binlog是可以追加写入的。“追加写”是指binlog文件写到一定大小后会切换到下一个，并不会覆盖以前的日志。</strong></li>
-</ol>
-<p>有了对这两个日志的概念性理解，我们再来看执行器和InnoDB引擎在执行这个简单的update语句时的内部流程。</p>
-<ol>
-<li>执行器先找引擎取ID&#x3D;2这一行。ID是主键，<strong>引擎直接用树（B+树）搜索找到这一行</strong>。如果ID&#x3D;2这一行所在的数据页本来就在内存中，就直接返回给执行器；否则，需要先从磁盘读入内存，然后再返回。</li>
-<li>执行器拿到引擎给的行数据，把这个值加上1，比如原来是N，现在就是N+1，得到新的一行数据，再调用引擎接口写入这行新数据。<strong>（这个有点类似用户态和内核态，写入之类的不安全操作交给操作系统内核执行）</strong></li>
-<li>引擎将这行新数据<strong>更新到内存</strong>中，同时将这个<strong>更新操作记录到redo log</strong>里面，<strong>此时redo log处于prepare状态</strong>。<strong>然后告知执行器执行完成了，随时可以提交事务</strong>。</li>
-<li><strong>执行器生成这个操作的binlog，并把binlog写入磁盘。</strong></li>
-<li>执行器调用引擎的提交事务接口，<strong>引擎把刚刚写入的redo log改成提交（commit）状态</strong>，更新完成。</li>
-</ol>
-<p>这里我给出这个update语句的执行流程图，图中浅色框表示是在InnoDB内部执行的<strong>（反正只要是执行写操作就一定是在InnoDB中执行的，它这里深色表示只是代表调用了引擎的接口）</strong>，<strong>深色框表示是在执行器</strong>中执行的。</p>
-<p><img src="/2024/09/09/MySQL02/image-20240909165928810.png" alt="image-20240909165928810"></p>
-<p>你可能注意到了，最后三步看上去有点“绕”，<strong>将redo log的写入拆成了两个步骤</strong>：<strong>prepare和commit</strong>，这就是”两阶段提交”。（搞半天原来后面讲了）</p>
-<h3 id="两阶段提交"><a href="#两阶段提交" class="headerlink" title="两阶段提交"></a>两阶段提交</h3><p>为什么必须有“两阶段提交”呢？<strong>这是为了让两份日志之间的逻辑一致。</strong>要说明这个问题，我们得从文章开头的那个问题说起：<strong>怎样让数据库恢复到半个月内任意一秒的状态？</strong></p>
-<p>前面我们说过了，binlog会记录所有的逻辑操作，并且是采用“追加写”的形式。如果你的DBA承诺说半个月内可以恢复，那么备份系统中一定会保存最近半个月的所有binlog，<strong>同时系统会定期做整库备份。这里的“定期”取决于系统的重要性，可以是一天一备，也可以是一周一备。</strong></p>
-<p>当需要恢复到指定的某一秒时，比如某天下午两点发现中午十二点有一次误删表，<strong>需要找回数据</strong>，那你可以这么做：</p>
-<ul>
-<li>首先，找到最近的一次全量备份，如果你运气好，可能就是昨天晚上的一个备份，<strong>从这个备份恢复到临时库</strong>；</li>
-<li><strong>然后，从备份的时间点开始，将备份的binlog依次取出来，重放到中午误删表之前的那个时刻。</strong></li>
-</ul>
-<p><strong>这里的思路挺像Docker的镜像构建方式的，都是将一个基础的东西作为我们的基石，然后再在上面加东西</strong></p>
-<p><strong>这样你的临时库就跟误删之前的线上库一样了，然后你可以把表数据从临时库取出来，按需要恢复到线上库去。</strong></p>
-<p>好了，说完了数据恢复过程，我们回来说说，为什么日志需要“两阶段提交”。这里不妨用反证法来进行解释。</p>
-<p>由于redo log和binlog是两个独立的逻辑，如果不用两阶段提交，<strong>要么就是先写完redo log再写binlog</strong>，或者采用反过来的顺序。我们看看这两种方式会有什么问题。</p>
-<p>仍然用前面的update语句来做例子。假设当前ID&#x3D;2的行，字段c的值是0，再假设执行update语句过程中在写完第一个日志后，第二个日志还没有写完期间发生了crash，会出现什么情况呢？</p>
-<ol>
-<li><strong>先写redo log后写binlog</strong>。假设在redo log写完，binlog还没有写完的时候，MySQL进程异常重启。由于我们前面说过的，redo log写完之后，系统即使崩溃，仍然能够把数据恢复回来，所以恢复后这一行c的值是1。 <strong>但是由于binlog没写完就crash了，这时候binlog里面就没有记录这个语句。因此，之后备份日志的时候，存起来的binlog里面就没有这条语句。 然后你会发现，如果需要用这个binlog来恢复临时库的话，由于这个语句的binlog丢失，这个临时库就会少了这一次更新，恢复出来的这一行c的值就是0，与原库的值不同</strong>。</li>
-<li><strong>先写binlog后写redo log</strong>。如果在binlog写完之后crash，由于redo log还没写，崩溃恢复以后这个事务无效，所以这一行c的值是0。但是binlog里面已经记录了“把c从0改成1”这个日志。所以，在之后用binlog来恢复的时候就多了一个事务出来，恢复出来的这一行c的值就是1，<strong>与原库的值不同</strong>。</li>
-</ol>
-<p><strong>看样子意思是binlog才能恢复一个完整的数据库，redo log一般用于恢复数据库突然故障丢失的数据</strong></p>
-<p><strong>可以看到，如果不使用“两阶段提交”，那么数据库的状态就有可能和用它的日志恢复出来的库的状态不一致。</strong></p>
-<p>你可能会说，这个概率是不是很低，平时也没有什么动不动就需要<strong>恢复临时库</strong>的场景呀？</p>
-<p>其实不是的，<strong>不只是误操作后需要用这个过程来恢复数据</strong>。当你需要<strong>扩容</strong>的时候，也就是需要<strong>再多搭建一些备库来增加系统的读能力的时候</strong>，现在常见的做法也是用<strong>全量备份</strong>加上<strong>应用binlog</strong>来实现的，<strong>这个“不一致”就会导致你的线上出现主从数据库不一致的情况</strong>。</p>
-<p><strong>简单说，redo log和binlog都可以用于表示事务的提交状态，而两阶段提交就是让这两个状态保持逻辑上的一致。</strong></p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>介绍了MySQL里面最重要的两个日志，<strong>即物理日志redo log和逻辑日志binlog</strong>。</p>
-<p><strong>redo log用于保证crash-safe能力</strong>。<strong>innodb_flush_log_at_trx_commit</strong>这个参数设置成1的时候，表示每次事务的redo log都直接持久化到磁盘。<strong>这个参数我建议你设置成1，这样可以保证MySQL异常重启之后数据不丢失。</strong></p>
-<p><strong>sync_binlog这个参数设置成1的时候，表示每次事务的binlog都持久化到磁盘。这个参数也建议你设置成1，这样可以保证MySQL异常重启之后binlog不丢失。</strong></p>
-<p>此外还介绍了与MySQL日志系统密切相关的“两阶段提交”。两阶段提交是跨系统<strong>维持数据逻辑一致性</strong>时<strong>常用</strong>的一个方案，即使你不做数据库内核开发，<strong>日常开发</strong>中也有可能会用到。</p>
-<p>前面说到定期全量备份的周期“取决于系统重要性，有的是一天一备，有的是一周一备”。那么在什么场景下，一天一备会比一周一备更有优势呢？或者说，它影响了这个数据库系统的哪个指标？</p>
-<p>补充资料：（小林Coding写的还是比较详细的）</p>
-<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_63566550/article/details/129819638">【MySQL】一文彻底搞懂 Redo-log 为什么要两阶段提交？_mysql redolog两阶段提交-CSDN博客</a></p>
-<p>把这篇文章比较重要的东西提取到下面了：</p>
-<p>两阶段提交的过程是怎样的？</p>
-<p>相信大家应该听说过<code>MySQL</code>事务两阶段提交方案，啥叫做事务两阶段提交呢？实则是指<code>Redo-log</code>分两次写入，如下：</p>
-<p><img src="/2024/09/09/MySQL02/image-20240909191851549.png" alt="image-20240909191851549"></p>
-<p>从图中可看出，事务的提交过程有两个阶段，<strong>就是将 redo log 的写入拆成了两个步骤：prepare 和 commit</strong>，<strong>中间再穿插写入binlog</strong>，具体如下：</p>
-<ul>
-<li><strong>prepare 阶段：</strong>将 XID（内部 XA 事务的 ID） 写入到 redo log，<strong>同时将 redo log 对应的事务状态设置为 prepare，然后将 redo log 持久化到磁盘（innodb_flush_log_at_trx_commit &#x3D; 1 的作用）；</strong></li>
-<li><strong>commit 阶段：</strong>把 XID 写入到 binlog，然后<strong>将 binlog 持久化到磁盘（sync_binlog &#x3D; 1 的作用），</strong>接着调用引擎的提交事务接口，<strong>将 redo log 状态设置为 commit</strong>，此时该状态并<strong>不需要持久化</strong>到磁盘，<strong>只需要 write 到文件系统的 page cache 中就够了</strong>，因为只要 binlog 写磁盘成功，就算 redo log 的状态还是 prepare 也没有关系，<strong>一样会被认为事务已经执行成功；</strong></li>
-</ul>
-<p>为什么需要两阶段提交？</p>
+<p>看来加全局锁不太好。但是细想一下，备份为什么要加锁呢？我们来看一下不加锁会有什么问题。</p>
+<p>假设你现在要维护“极客时间”的购买系统，关注的是用户账户余额表和用户课程表。</p>
+<p><strong>现在发起一个逻辑备份。假设备份期间，有一个用户，他购买了一门课程，业务逻辑里就要扣掉他的余额，然后往已购课程里面加上一门课。</strong></p>
+<p>如果时间顺序上是先备份账户余额表(u_account)，然后用户购买，然后备份用户课程表(u_course)，会怎么样呢？你可以看一下这个图：</p>
+<p><img src="/2024/09/10/MySQL06/image-20240910114231615.png" alt="image-20240910114231615"></p>
+<p><strong>可以看到，这个备份结果里，用户A的数据状态是“账户余额没扣，但是用户课程表里面已经多了一门课”。如果后面用这个备份来恢复数据的话，用户A就发现，自己赚了。</strong></p>
+<p>作为用户可别觉得这样可真好啊，你可以试想一下：如果备份表的顺序反过来，先备份用户课程表再备份账户余额表，又可能会出现什么结果？</p>
+<p><strong>也就是说，不加锁的话，备份系统备份的得到的库不是一个逻辑时间点，这个视图是逻辑不一致的。（所以在全库逻辑备份的时候要STW，得到那一个时间点的快照数据）</strong></p>
+<p>说到视图你肯定想起来了，我们在前面讲事务隔离的时候，其实是有一个方法能够拿到一致性视图的（还记得是通过undo log实现的），对吧？</p>
+<p><strong>是的，就是在可重复读隔离级别下开启一个事务。</strong></p>
 <blockquote>
-<p>其实想要弄明白这个问题，要结合bin-log日志一起来聊。</p>
+<p>备注：如果你对事务隔离级别的概念不是很清晰的话，可以再回顾一下第3篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68963">《事务隔离：为什么你改了我还看不见？》</a>中的相关内容。</p>
 </blockquote>
-<p>如果只写一次的话，那到底先写bin-log还是redo-log呢？</p>
+<p><strong>官方自带的逻辑备份工具是mysqldump。当mysqldump使用参数–single-transaction的时候，导数据之前就会启动一个事务，来确保拿到一致性视图。</strong>而由于MVCC的支持，这个过程中数据是可以正常更新的。</p>
+<p>你一定在疑惑，有了这个功能，为什么还需要FTWRL呢？<strong>一致性读是好，但前提是引擎要支持这个隔离级别。</strong>比如，对于<strong>MyISAM这种不支持事务的引擎（事务这一层面的东西是在存储引擎中实现的）</strong>，如果备份过程中有更新，<strong>总是只能取到最新的数据，那么就破坏了备份的一致性。</strong>这时，我们就需要使用FTWRL命令了。</p>
+<p>所以，<strong>single-transaction方法只适用于所有的表使用事务引擎的库。</strong>如果有的表使用了<strong>不支持事务</strong>的引擎，那么备份就<strong>只能通过FTWRL方法</strong>。这往往是<strong>DBA要求业务开发人员使用InnoDB替代MyISAM的原因之一</strong>。</p>
+<p>你也许会问，<strong>既然要全库只读，为什么不使用set global readonly&#x3D;true的方式呢</strong>？确实readonly方式也可以让全库进入只读状态，<strong>但我还是会建议你用FTWRL方式</strong>，主要有两个原因：</p>
 <ul>
-<li><strong>先写bin-log，再写redo-log：</strong>当事务提交后，先写bin-log成功，结果在写redo-log时断电宕机了，再重启后由于redo-log中没有该事务的日志记录，因此不会恢复该事务提交的数据。但要注意，主从架构中同步数据是使用bin-log来实现的，而宕机前bin-log写入成功了，就代表这个事务提交的数据会被同步到从机，<strong>也就意味着从机会比主机多出一条数据。</strong></li>
-<li><strong>先写redo-log，再写bin-log：</strong>当事务提交后，先写redo-log成功，但在写bin-log时宕机了，主节点重启后，会根据redo-log恢复数据，但从机依旧是依赖bin-log来同步数据的，因此从机无法将这个事务提交的数据同步过去，毕竟bin-log中没有撒，<strong>最终从机会比主机少一条数据。</strong></li>
+<li><strong>一是，在有些系统中，readonly的值会被用来做其他逻辑，比如用来判断一个库是主库还是备库。</strong>因此，修改global变量的方式<strong>影响面更大</strong>，我不建议你使用。</li>
+<li><strong>二是，在异常处理机制上有差异。</strong>如果执行FTWRL命令之后由于<strong>客户端发生异常断开</strong>，那么MySQL会<strong>自动释放这个全局锁</strong>，整个库回到可以正常更新的状态。而将整个库设置为readonly之后，<strong>如果客户端发生异常，则数据库就会一直保持readonly状态，这样会导致整个库长时间处于不可写状态，风险较高。</strong></li>
 </ul>
-<p>经过上述分析后可得知：如果redo-log<strong>只写一次</strong>，那不管谁先写，<strong>都有可能造成主从同步数据时的不一致问题</strong>出现，<strong>为了解决该问题，redo-log就被设计成了两阶段提交模式</strong>，设置成两阶段提交后，整个执行过程有三处崩溃点：</p>
+<p><strong>业务的更新不只是增删改数据（DML)，还有可能是加字段等修改表结构的操作（DDL）。不论是哪种方法，一个库被全局锁上以后，你要对里面任何一个表做加字段操作，都是会被锁住的。</strong></p>
+<p>但是，<strong>即使没有被全局锁住</strong>，加字段也不是就能一帆风顺的，因为你还会碰到接下来我们要介绍的表级锁。</p>
+<h3 id="表级锁"><a href="#表级锁" class="headerlink" title="表级锁"></a>表级锁</h3><p>MySQL里面表级别的锁有两种：一种是表锁，一种是元数据锁（meta data lock，MDL)。</p>
+<p><strong>表锁的语法是 lock tables … read&#x2F;write。</strong>与FTWRL类似，可以用<strong>unlock tables主动释放锁</strong>，也可以在客户端断开的时候<strong>自动释放</strong>。需要注意，lock tables语法除了会限制别的线程的读写外，<strong>也限定了本线程接下来的操作对象</strong>。</p>
+<p>举个例子, 如果在某个线程A中执行lock tables t1 read, t2 write; 这个语句，则其他线程写t1、读写t2的语句都会被阻塞。<strong>同时，线程A在执行unlock tables之前，也只能执行读t1、读写t2的操作。连写t1都不允许，自然也不能访问其他表。（简单的说，你对于你自己锁住的资源要负责，不能在锁还没有释放的时候就访问其他的资源）</strong></p>
+<p>在还没有出现更细粒度的锁的时候，<strong>表锁是最常用的处理并发的方式。而对于InnoDB这种支持行锁的引擎，一般不使用lock tables命令来控制并发，毕竟锁住整个表的影响面还是太大。</strong></p>
+<p><strong>另一类表级的锁是MDL（metadata lock)。</strong>MDL<strong>不需要显式使用</strong>，在访问一个表的时候会<strong>被自动加上</strong>。MDL的作用是，<strong>保证读写的正确性</strong>。你可以想象一下，如果一个查询正在遍历一个表中的数据，而执行期间另一个线程对这个表结构做变更，删了一列，那么查询线程拿到的结果跟表结构对不上，肯定是不行的。</p>
+<p>因此，在MySQL 5.5版本中引入了MDL，<strong>当对一个表做增删改查操作的时候，加MDL读锁；当要对表做结构变更操作的时候，加MDL写锁。</strong></p>
+<p>关于读锁和写锁，这里有比较详细的介绍</p>
+<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_44766883/article/details/105879308">mysql的锁机制(读锁，写锁，表锁，行锁，悲观锁，乐观锁，间隙锁)_mysql 读锁 写锁 兼容性-CSDN博客</a></p>
 <ul>
-<li>redo-log(prepare)：在写入准备状态的redo记录时宕机，事务还未提交，<strong>不会影响一致性</strong>。</li>
-<li>bin-log：在写bin记录时崩溃，重启后会根据redo记录中的事务ID，<strong>回滚</strong>前面已写入的数据。（然后会继续执行这个过程）</li>
-<li>redo-log(commit)：在bin-log写入成功后，<strong>写redo(commit)记录时崩溃</strong>，因为bin-log中已经写入成功了，<strong>所以从机也可以同步数据，因此重启时直接再次提交事务</strong>，写入一条redo(commit)记录即可。（这种commit一半没有成功的，之后再commit一次就行了）</li>
+<li>读锁之间不互斥，<strong>这意味着多个线程可以同时对同一张表进行读取操作，而不会相互阻塞。（对同一个数据，多个读操作可以同时进行，互不干扰。加锁的会话只能对此表进行读操作,其他会话也只能进行读操作。）</strong></li>
+<li>读写锁之间、写锁之间是互斥的，用来保证变更表结构操作的安全性。<strong>因此，如果有两个线程要同时给一个表加字段，其中一个要等另一个执行完才能开始执行。（如果当前写操作没有完毕，则无法进行其他的读操作、写操作。当前会话只能对此表进行读,写操作,其他会话无法进行任何操作。）</strong></li>
 </ul>
-<p>通过这种两阶段提交的方案，就能够确保redo-log、bin-log两者的日志数据是相同的，<strong>bin-log中有的主机再恢复，如果bin-log没有则直接回滚主机上写入的数据，确保整个数据库系统的数据一致性。</strong></p>
+<p>虽然<strong>MDL锁是系统默认会加的，但却是你不能忽略的一个机制</strong>。比如下面这个例子，我经常看到有人掉到这个坑里：<strong>给一个小表加个字段，导致整个库挂了。</strong></p>
+<p>你肯定知道，<strong>给一个表加字段，或者修改字段，或者加索引，需要扫描全表的数据</strong>。在对大表操作的时候，你肯定会特别小心，以免对线上服务造成影响。而实际上，即使是小表，操作不慎也会出问题。我们来看一下下面的操作序列，假设表t是一个小表。</p>
 <blockquote>
-<p>OK~,最后再简单补充一点：为什么bin-log又被叫做二进制日志呢？因为记录日志时，MySQL写入的是二进制数据，而并非字符数据，也就意味着直接用cat&#x2F;vim这类工具是无法打开的，必须要通过MySQL提供的mysqlbinlog工具解析查看。</p>
+<p>备注：这里的实验环境是MySQL 5.6。</p>
 </blockquote>
-<p>两阶段提交有什么问题？</p>
-<p>两阶段提交虽然保证了两个日志文件的数据一致性，但是性能很差，主要有两个方面的影响：</p>
+<p><img src="/2024/09/10/MySQL06/image-20240910115825808.png" alt="image-20240910115825808"></p>
+<p>我们可以看到session A先启动，<strong>这时候会对表t加一个MDL读锁</strong>。<strong>由于session B需要的也是MDL读锁，因此可以正常执行。</strong></p>
+<p>之后session C会被blocked，是因为session A的MDL读锁还没有释放，<strong>而session C需要MDL写锁，因此只能被阻塞</strong>。</p>
+<p>如果只有session C自己被阻塞还没什么关系，但是之后所有<strong>要在表t上新申请MDL读锁的请求也会被session C阻塞。前面我们说了，所有对表的增删改操作都需要先申请MDL写锁，如果session C自己阻塞了，就会导致后面的session都被锁住，等于这个表现在完全不可读写了。</strong></p>
+<p>如果某个表上的<strong>查询语句频繁</strong>，而且客户端有重试机制，<strong>也就是说超时后会再起一个新session再请求的话，这个库的线程很快就会爆满。</strong></p>
+<p>你现在应该知道了，事务中的MDL锁，<strong>在语句执行开始时申请，但是语句结束后并不会马上释放，而会等到整个事务提交后再释放。</strong></p>
+<p>基于上面的分析，我们来讨论一个问题，<strong>如何安全地给小表加字段？</strong></p>
+<p><strong>首先我们要解决长事务，事务不提交，就会一直占着MDL锁。</strong>在MySQL的information_schema 库的 innodb_trx 表中，你可以查到当前执行中的事务。<strong>如果你要做DDL变更的表刚好有长事务在执行，要考虑先暂停DDL，或者kill掉这个长事务。</strong></p>
+<p>但考虑一下这个场景。<strong>如果你要变更的表是一个热点表，虽然数据量不大，但是上面的请求很频繁，而你不得不加个字段，你该怎么做呢？</strong></p>
+<p>这时候kill可能未必管用，<strong>因为新的请求马上就来了</strong>。比较理想的机制是，在alter table语句里面设定等待时间，<strong>如果在这个指定的等待时间里面能够拿到MDL写锁最好</strong>，拿不到也不要阻塞后面的业务语句，<strong>先放弃。之后开发人员或者DBA再通过重试命令重复这个过程</strong>。</p>
+<p>MariaDB已经合并了<a target="_blank" rel="noopener" href="https://github.com/alibaba/AliSQL">AliSQL</a>的这个功能，所以这两个开源分支目前都支持DDL NOWAIT&#x2F;WAIT n这个语法。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ALTER TABLE tbl_name NOWAIT add column ...</span><br><span class="line">ALTER TABLE tbl_name WAIT N add column ... </span><br></pre></td></tr></table></figure>
+
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天介绍了MySQL的全局锁和表级锁。</p>
+<p><strong>全局锁主要用在逻辑备份过程中。对于全部是InnoDB引擎的库，我建议你选择使用–single-transaction参数，对应用会更友好。</strong></p>
+<p><strong>表锁一般是在数据库引擎不支持行锁的时候才会被用到的。</strong>如果你发现你的应用程序里有lock tables这样的语句，你需要追查一下，比较可能的情况是：</p>
 <ul>
-<li>磁盘 I&#x2F;O 次数高：对于“双1”配置，<strong>每个事务提交都会进行两次 fsync（刷盘），一次是 redo log 刷盘，另一次是 binlog 刷盘。</strong></li>
-<li>锁竞争激烈：两阶段提交虽然能够保证「单事务」两个日志的内容一致，但在「多事务」的情况下，却不能保证两者的提交顺序一致，因此，在两阶段提交的流程基础上，还需要加一个锁来保证提交的原子性，从而保证多事务的情况下，两个日志的提交顺序一致。</li>
+<li><strong>要么是你的系统现在还在用MyISAM这类不支持事务的引擎，那要安排升级换引擎；</strong></li>
+<li>要么是你的引擎升级了，但是代码还没升级。我见过这样的情况，<strong>最后业务开发就是把lock tables 和 unlock tables 改成 begin 和 commit，问题就解决了。</strong></li>
 </ul>
-<p>为什么两阶段提交的磁盘 <strong>I&#x2F;O 次数会很高</strong>？</p>
-<p>binlog 和 redo log 在内存中都对应的缓存空间，binlog 会缓存在 binlog cache，redo log 会缓存在 redo log buffer，它们持久化到磁盘的时机分别由下面这两个参数控制。一般我们为了避免日志丢失的风险，会将这两个参数设置为 1：</p>
+<p><strong>MDL会直到事务提交才释放，在做表结构变更的时候，你一定要小心，不要锁住整张表导致线上查询和更新出现阻塞。</strong></p>
+<p>备份一般都会在备库上执行，你在用–single-transaction方法做逻辑备份的过程中，如果主库上的一个小表做了一个DDL，比如给一个表上加了一列。这时候，从备库上会看到什么现象呢？</p>
+<p>说明：这篇文章没有介绍到物理备份，<strong>物理备份会有一篇单独的文章</strong>。</p>
+<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期的问题是关于对联合主键索引和InnoDB索引组织表的理解。</p>
+<p><img src="/2024/09/10/MySQL06/image-20240910123652692.png" alt="image-20240910123652692"></p>
+<p>主键 a，b的聚簇索引组织顺序相当于 order by a,b ，也就是先按a排序，再按b排序，c无序。</p>
+<p>索引 ca 的组织是先按c排序，再按a排序，同时记录主键 </p>
+<p><img src="/2024/09/10/MySQL06/image-20240910123710753.png" alt="image-20240910123710753"></p>
+<p>这个跟索引c的数据是一模一样的。</p>
+<p>索引 cb 的组织是先按c排序，在按b排序，同时记录主键 </p>
+<p><img src="/2024/09/10/MySQL06/image-20240910123725156.png" alt="image-20240910123725156"></p>
+<p><strong>所以，结论是ca可以去掉，cb需要保留。确实有道理，因为现在已经有了a索引，（a，b）索引，c索引，（c，a）索引，（c，b）索引了，（c，a）索引 &#x3D;&#x3D; c索引加上a索引，所以多余的这个ca可以去掉。</strong></p>
+<p>MRR优化—这篇文章讲的还可以，建议看一下</p>
+<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/110154066">MySQL 的 MRR 到底是什么？ - 知乎 (zhihu.com)</a></p>
+<p>把这篇文章的尾声搬了一下：</p>
 <ul>
-<li>当 sync_binlog &#x3D; 1 的时候，表示每次提交事务都会将 binlog cache 里的 binlog 直接持久到磁盘；</li>
-<li>当 innodb_flush_log_at_trx_commit &#x3D; 1 时，表示每次事务提交时，都将缓存在 redo log buffer 里的 redo log 直接持久化到磁盘；</li>
+<li>MRR 跟索引有很大的关系。</li>
+<li><strong>索引是 MySQL 对查询做的一个优化，把原本杂乱无章的数据，用有序的结构组织起来，让全表扫描变成有章可循的查询。</strong></li>
+<li><strong>而我们讲的 MRR，则是 MySQL 对基于索引的查询做的一个的优化，可以说是对优化的优化了。</strong></li>
+<li>要优化 MySQL 的查询，就得先知道 MySQL 的查询过程；而要优化索引的查询，则要知道 MySQL 索引的原理。</li>
 </ul>
-<p><strong>可以看到，如果 sync_binlog 和 当 innodb_flush_log_at_trx_commit 都设置为 1，那么在每个事务提交过程中， 都会至少调用 2 次刷盘操作，一次是 redo log 刷盘，一次是 binlog 落盘，所以这会成为性能瓶颈。</strong></p>
-<p>为什么锁竞争激烈？</p>
-<p>在早期的 MySQL 版本中，通过使用 prepare_commit_mutex 互斥锁来保证事务提交的顺序，<strong>在一个事务获取到锁时才能进入 prepare 阶段，一直到 commit 阶段结束才能释放锁，下个事务才可以继续进行 prepare 操作。</strong></p>
-<p><strong>通过加锁虽然完美地解决了顺序一致性的问题，但在并发量较大的时候，就会导致对锁的争用，性能不佳。</strong></p>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/02-ri-zhi-xi-tong-yi-tiao-sql-geng-xin-yu-ju-shi-ru-he-zhi-hang-de">02 日志系统：一条SQL更新语句是如何执行的？ | MySql实战45讲 (gitbook.io)</a></p>
+<p>文中的两个图画的很好</p>
+<p><img src="/2024/09/10/MySQL06/image-20240910130042818.png" alt="image-20240910130042818"></p>
+<p><img src="/2024/09/10/MySQL06/image-20240910130053955.png" alt="image-20240910130053955"></p>
+<p>总结：</p>
+<ul>
+<li>MRR，全称「Multi-Range Read Optimization」。</li>
+<li>简单说：<strong>MRR 通过把「随机磁盘读」，转化为「<a target="_blank" rel="noopener" href="https://zhida.zhihu.com/search?q=%E9%A1%BA%E5%BA%8F%E7%A3%81%E7%9B%98&zhida_source=entity&is_preview=1">顺序磁盘</a>读」，从而提高了索引查询的性能。</strong></li>
+</ul>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/06-quan-ju-suo-he-biao-suo-gei-biao-jia-ge-zi-duan-zen-mo-you-zhe-mo-duo-zu-ai">06 全局锁和表锁 ：给表加个字段怎么有这么多阻碍？ | MySql实战45讲 (gitbook.io)</a></p>
 
                 
             </div>
@@ -541,7 +516,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/09/MySQL02/">http://example.com/2024/09/09/MySQL02/</a>
+                    <a href="http://example.com/2024/09/10/MySQL06/">http://example.com/2024/09/10/MySQL06/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -926,17 +901,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/09/MySQL03/">
+                <a href="/2024/09/10/MySQL06/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/9.jpg" class="responsive-img" alt="事务隔离：为什么你改了我还看不见？">
+                        <img src="/medias/featureimages/12.jpg" class="responsive-img" alt="全局锁和表锁 ：给表加个字段怎么有这么多阻碍？">
                         
-                        <span class="card-title">事务隔离：为什么你改了我还看不见？</span>
+                        <span class="card-title">全局锁和表锁 ：给表加个字段怎么有这么多阻碍？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -946,9 +922,9 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-09
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
@@ -961,6 +937,7 @@
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
@@ -979,13 +956,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/09/MySQL01/">
+                <a href="/2024/09/10/MySQL05/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/16.jpg" class="responsive-img" alt="一条SQL查询语句是如何执行的？">
+                        <img src="/medias/featureimages/10.jpg" class="responsive-img" alt="深入浅出索引（下）">
                         
-                        <span class="card-title">一条SQL查询语句是如何执行的？</span>
+                        <span class="card-title">深入浅出索引（下）</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -996,7 +973,7 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-09
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
                             </span>
                         <span class="publish-author">
                             
