@@ -359,7 +359,7 @@
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    4.2k
+                    4.1k
                 </div>
                 
 
@@ -433,50 +433,52 @@
 </ol>
 <p>所以，InnoDB需要有控制脏页比例的机制，来尽量避免上面的这两种情况。</p>
 <h3 id="InnoDB刷脏页的控制策略"><a href="#InnoDB刷脏页的控制策略" class="headerlink" title="InnoDB刷脏页的控制策略"></a>InnoDB刷脏页的控制策略</h3><p>接下来，我就来和你说说InnoDB脏页的控制策略，以及和这些策略相关的参数。</p>
-<p>首先，你要正确地告诉InnoDB所在主机的IO能力，这样InnoDB才能知道需要全力刷脏页的时候，可以刷多快。</p>
-<p>这就要用到innodb_io_capacity这个参数了，它会告诉InnoDB你的磁盘能力。这个值我建议你设置成磁盘的IOPS。磁盘的IOPS可以通过fio这个工具来测试，下面的语句是我用来测试磁盘随机读写的命令：</p>
+<p><strong>首先，你要正确地告诉InnoDB所在主机的IO能力，这样InnoDB才能知道需要全力刷脏页的时候，可以刷多快。</strong></p>
+<p>这就要用到<strong>innodb_io_capacity这个参数了，它会告诉InnoDB你的磁盘能力</strong>。<strong>这个值我建议你设置成磁盘的IOPS。磁盘的IOPS可以通过fio这个工具来测试，下面的语句是我用来测试磁盘随机读写的命令：</strong></p>
+<p>关于IOPS可以看看这篇文章：</p>
+<ul>
+<li><p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/668976764">一文读懂：IOPS、延迟和吞吐量等存储性能指标 - 知乎 (zhihu.com)</a></p>
+<p><strong>我们举个简单的栗子</strong>，就像我们上班坐地铁一样，<strong>地铁上一个和下一个人可以看作存储系统的I&#x2F;O，IOPS就相当于（地铁上的人+地铁下的人）&#x2F;停留时间（秒）。</strong></p>
+</li>
+</ul>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">fio -filename=$filename -direct=1 -iodepth 1 -thread -rw=randrw -ioengine=psync -bs=16k -size=500M -numjobs=10 -runtime=10 -group_reporting -name=mytest </span><br></pre></td></tr></table></figure>
 
-<p>其实，因为没能正确地设置innodb_io_capacity参数，而导致的性能问题也比比皆是。之前，就曾有其他公司的开发负责人找我看一个库的性能问题，说MySQL的写入速度很慢，TPS很低，但是数据库主机的IO压力并不大。经过一番排查，发现罪魁祸首就是这个参数的设置出了问题。</p>
-<p>他的主机磁盘用的是SSD，但是innodb_io_capacity的值设置的是300。于是，InnoDB认为这个系统的能力就这么差，所以刷脏页刷得特别慢，甚至比脏页生成的速度还慢，这样就造成了脏页累积，影响了查询和更新性能。</p>
-<p>虽然我们现在已经定义了“全力刷脏页”的行为，但平时总不能一直是全力刷吧？毕竟磁盘能力不能只用来刷脏页，还需要服务用户请求。所以接下来，我们就一起看看InnoDB怎么控制引擎按照“全力”的百分比来刷脏页。</p>
+<p>其实，<strong>因为没能正确地设置innodb_io_capacity参数，而导致的性能问题也比比皆是</strong>。之前，就曾有其他公司的开发负责人找我看一个库的性能问题，说<strong>MySQL的写入速度很慢，TPS很低，但是数据库主机的IO压力并不大。经过一番排查，发现罪魁祸首就是这个参数的设置出了问题</strong>。</p>
+<p>他的主机磁盘用的是SSD，<strong>但是innodb_io_capacity的值设置的是300。于是，InnoDB认为这个系统的能力就这么差，所以刷脏页刷得特别慢，甚至比脏页生成的速度还慢，这样就造成了脏页累积，影响了查询和更新性能</strong>。</p>
+<p><strong>虽然我们现在已经定义了“全力刷脏页”的行为，但平时总不能一直是全力刷吧？毕竟磁盘能力不能只用来刷脏页，还需要服务用户请求。所以接下来，我们就一起看看InnoDB怎么控制引擎按照“全力”的百分比来刷脏页。</strong></p>
 <p>根据我前面提到的知识点，试想一下，<strong>如果你来设计策略控制刷脏页的速度，会参考哪些因素呢？</strong></p>
-<p>这个问题可以这么想，如果刷太慢，会出现什么情况？首先是内存脏页太多，其次是redo log写满。</p>
-<p>所以，InnoDB的刷盘速度就是要参考这两个因素：一个是脏页比例，一个是redo log写盘速度。</p>
+<p>这个问题可以这么想，如果刷太慢，会出现什么情况？<strong>首先是内存脏页太多，其次是redo log写满。</strong></p>
+<p>所以，InnoDB的刷盘速度就是要参考这两个因素：<strong>一个是脏页比例，一个是redo log写盘速度。</strong></p>
 <p>InnoDB会根据这两个因素先单独算出两个数字。</p>
 <p>参数innodb_max_dirty_pages_pct是脏页比例上限，默认值是75%。InnoDB会根据当前的脏页比例（假设为M），算出一个范围在0到100之间的数字，计算这个数字的伪代码类似这样：</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">F1(M)</span><br><span class="line">&#123;</span><br><span class="line">  if M&gt;=innodb_max_dirty_pages_pct then</span><br><span class="line">      return 100;</span><br><span class="line">  return 100*M/innodb_max_dirty_pages_pct;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>InnoDB每次写入的日志都有一个序号，当前写入的序号跟checkpoint对应的序号之间的差值，我们假设为N。InnoDB会根据这个N算出一个范围在0到100之间的数字，这个计算公式可以记为F2(N)。F2(N)算法比较复杂，你只要知道N越大，算出来的值越大就好了。</p>
+<p>InnoDB每次写入的日志都有一个序号，<strong>当前写入的序号跟checkpoint对应的序号之间的差值，我们假设为N</strong>。InnoDB会根据这个N算出一个<strong>范围在0到100之间的数字</strong>，这个计算公式可以记为F2(N)。F2(N)算法比较复杂，你只要知道N越大，算出来的值越大就好了。</p>
 <p>然后，<strong>根据上述算得的F1(M)和F2(N)两个值，取其中较大的值记为R，之后引擎就可以按照innodb_io_capacity定义的能力乘以R%来控制刷脏页的速度。</strong></p>
 <p>上述的计算流程比较抽象，不容易理解，所以我画了一个简单的流程图。图中的F1、F2就是上面我们通过脏页比例和redo log写入速度算出来的两个值。</p>
 <p><img src="/2024/09/11/MySQL12/image-20240911105833495.png" alt="image-20240911105833495"></p>
-<p>现在你知道了，InnoDB会在后台刷脏页，而刷脏页的过程是要将内存页写入磁盘。所以，无论是你的查询语句在需要内存的时候可能要求淘汰一个脏页，还是由于刷脏页的逻辑会占用IO资源并可能影响到了你的更新语句，都可能是造成你从业务端感知到MySQL“抖”了一下的原因。</p>
-<p>要尽量避免这种情况，你就要合理地设置innodb_io_capacity的值，并且**平时要多关注脏页比例，不要让它经常接近75%**。</p>
+<p>现在你知道了，<strong>InnoDB会在后台刷脏页，而刷脏页的过程是要将内存页写入磁盘。所以，无论是你的查询语句在需要内存的时候可能要求淘汰一个脏页，还是由于刷脏页的逻辑会占用IO资源并可能影响到了你的更新语句</strong>，都可能是造成你从业务端感知到MySQL“抖”了一下的原因。</p>
+<p>要尽量避免这种情况，你就要<strong>合理地设置innodb_io_capacity</strong>的值，并且**平时要多关注脏页比例，不要让它经常接近75%**。</p>
 <p>其中，脏页比例是通过Innodb_buffer_pool_pages_dirty&#x2F;Innodb_buffer_pool_pages_total得到的，具体的命令参考下面的代码：</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select VARIABLE_VALUE into @a from global_status where VARIABLE_NAME = &#x27;Innodb_buffer_pool_pages_dirty&#x27;;</span><br><span class="line">select VARIABLE_VALUE into @b from global_status where VARIABLE_NAME = &#x27;Innodb_buffer_pool_pages_total&#x27;;</span><br><span class="line">select @a/@b;</span><br></pre></td></tr></table></figure>
 
 <p>接下来，我们再看一个有趣的策略。</p>
-<p>一旦一个查询请求需要在执行过程中先flush掉一个脏页时，这个查询就可能要比平时慢了。而MySQL中的一个机制，可能让你的查询会更慢：在准备刷一个脏页的时候，如果这个数据页旁边的数据页刚好是脏页，就会把这个“邻居”也带着一起刷掉；而且这个把“邻居”拖下水的逻辑还可以继续蔓延，也就是对于每个邻居数据页，如果跟它相邻的数据页也还是脏页的话，也会被放到一起刷。</p>
-<p>在InnoDB中，innodb_flush_neighbors 参数就是用来控制这个行为的，值为1的时候会有上述的“连坐”机制，值为0时表示不找邻居，自己刷自己的。</p>
-<p>找“邻居”这个优化在机械硬盘时代是很有意义的，可以减少很多随机IO。机械硬盘的随机IOPS一般只有几百，相同的逻辑操作减少随机IO就意味着系统性能的大幅度提升。</p>
-<p>而如果使用的是SSD这类IOPS比较高的设备的话，我就建议你把innodb_flush_neighbors的值设置成0。因为这时候IOPS往往不是瓶颈，而“只刷自己”，就能更快地执行完必要的刷脏页操作，减少SQL语句响应时间。</p>
-<p>在MySQL 8.0中，innodb_flush_neighbors参数的默认值已经是0了。</p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天这篇文章，我延续第2篇中介绍的WAL的概念，和你解释了这个机制后续需要的刷脏页操作和执行时机。利用WAL技术，数据库将随机写转换成了顺序写，大大提升了数据库的性能。</p>
-<p>但是，由此也带来了内存脏页的问题。脏页会被后台线程自动flush，也会由于数据页淘汰而触发flush，而刷脏页的过程由于会占用资源，可能会让你的更新和查询语句的响应时间长一些。在文章里，我也给你介绍了控制刷脏页的方法和对应的监控方式。</p>
-<p>文章最后，我给你留下一个思考题吧。</p>
+<p><strong>一旦一个查询请求需要在执行过程中先flush掉一个脏页时，这个查询就可能要比平时慢了</strong>。而MySQL中的一个机制，可能让你的查询会更慢：<strong>在准备刷一个脏页的时候，如果这个数据页旁边的数据页刚好是脏页，就会把这个“邻居”也带着一起刷掉；而且这个把“邻居”拖下水的逻辑还可以继续蔓延，也就是对于每个邻居数据页，如果跟它相邻的数据页也还是脏页的话，也会被放到一起刷</strong>。</p>
+<p>在InnoDB中，innodb_flush_neighbors 参数就是用来控制这个行为的，<strong>值为1的时候会有上述的“连坐”机制，值为0时表示不找邻居，自己刷自己的</strong>。</p>
+<p>找“邻居”这个优化在机械硬盘时代是很有意义的，<strong>可以减少很多随机IO。机械硬盘的随机IOPS一般只有几百，相同的逻辑操作减少随机IO就意味着系统性能的大幅度提升</strong>。</p>
+<p>而如果使用的是SSD这类IOPS比较高的设备的话，<strong>我就建议你把innodb_flush_neighbors的值设置成0。因为这时候IOPS往往不是瓶颈，而“只刷自己”，就能更快地执行完必要的刷脏页操作，减少SQL语句响应时间。</strong></p>
+<p><strong>在MySQL 8.0中，innodb_flush_neighbors参数的默认值已经是0了。</strong></p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天这篇文章，我延续第2篇中介绍的WAL的概念，<strong>和你解释了这个机制后续需要的刷脏页操作和执行时机</strong>。利用WAL技术，<strong>数据库将随机写转换成了顺序写，大大提升了数据库的性能</strong>。</p>
+<p>但是，<strong>由此也带来了内存脏页的问题。脏页会被后台线程自动flush，也会由于数据页淘汰而触发flush，而刷脏页的过程由于会占用资源，可能会让你的更新和查询语句的响应时间长一些</strong>。在文章里，我也给你介绍了控制刷脏页的方法和对应的监控方式。</p>
 <p>一个内存配置为128GB、innodb_io_capacity设置为20000的大规格实例，正常会建议你将redo log设置成4个1GB的文件。</p>
 <p>但如果你在配置的时候不慎将redo log设置成了1个100M的文件，会发生什么情况呢？又为什么会出现这样的情况呢？</p>
-<p>你可以把你的分析结论写在留言区里，我会在下一篇文章的末尾和你讨论这个问题。感谢你的收听，也欢迎你把这篇文章分享给更多的朋友一起阅读。</p>
 <h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期我留给你的问题是，给一个学号字段创建索引，有哪些方法。</p>
-<p>由于这个学号的规则，无论是正向还是反向的前缀索引，重复度都比较高。因为维护的只是一个学校的，因此前面6位（其中，前三位是所在城市编号、第四到第六位是学校编号）其实是固定的，邮箱后缀都是@gamil.com，因此可以只存入学年份加顺序编号，它们的长度是9位。</p>
-<p>而其实在此基础上，可以用数字类型来存这9位数字。比如201100001，这样只需要占4个字节。其实这个就是一种hash，只是它用了最简单的转换规则：字符串转数字的规则，而刚好我们设定的这个背景，可以保证这个转换后结果的唯一性。</p>
-<p>评论区中，也有其他一些很不错的见解。</p>
-<p>评论用户@封建的风 说，一个学校的总人数这种数据量，50年才100万学生，这个表肯定是小表。为了业务简单，直接存原来的字符串。这个答复里面包含了“优化成本和收益”的思想，我觉得值得at出来。</p>
-<p>@小潘 同学提了另外一个极致的方向。如果碰到表数据量特别大的场景，通过这种方式的收益是很不错的。</p>
-<p><strong>评论区留言点赞板：</strong></p>
+<p>由于这个学号的规则，<strong>无论是正向还是反向的前缀索引，重复度都比较高。因为维护的只是一个学校的，因此前面6位（其中，前三位是所在城市编号、第四到第六位是学校编号）其实是固定</strong>的，邮箱后缀都是@gamil.com，<strong>因此可以只存入学年份加顺序编号，它们的长度是9位</strong>。</p>
+<p>而其实在此基础上，<strong>可以用数字类型来存这9位数字。比如201100001，这样只需要占4个字节。其实这个就是一种hash</strong>，只是它用了最简单的转换规则：<strong>字符串转数字的规则，而刚好我们设定的这个背景，可以保证这个转换后结果的唯一性</strong>。</p>
+<p>一个学校的总人数这种数据量，50年才100万学生，这个表肯定是小表。<strong>为了业务简单，直接存原来的字符串。这个答复里面包含了“优化成本和收益”的思想，我觉得值得at出来</strong>。</p>
+<p>如果碰到表数据量特别大的场景，通过这种方式的收益是很不错的。</p>
 <blockquote>
-<p>@lttzzlll ，提到了用整型存“四位年份+五位编号”的方法； 由于整个学号的值超过了int上限，@老杨同志 也提到了用8个字节的bigint来存的方法。</p>
+<p>用整型存<strong>“四位年份+五位编号”</strong>的方法； <strong>由于整个学号的值超过了int上限，用8个字节的bigint来存的方法。</strong></p>
 </blockquote>
 <p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/12-wei-shi-mo-wo-de-mysql-hui-dou-yi-xia">12 为什么我的MySQL会“抖”一下？ | MySql实战45讲 (gitbook.io)</a></p>
 
@@ -1178,7 +1180,7 @@
             <br>
             
                 &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
-                        class="white-color">80k</span>
+                        class="white-color">79.9k</span>
             
             
             
