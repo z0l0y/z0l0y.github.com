@@ -4,9 +4,9 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="全局锁和表锁 ：给表加个字段怎么有这么多阻碍？, zoloy">
-    <meta name="description" content=" 今天我要跟你聊聊MySQL的锁。数据库锁设计的初衷是处理并发问题。作为多用户共享的资源，当出现并发访问的时候，数据库需要合理地控制资源的访问规则。而锁就是用来实现这些访问规则的重要数据结构。
-根据加锁的范围，MySQL里面的锁大致可以分成">
+    <meta name="keywords" content="count(*)这么慢，我该怎么办？, zoloy">
+    <meta name="description" content="在开发系统的时候，你可能经常需要计算一个表的行数，比如一个交易系统的所有变更记录总数。这时候你可能会想，一条select count(*) from t 语句不就解决了吗？
+但是，你会发现随着系统中记录数越来越多，这条语句执行得也会越来越慢">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -18,7 +18,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>全局锁和表锁 ：给表加个字段怎么有这么多阻碍？ | zoloy&#39;s blog</title>
+    <title>count(*)这么慢，我该怎么办？ | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -291,12 +291,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/12.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/8.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">全局锁和表锁 ：给表加个字段怎么有这么多阻碍？</h1>
+                    <h1 class="description center-align post-title">count(*)这么慢，我该怎么办？</h1>
                 </div>
             </div>
         </div>
@@ -345,28 +345,28 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-10
+                    2024-09-11
                 </div>
                 
 
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
-                    2024-09-10
+                    2024-09-11
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    3.9k
+                    4.1k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    13 分
+                    14 分
                 </div>
                 
 
@@ -389,107 +389,130 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <p> 今天我要跟你聊聊MySQL的锁。<strong>数据库锁设计的初衷是处理并发问题。</strong>作为多用户共享的资源，当出现并发访问的时候，<strong>数据库需要合理地控制资源的访问规则</strong>。而锁就是用来实现这些访问规则的重要数据结构。</p>
-<p><strong>根据加锁的范围，MySQL里面的锁大致可以分成全局锁、表级锁和行锁三类</strong>。今天这篇文章，我会和你分享全局锁和表级锁。而关于行锁的内容，我会留着在下一篇文章中再和你详细介绍。</p>
-<p>这里需要说明的是，锁的设计比较复杂，这两篇文章不会涉及锁的具体实现细节，主要介绍的是碰到锁时的现象和其背后的原理。</p>
-<h3 id="全局锁"><a href="#全局锁" class="headerlink" title="全局锁"></a>全局锁</h3><p>顾名思义，全局锁就是对<strong>整个数据库实例加锁</strong>。MySQL提供了一个加全局读锁的方法，命令是 Flush tables with read lock (FTWRL)。<strong>当你需要让整个库处于只读状态的时候，可以使用这个命令，之后其他线程的以下语句会被阻塞：数据更新语句（数据的增删改）、数据定义语句（包括建表、修改表结构等）和更新类事务的提交语句。</strong></p>
-<p><strong>全局锁的典型使用场景是，做全库逻辑备份。</strong>也就是把整库每个表都select出来存成文本。</p>
-<p>以前有一种做法，是通过FTWRL确保不会有其他线程对数据库做更新，然后对整个库做备份。<strong>注意，在备份过程中整个库完全处于只读状态。</strong></p>
-<p><strong>但是让整库都只读，听上去就很危险：</strong></p>
+                <p>在开发系统的时候，<strong>你可能经常需要计算一个表的行数，比如一个交易系统的所有变更记录总数。这时候你可能会想，一条select count(*) from t 语句不就解决了吗？</strong></p>
+<p>但是，<strong>你会发现随着系统中记录数越来越多，这条语句执行得也会越来越慢</strong>。然后你可能就想了，<strong>MySQL怎么这么笨啊，记个总数，每次要查的时候直接读出来，不就好了</strong>吗。</p>
+<p>那么今天，我们就来<strong>聊聊count(*)语句到底是怎样实现的，以及MySQL为什么会这么实现</strong>。然后，<strong>我会再和你说说，如果应用中有这种频繁变更并需要统计表行数的需求</strong>，业务设计上可以怎么做。</p>
+<h3 id="count-的实现方式"><a href="#count-的实现方式" class="headerlink" title="count(*)的实现方式"></a>count(*)的实现方式</h3><p>你首先要明确的是，<strong>在不同的MySQL引擎中，count(*)有不同的实现方式。</strong></p>
 <ul>
-<li>如果你在主库上备份，<strong>那么在备份期间都不能执行更新，业务基本上就得停摆；</strong></li>
-<li>如果你在从库上备份，<strong>那么备份期间从库不能执行主库同步过来的binlog，会导致主从延迟。</strong></li>
+<li><p><strong>MyISAM引擎把一个表的总行数存在了磁盘上，因此执行count(*)的时候会直接返回这个数，效率很高。</strong></p>
+</li>
+<li><p><strong>而InnoDB引擎就麻烦了，它执行count(*)的时候，需要把数据一行一行地从引擎里面读出来，然后累积计数。</strong></p>
+</li>
 </ul>
-<p>看来加全局锁不太好。但是细想一下，备份为什么要加锁呢？我们来看一下不加锁会有什么问题。</p>
-<p>假设你现在要维护“极客时间”的购买系统，关注的是用户账户余额表和用户课程表。</p>
-<p><strong>现在发起一个逻辑备份。假设备份期间，有一个用户，他购买了一门课程，业务逻辑里就要扣掉他的余额，然后往已购课程里面加上一门课。</strong></p>
-<p>如果时间顺序上是先备份账户余额表(u_account)，然后用户购买，然后备份用户课程表(u_course)，会怎么样呢？你可以看一下这个图：</p>
-<p><img src="/2024/09/10/MySQL06/image-20240910114231615.png" alt="image-20240910114231615"></p>
-<p><strong>可以看到，这个备份结果里，用户A的数据状态是“账户余额没扣，但是用户课程表里面已经多了一门课”。如果后面用这个备份来恢复数据的话，用户A就发现，自己赚了。</strong></p>
-<p>作为用户可别觉得这样可真好啊，你可以试想一下：如果备份表的顺序反过来，先备份用户课程表再备份账户余额表，又可能会出现什么结果？</p>
-<p><strong>也就是说，不加锁的话，备份系统备份的得到的库不是一个逻辑时间点，这个视图是逻辑不一致的。（所以在全库逻辑备份的时候要STW，得到那一个时间点的快照数据）</strong></p>
-<p>说到视图你肯定想起来了，我们在前面讲事务隔离的时候，其实是有一个方法能够拿到一致性视图的（还记得是通过undo log实现的），对吧？</p>
-<p><strong>是的，就是在可重复读隔离级别下开启一个事务。</strong></p>
+<p>这里需要注意的是，<strong>我们在这篇文章里讨论的是没有过滤条件的count(*)，如果加了where 条件的话，MyISAM表也是不能返回得这么快的。</strong></p>
+<p>在前面的文章中，<strong>我们一起分析了为什么要使用InnoDB，因为不论是在事务支持、并发能力还是在数据安全方面，InnoDB都优于MyISAM</strong>。我猜你的表也一定是用了InnoDB引擎。<strong>这就是当你的记录数越来越多的时候，计算一个表的总行数会越来越慢的原因</strong>。</p>
+<p>那<strong>为什么InnoDB不跟MyISAM一样，也把数字存起来呢？</strong></p>
+<p><strong>这是因为即使是在同一个时刻的多个查询，由于多版本并发控制（MVCC）的原因，InnoDB表“应该返回多少行”也是不确定的。</strong>这里，我用一个算count(*)的例子来为你解释一下。</p>
+<p>假设表t中现在有10000条记录，我们设计了三个用户并行的会话。</p>
+<ul>
+<li>会话A先启动事务并查询一次表的总行数；</li>
+<li>会话B启动事务，插入一行后记录后，查询表的总行数；</li>
+<li>会话C先启动一个单独的语句，插入一行记录后，查询表的总行数。</li>
+</ul>
+<p>我们假设从上到下是按照时间顺序执行的，同一行语句是在同一时刻执行的。</p>
+<p><img src="/2024/09/11/MySQL14/image-20240911184247099.png" alt="image-20240911184247099"></p>
+<p><strong>你会看到，在最后一个时刻，三个会话A、B、C会同时查询表t的总行数，但拿到的结果却不同。</strong></p>
+<p><strong>这和InnoDB的事务设计有关系，可重复读是它默认的隔离级别，在代码上就是通过多版本并发控制，也就是MVCC来实现的。</strong>每一行记录<strong>都要判断自己是否对这个会话可见</strong>，因此对于count(<em>)请求来说，*<em>InnoDB只好把数据一行一行地读出依次判断，可见的行才能够用于计算“基于这个查询”的表的总行数。</em></em></p>
 <blockquote>
-<p>备注：如果你对事务隔离级别的概念不是很清晰的话，可以再回顾一下第3篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68963">《事务隔离：为什么你改了我还看不见？》</a>中的相关内容。</p>
+<p>备注：<strong>如果你对MVCC记忆模糊了，可以再回顾下第3篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68963">《事务隔离：为什么你改了我还看不见？》</a>和第8篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/70562">《事务到底是隔离的还是不隔离的？》</a>中的相关内容。</strong></p>
 </blockquote>
-<p><strong>官方自带的逻辑备份工具是mysqldump。当mysqldump使用参数–single-transaction的时候，导数据之前就会启动一个事务，来确保拿到一致性视图。</strong>而由于MVCC的支持，这个过程中数据是可以正常更新的。</p>
-<p>你一定在疑惑，有了这个功能，为什么还需要FTWRL呢？<strong>一致性读是好，但前提是引擎要支持这个隔离级别。</strong>比如，对于<strong>MyISAM这种不支持事务的引擎（事务这一层面的东西是在存储引擎中实现的）</strong>，如果备份过程中有更新，<strong>总是只能取到最新的数据，那么就破坏了备份的一致性。</strong>这时，我们就需要使用FTWRL命令了。</p>
-<p>所以，<strong>single-transaction方法只适用于所有的表使用事务引擎的库。</strong>如果有的表使用了<strong>不支持事务</strong>的引擎，那么备份就<strong>只能通过FTWRL方法</strong>。这往往是<strong>DBA要求业务开发人员使用InnoDB替代MyISAM的原因之一</strong>。</p>
-<p>你也许会问，<strong>既然要全库只读，为什么不使用set global readonly&#x3D;true的方式呢</strong>？确实readonly方式也可以让全库进入只读状态，<strong>但我还是会建议你用FTWRL方式</strong>，主要有两个原因：</p>
+<p>当然，<strong>现在这个看上去笨笨的MySQL，在执行count(*)操作的时候还是做了优化的</strong>。</p>
+<p>你知道的，<strong>InnoDB是索引组织表，主键索引树的叶子节点是数据，而普通索引树的叶子节点是主键值</strong>。所以，<strong>普通索引树比主键索引树小很多。对于count(*)这样的操作，遍历哪个索引树得到的结果逻辑上都是一样的</strong>。因此，MySQL优化器会找到<strong>最小的那棵树</strong>来遍历。<strong>在保证逻辑正确的前提下，尽量减少扫描的数据量，是数据库系统设计的通用法则之一。</strong></p>
+<p><strong>如果你用过show table status 命令的话，就会发现这个命令的输出结果里面也有一个TABLE_ROWS用于显示这个表当前有多少行，这个命令执行挺快的，那这个TABLE_ROWS能代替count(*)吗？</strong></p>
+<p>关于这个命令，你可以看看这篇文章</p>
 <ul>
-<li><strong>一是，在有些系统中，readonly的值会被用来做其他逻辑，比如用来判断一个库是主库还是备库。</strong>因此，修改global变量的方式<strong>影响面更大</strong>，我不建议你使用。</li>
-<li><strong>二是，在异常处理机制上有差异。</strong>如果执行FTWRL命令之后由于<strong>客户端发生异常断开</strong>，那么MySQL会<strong>自动释放这个全局锁</strong>，整个库回到可以正常更新的状态。而将整个库设置为readonly之后，<strong>如果客户端发生异常，则数据库就会一直保持readonly状态，这样会导致整个库长时间处于不可写状态，风险较高。</strong></li>
+<li><p><a target="_blank" rel="noopener" href="https://blog.csdn.net/longool/article/details/140136206">mysql 命令 —— 查看表信息（show table status）-CSDN博客</a></p>
+<p>这个命令是用来<strong>查询表信息的</strong>，<strong>比如整个表的数据量大小、表的索引占用空间大小</strong>等</p>
+</li>
 </ul>
-<p><strong>业务的更新不只是增删改数据（DML)，还有可能是加字段等修改表结构的操作（DDL）。不论是哪种方法，一个库被全局锁上以后，你要对里面任何一个表做加字段操作，都是会被锁住的。</strong></p>
-<p>但是，<strong>即使没有被全局锁住</strong>，加字段也不是就能一帆风顺的，因为你还会碰到接下来我们要介绍的表级锁。</p>
-<h3 id="表级锁"><a href="#表级锁" class="headerlink" title="表级锁"></a>表级锁</h3><p>MySQL里面表级别的锁有两种：一种是表锁，一种是元数据锁（meta data lock，MDL)。</p>
-<p><strong>表锁的语法是 lock tables … read&#x2F;write。</strong>与FTWRL类似，可以用<strong>unlock tables主动释放锁</strong>，也可以在客户端断开的时候<strong>自动释放</strong>。需要注意，lock tables语法除了会限制别的线程的读写外，<strong>也限定了本线程接下来的操作对象</strong>。</p>
-<p>举个例子, 如果在某个线程A中执行lock tables t1 read, t2 write; 这个语句，则其他线程写t1、读写t2的语句都会被阻塞。<strong>同时，线程A在执行unlock tables之前，也只能执行读t1、读写t2的操作。连写t1都不允许，自然也不能访问其他表。（简单的说，你对于你自己锁住的资源要负责，不能在锁还没有释放的时候就访问其他的资源）</strong></p>
-<p>在还没有出现更细粒度的锁的时候，<strong>表锁是最常用的处理并发的方式。而对于InnoDB这种支持行锁的引擎，一般不使用lock tables命令来控制并发，毕竟锁住整个表的影响面还是太大。</strong></p>
-<p><strong>另一类表级的锁是MDL（metadata lock)。</strong>MDL<strong>不需要显式使用</strong>，在访问一个表的时候会<strong>被自动加上</strong>。MDL的作用是，<strong>保证读写的正确性</strong>。你可以想象一下，如果一个查询正在遍历一个表中的数据，而执行期间另一个线程对这个表结构做变更，删了一列，那么查询线程拿到的结果跟表结构对不上，肯定是不行的。</p>
-<p>因此，在MySQL 5.5版本中引入了MDL，<strong>当对一个表做增删改查操作的时候，加MDL读锁；当要对表做结构变更操作的时候，加MDL写锁。</strong></p>
-<p>关于读锁和写锁，这里有比较详细的介绍</p>
-<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_44766883/article/details/105879308">mysql的锁机制(读锁，写锁，表锁，行锁，悲观锁，乐观锁，间隙锁)_mysql 读锁 写锁 兼容性-CSDN博客</a></p>
+<p>你可能还记得在第10篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/71173">《 MySQL为什么有时候会选错索引？》</a>中我提到过，<strong>索引统计的值是通过采样来估算的</strong>。实际上，TABLE_ROWS就是从这个采样估算得来的，<strong>因此它也很不准</strong>。有多不准呢，官方文档说误差<strong>可能达到40%到50%<strong>。</strong>所以，show table status命令显示的行数也不能直接使用。</strong></p>
+<p>到这里我们小结一下：</p>
 <ul>
-<li>读锁之间不互斥，<strong>这意味着多个线程可以同时对同一张表进行读取操作，而不会相互阻塞。（对同一个数据，多个读操作可以同时进行，互不干扰。加锁的会话只能对此表进行读操作,其他会话也只能进行读操作。）</strong></li>
-<li>读写锁之间、写锁之间是互斥的，用来保证变更表结构操作的安全性。<strong>因此，如果有两个线程要同时给一个表加字段，其中一个要等另一个执行完才能开始执行。（如果当前写操作没有完毕，则无法进行其他的读操作、写操作。当前会话只能对此表进行读,写操作,其他会话无法进行任何操作。）</strong></li>
+<li><strong>MyISAM表虽然count(*)很快，但是不支持事务；</strong></li>
+<li><strong>show table status命令虽然返回很快，但是不准确；</strong></li>
+<li><strong>InnoDB表直接count(*)会遍历全表，虽然结果准确，但会导致性能问题。</strong></li>
 </ul>
-<p>虽然<strong>MDL锁是系统默认会加的，但却是你不能忽略的一个机制</strong>。比如下面这个例子，我经常看到有人掉到这个坑里：<strong>给一个小表加个字段，导致整个库挂了。</strong></p>
-<p>你肯定知道，<strong>给一个表加字段，或者修改字段，或者加索引，需要扫描全表的数据</strong>。在对大表操作的时候，你肯定会特别小心，以免对线上服务造成影响。而实际上，即使是小表，操作不慎也会出问题。我们来看一下下面的操作序列，假设表t是一个小表。</p>
+<p>那么，回到文章开头的问题，如果你现在有一个页面经常要显示交易系统的操作记录总数，到底应该怎么办呢？答案是，我们只能自己计数。</p>
+<p>接下来，我们讨论一下，看看自己计数有哪些方法，以及每种方法的优缺点有哪些。</p>
+<p>这里，我先和你说一下这些方法的基本思路：你需要自己找一个地方，把操作记录表的行数存起来。</p>
+<h3 id="用缓存系统保存计数"><a href="#用缓存系统保存计数" class="headerlink" title="用缓存系统保存计数"></a>用缓存系统保存计数</h3><p>对于更新很频繁的库来说，你可能会第一时间想到，用缓存系统来支持。</p>
+<p><strong>你可以用一个Redis服务来保存这个表的总行数。这个表每被插入一行Redis计数就加1，每被删除一行Redis计数就减1。这种方式下，读和更新操作都很快，但你再想一下这种方式存在什么问题吗？</strong></p>
+<p>没错，<strong>缓存系统可能会丢失更新</strong>。</p>
+<p>Redis的数据不能永久地留在内存里，所以你会找一个地方把这个值定期地持久化存储起来。<strong>但即使这样，仍然可能丢失更新。试想如果刚刚在数据表中插入了一行，Redis中保存的值也加了1，然后Redis异常重启了，重启后你要从存储redis数据的地方把这个值读回来，而刚刚加1的这个计数操作却丢失了。</strong></p>
+<p>当然了，这还是有解的。<strong>比如，Redis异常重启以后，到数据库里面单独执行一次count(*)获取真实的行数，再把这个值写回到Redis里就可以了。异常重启毕竟不是经常出现的情况，这一次全表扫描的成本，还是可以接受的。</strong></p>
+<p>但实际上，<strong>将计数保存在缓存系统中的方式，还不只是丢失更新的问题。即使Redis正常工作，这个值还是逻辑上不精确的。</strong></p>
+<p>你可以设想一下有这么一个页面，要显示操作记录的总数，同时还要显示最近操作的100条记录。那么，这个页面的逻辑就需要先到Redis里面取出计数，再到数据表里面取数据记录。</p>
+<p><strong>我们是这么定义不精确的：</strong></p>
+<ol>
+<li><strong>一种是，查到的100行结果里面有最新插入记录，而Redis的计数里还没加1；</strong></li>
+<li><strong>另一种是，查到的100行结果里没有最新插入的记录，而Redis的计数里已经加了1。</strong></li>
+</ol>
+<p><strong>这两种情况，都是逻辑不一致的。</strong></p>
+<p>我们一起来看看这个时序图。</p>
+<p><img src="/2024/09/11/MySQL14/image-20240911184506659.png" alt="image-20240911184506659"></p>
+<p>图2中，会话A是一个插入交易记录的逻辑，往数据表里插入一行R，然后Redis计数加1；会话B就是查询页面显示时需要的数据。</p>
+<p>在图2的这个时序里，<strong>在T3时刻会话B来查询的时候，会显示出新插入的R这个记录，但是Redis的计数还没加1。这时候，就会出现我们说的数据不一致。</strong></p>
+<p>你一定会说，这是因为我们执行新增记录逻辑时候，是先写数据表，再改Redis计数。而读的时候是先读Redis，再读数据表，这个顺序是相反的。那么，如果保持顺序一样的话，是不是就没问题了？我们现在把会话A的更新顺序换一下，再看看执行结果。</p>
+<p><img src="/2024/09/11/MySQL14/image-20240911184533306.png" alt="image-20240911184533306"></p>
+<p>你会发现，这时候反过来了，<strong>会话B在T3时刻查询的时候，Redis计数加了1了，但还查不到新插入的R这一行，也是数据不一致的情况。</strong></p>
+<p><strong>在并发系统里面，我们是无法精确控制不同线程的执行时刻的，因为存在图中的这种操作序列，所以，我们说即使Redis正常工作，这个计数值还是逻辑上不精确的。</strong></p>
+<h3 id="在数据库保存计数"><a href="#在数据库保存计数" class="headerlink" title="在数据库保存计数"></a>在数据库保存计数</h3><p>根据上面的分析，<strong>用缓存系统保存计数有丢失数据和计数不精确的问题</strong>。那么，<strong>如果我们把这个计数直接放到数据库里单独的一张计数表C中，又会怎么样呢？</strong></p>
+<p>首先，<strong>这解决了崩溃丢失的问题，InnoDB是支持崩溃恢复不丢数据的</strong>。</p>
 <blockquote>
-<p>备注：这里的实验环境是MySQL 5.6。</p>
+<p><strong>备注：关于InnoDB的崩溃恢复，你可以再回顾一下第2篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68633">《日志系统：一条SQL更新语句是如何执行的？》</a>中的相关内容。</strong></p>
 </blockquote>
-<p><img src="/2024/09/10/MySQL06/image-20240910115825808.png" alt="image-20240910115825808"></p>
-<p>我们可以看到session A先启动，<strong>这时候会对表t加一个MDL读锁</strong>。<strong>由于session B需要的也是MDL读锁，因此可以正常执行。</strong></p>
-<p>之后session C会被blocked，是因为session A的MDL读锁还没有释放，<strong>而session C需要MDL写锁，因此只能被阻塞</strong>。</p>
-<p>如果只有session C自己被阻塞还没什么关系，但是之后所有<strong>要在表t上新申请MDL读锁的请求也会被session C阻塞。前面我们说了，所有对表的增删改操作都需要先申请MDL写锁，如果session C自己阻塞了，就会导致后面的session都被锁住，等于这个表现在完全不可读写了。</strong></p>
-<p>如果某个表上的<strong>查询语句频繁</strong>，而且客户端有重试机制，<strong>也就是说超时后会再起一个新session再请求的话，这个库的线程很快就会爆满。</strong></p>
-<p>你现在应该知道了，事务中的MDL锁，<strong>在语句执行开始时申请，但是语句结束后并不会马上释放，而会等到整个事务提交后再释放。</strong></p>
-<p>基于上面的分析，我们来讨论一个问题，<strong>如何安全地给小表加字段？</strong></p>
-<p><strong>首先我们要解决长事务，事务不提交，就会一直占着MDL锁。</strong>在MySQL的information_schema 库的 innodb_trx 表中，你可以查到当前执行中的事务。<strong>如果你要做DDL变更的表刚好有长事务在执行，要考虑先暂停DDL，或者kill掉这个长事务。</strong></p>
-<p>但考虑一下这个场景。<strong>如果你要变更的表是一个热点表，虽然数据量不大，但是上面的请求很频繁，而你不得不加个字段，你该怎么做呢？</strong></p>
-<p>这时候kill可能未必管用，<strong>因为新的请求马上就来了</strong>。比较理想的机制是，在alter table语句里面设定等待时间，<strong>如果在这个指定的等待时间里面能够拿到MDL写锁最好</strong>，拿不到也不要阻塞后面的业务语句，<strong>先放弃。之后开发人员或者DBA再通过重试命令重复这个过程</strong>。</p>
-<p>MariaDB已经合并了<a target="_blank" rel="noopener" href="https://github.com/alibaba/AliSQL">AliSQL</a>的这个功能，所以这两个开源分支目前都支持DDL NOWAIT&#x2F;WAIT n这个语法。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ALTER TABLE tbl_name NOWAIT add column ...</span><br><span class="line">ALTER TABLE tbl_name WAIT N add column ... </span><br></pre></td></tr></table></figure>
-
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天介绍了MySQL的全局锁和表级锁。</p>
-<p><strong>全局锁主要用在逻辑备份过程中。对于全部是InnoDB引擎的库，我建议你选择使用–single-transaction参数，对应用会更友好。</strong></p>
-<p><strong>表锁一般是在数据库引擎不支持行锁的时候才会被用到的。</strong>如果你发现你的应用程序里有lock tables这样的语句，你需要追查一下，比较可能的情况是：</p>
-<ul>
-<li><strong>要么是你的系统现在还在用MyISAM这类不支持事务的引擎，那要安排升级换引擎；</strong></li>
-<li>要么是你的引擎升级了，但是代码还没升级。我见过这样的情况，<strong>最后业务开发就是把lock tables 和 unlock tables 改成 begin 和 commit，问题就解决了。</strong></li>
-</ul>
-<p><strong>MDL会直到事务提交才释放，在做表结构变更的时候，你一定要小心，不要锁住整张表导致线上查询和更新出现阻塞。</strong></p>
-<p>备份一般都会在备库上执行，你在用–single-transaction方法做逻辑备份的过程中，如果主库上的一个小表做了一个DDL，比如给一个表上加了一列。这时候，从备库上会看到什么现象呢？</p>
-<p>说明：这篇文章没有介绍到物理备份，<strong>物理备份会有一篇单独的文章</strong>。</p>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期的问题是关于对联合主键索引和InnoDB索引组织表的理解。</p>
-<p><img src="/2024/09/10/MySQL06/image-20240910123652692.png" alt="image-20240910123652692"></p>
-<p>主键 a，b的聚簇索引组织顺序相当于 order by a,b ，也就是先按a排序，再按b排序，c无序。</p>
-<p>索引 ca 的组织是先按c排序，再按a排序，同时记录主键 </p>
-<p><img src="/2024/09/10/MySQL06/image-20240910123710753.png" alt="image-20240910123710753"></p>
-<p>这个跟索引c的数据是一模一样的。</p>
-<p>索引 cb 的组织是先按c排序，在按b排序，同时记录主键 </p>
-<p><img src="/2024/09/10/MySQL06/image-20240910123725156.png" alt="image-20240910123725156"></p>
-<p><strong>所以，结论是ca可以去掉，cb需要保留。确实有道理，因为现在已经有了a索引，（a，b）索引，c索引，（c，a）索引，（c，b）索引了，（c，a）索引 &#x3D;&#x3D; c索引加上a索引，所以多余的这个ca可以去掉。</strong></p>
-<p>MRR优化—这篇文章讲的还可以，建议看一下</p>
-<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/110154066">MySQL 的 MRR 到底是什么？ - 知乎 (zhihu.com)</a></p>
-<p>把这篇文章的尾声搬了一下：</p>
-<ul>
-<li>MRR 跟索引有很大的关系。</li>
-<li><strong>索引是 MySQL 对查询做的一个优化，把原本杂乱无章的数据，用有序的结构组织起来，让全表扫描变成有章可循的查询。</strong></li>
-<li><strong>而我们讲的 MRR，则是 MySQL 对基于索引的查询做的一个的优化，可以说是对优化的优化了。</strong></li>
-<li>要优化 MySQL 的查询，就得先知道 MySQL 的查询过程；而要优化索引的查询，则要知道 MySQL 索引的原理。</li>
-</ul>
-<p>文中的两个图画的很好</p>
-<p><img src="/2024/09/10/MySQL06/image-20240910130042818.png" alt="image-20240910130042818"></p>
-<p><img src="/2024/09/10/MySQL06/image-20240910130053955.png" alt="image-20240910130053955"></p>
-<p>总结：</p>
-<ul>
-<li>MRR，全称「Multi-Range Read Optimization」。</li>
-<li>简单说：<strong>MRR 通过把「随机磁盘读」，转化为「<a target="_blank" rel="noopener" href="https://zhida.zhihu.com/search?q=%E9%A1%BA%E5%BA%8F%E7%A3%81%E7%9B%98&zhida_source=entity&is_preview=1">顺序磁盘</a>读」，从而提高了索引查询的性能。</strong></li>
-</ul>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/06-quan-ju-suo-he-biao-suo-gei-biao-jia-ge-zi-duan-zen-mo-you-zhe-mo-duo-zu-ai">06 全局锁和表锁 ：给表加个字段怎么有这么多阻碍？ | MySql实战45讲 (gitbook.io)</a></p>
+<p>然后，我们再看看能不能解决计数不精确的问题。</p>
+<p>你会说，这不一样吗？<strong>无非就是把图3中对Redis的操作，改成了对计数表C的操作。只要出现图3的这种执行序列，这个问题还是无解的吧？</strong></p>
+<p>这个问题还真不是无解的。</p>
+<p>我们这篇文章要解决的问题，<strong>都是由于InnoDB要支持事务，从而导致InnoDB表不能把count(*)直接存起来，然后查询的时候直接返回形成的。</strong></p>
+<p>所谓以子之矛攻子之盾，<strong>现在我们就利用“事务”这个特性，把问题解决掉</strong>。</p>
+<p><img src="/2024/09/11/MySQL14/image-20240911184611901.png" alt="image-20240911184611901"></p>
+<p>我们来看下现在的执行结果。<strong>虽然会话B的读操作仍然是在T3执行的，但是因为这时候更新事务还没有提交，所以计数值加1这个操作对会话B还不可见。</strong></p>
+<p>因此，会话B看到的结果里， <strong>查计数值和“最近100条记录”看到的结果，逻辑上就是一致的。</strong></p>
+<h3 id="不同的count用法"><a href="#不同的count用法" class="headerlink" title="不同的count用法"></a>不同的count用法</h3><p>在前面文章的评论区，有同学留言问到：在select count(?) from t这样的查询语句里面，count(<em>)、count(主键id)、count(字段)和count(1)等不同用法的性能，有哪些差别。今天谈到了count(</em>)的性能问题，我就借此机会和你详细说明一下这几种用法的性能差别。</p>
+<p><strong>需要注意的是，下面的讨论还是基于InnoDB引擎的。</strong></p>
+<p>这里，首先你要弄清楚count()的语义。<strong>count()是一个聚合函数，对于返回的结果集，一行行地判断，如果count函数的参数不是NULL，累计值就加1，否则不加。最后返回累计值。</strong></p>
+<p>所以，<strong>count(*)、count(主键id)和count(1)</strong> 都表示返回满足条件的结果集的<strong>总行数</strong>；<strong>而count(字段），则表示返回满足条件的数据行里面，参数“字段”不为NULL的总个数</strong>。</p>
+<p><strong>至于分析性能差别的时候</strong>，你可以记住这么几个原则：</p>
+<ol>
+<li><p><strong>server层要什么就给什么；（注意这个count是在server层的功能）</strong></p>
+</li>
+<li><p><strong>InnoDB只给必要的值；</strong></p>
+</li>
+<li><p>现在的优化器只优化了count(*)的语义为“取行数”，其他“显而易见”的优化并没有做。</p>
+</li>
+</ol>
+<p>这是什么意思呢？接下来，我们就一个个地来看看。</p>
+<p><strong>对于count(主键id)来说</strong>，InnoDB引擎会遍历整张表，<strong>把每一行的id值都取出来，返回给server层。server层拿到id后，判断是不可能为空的，就按行累加。</strong></p>
+<p><strong>对于count(1)来说</strong>，InnoDB引擎遍历整张表，<strong>但不取值。server层对于返回的每一行，放一个数字“1”进去，判断是不可能为空的，按行累加。</strong></p>
+<p>单看这两个用法的差别的话，<strong>你能对比出来，count(1)执行得要比count(主键id)快。因为从引擎返回id会涉及到解析数据行，以及拷贝字段值的操作。</strong></p>
+<p><strong>对于count(字段)来说</strong>：</p>
+<ol>
+<li><p><strong>如果这个“字段”是定义为not null的话，一行行地从记录里面读出这个字段，判断不能为null，按行累加；</strong></p>
+</li>
+<li><p><strong>如果这个“字段”定义允许为null，那么执行的时候，判断到有可能是null，还要把值取出来再判断一下，不是null才累加。</strong></p>
+</li>
+</ol>
+<p>也就是前面的第一条原则，<strong>server层要什么字段，InnoDB就返回什么字段。</strong></p>
+<p><strong>但是count(*)是例外</strong>，并不会把全部字段取出来，<strong>而是专门做了优化，不取值。count(*)肯定不是null，按行累加</strong>。</p>
+<p>看到这里，你一定会说，优化器就不能自己判断一下吗，主键id肯定非空啊，为什么不能按照count(*)来处理，多么简单的优化啊。</p>
+<p>当然，MySQL专门针对这个语句进行优化，也不是不可以。但是这种需要专门优化的情况太多了，<strong>而且MySQL已经优化过count(*)了，你直接使用这种用法就可以了</strong>。</p>
+<p>所以结论是：按照效率排序的话，**count(字段)&lt;count(主键id)&lt;count(1)≈count(<code>*</code>)，所以我建议你，尽量使用count(<code>*</code>)**。</p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p><strong>今天，我和你聊了聊MySQL中获得表行数的两种方法。</strong>我们提到了<strong>在不同引擎中count(*)的实现方式是不一样的</strong>，也分析了用<strong>缓存系统来存储计数值存在的问题</strong>。</p>
+<p>其实，把计数放在Redis里面，不能够保证计数和MySQL表里的数据精确一致的原因，是<strong>这两个不同的存储构成的系统，不支持分布式事务，无法拿到精确一致的视图。</strong>而把计数值也放在MySQL中，就解决了一致性视图的问题。</p>
+<p>InnoDB引擎支持事务，<strong>我们利用好事务的原子性和隔离性，就可以简化在业务开发时的逻辑。这也是InnoDB引擎备受青睐的原因之一。</strong></p>
+<p>在刚刚讨论的方案中，我们用了事务来确保计数准确。由于<strong>事务可以保证中间结果不被别的事务读到，因此修改计数值和插入新记录的顺序是不影响逻辑结果的。但是，从并发系统性能的角度考虑，你觉得在这个事务序列里，应该先插入操作记录，还是应该先更新计数表呢？</strong></p>
+<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期我给你留的问题是，什么时候使用alter table t engine&#x3D;InnoDB会让一个表占用的空间反而变大。</p>
+<p>在这篇文章的评论区里面，大家都提到了一个点，<strong>就是这个表，本身就已经没有空洞的了，比如说刚刚做过一次重建表操作。</strong></p>
+<p><strong>在DDL期间，如果刚好有外部的DML在执行，这期间可能会引入一些新的空洞。</strong></p>
+<p><strong>在重建表的时候，InnoDB不会把整张表占满，每个页留了1&#x2F;16给后续的更新用。也就是说，其实重建表之后不是“最”紧凑的。</strong></p>
+<p>假如是这么一个过程：</p>
+<ol>
+<li><strong>将表t重建一次；</strong></li>
+<li><strong>插入一部分数据，但是插入的这些数据，用掉了一部分的预留空间；</strong></li>
+<li><strong>这种情况下，再重建一次表t，就可能会出现问题中的现象。（简单的说，就是要保证一定的预留空间，用了的都是要还回来的）</strong></li>
+</ol>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/14-count-zhe-mo-man-wo-gai-zen-mo-ban">14 count(*)这么慢，我该怎么办？ | MySql实战45讲 (gitbook.io)</a></p>
 
                 
             </div>
@@ -516,7 +539,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/10/MySQL06/">http://example.com/2024/09/10/MySQL06/</a>
+                    <a href="http://example.com/2024/09/11/MySQL14/">http://example.com/2024/09/11/MySQL14/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -901,17 +924,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/10/MySQL07/">
+                <a href="/2024/09/11/MySQL14/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/0.jpg" class="responsive-img" alt="行锁功过：怎么减少行锁对性能的影响？">
+                        <img src="/medias/featureimages/8.jpg" class="responsive-img" alt="count(*)这么慢，我该怎么办？">
                         
-                        <span class="card-title">行锁功过：怎么减少行锁对性能的影响？</span>
+                        <span class="card-title">count(*)这么慢，我该怎么办？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -921,9 +945,9 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-11
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
@@ -936,6 +960,7 @@
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
@@ -954,13 +979,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/10/MySQL05/">
+                <a href="/2024/09/11/MySQL13/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/10.jpg" class="responsive-img" alt="深入浅出索引（下）">
+                        <img src="/medias/featureimages/22.jpg" class="responsive-img" alt="为什么表数据删掉一半，表文件大小不变？">
                         
-                        <span class="card-title">深入浅出索引（下）</span>
+                        <span class="card-title">为什么表数据删掉一半，表文件大小不变？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -971,7 +996,7 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-11
                             </span>
                         <span class="publish-author">
                             
