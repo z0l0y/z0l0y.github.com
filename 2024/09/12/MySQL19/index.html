@@ -4,9 +4,9 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="为什么我的MySQL会“抖”一下？, zoloy">
-    <meta name="description" content="平时的工作中，不知道你有没有遇到过这样的场景，一条SQL语句，正常执行的时候特别快，但是有时也不知道怎么回事，它就会变得特别慢，并且这样的场景很难复现，它不只随机，而且持续时间还很短。
-看上去，这就像是数据库“抖”了一下。今天，我们就一起来">
+    <meta name="keywords" content="为什么我只查一行的语句，也执行这么慢？, zoloy">
+    <meta name="description" content="一般情况下，如果我跟你说查询性能优化，你首先会想到一些复杂的语句，想到查询需要返回大量的数据。但有些情况下，“查一行”，也会执行得特别慢。今天，我就跟你聊聊这个有趣的话题，看看什么情况下，会出现这个现象。
+需要说明的是，如果MySQL数据库">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -18,7 +18,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>为什么我的MySQL会“抖”一下？ | zoloy&#39;s blog</title>
+    <title>为什么我只查一行的语句，也执行这么慢？ | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -291,12 +291,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/22.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/10.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">为什么我的MySQL会“抖”一下？</h1>
+                    <h1 class="description center-align post-title">为什么我只查一行的语句，也执行这么慢？</h1>
                 </div>
             </div>
         </div>
@@ -345,28 +345,28 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-11
+                    2024-09-12
                 </div>
                 
 
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
-                    2024-09-11
+                    2024-09-12
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    4.1k
+                    3.3k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    14 分
+                    12 分
                 </div>
                 
 
@@ -389,98 +389,135 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <p>平时的工作中，不知道你有没有遇到过这样的场景，<strong>一条SQL语句，正常执行的时候特别快，但是有时也不知道怎么回事，它就会变得特别慢，并且这样的场景很难复现，它不只随机，而且持续时间还很短。</strong></p>
-<p>看上去，这就像是数据库“抖”了一下。今天，我们就一起来看一看这是什么原因。</p>
-<h3 id="你的SQL语句为什么变“慢”了"><a href="#你的SQL语句为什么变“慢”了" class="headerlink" title="你的SQL语句为什么变“慢”了"></a>你的SQL语句为什么变“慢”了</h3><p>在前面第2篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68633">《日志系统：一条SQL更新语句是如何执行的？》</a>中，我为你介绍了WAL机制。现在你知道了，<strong>InnoDB在处理更新语句的时候，只做了写日志这一个磁盘操作。这个日志叫作redo log（重做日志），也就是《孔乙己》里咸亨酒店掌柜用来记账的粉板，在更新内存写完redo log后，就返回给客户端，本次更新成功。</strong></p>
-<p>做下类比的话，<strong>掌柜记账的账本是数据文件，记账用的粉板是日志文件（redo log），掌柜的记忆就是内存</strong>。</p>
-<p>掌柜总要找时间把账本更新一下，<strong>这对应的就是把内存里的数据写入磁盘的过程，术语就是flush</strong>。在这个flush操作执行之前，孔乙己的赊账总额，其实跟掌柜手中账本里面的记录是不一致的。因为孔乙己今天的赊账金额还只在粉板上，而账本里的记录是老的，还没把今天的赊账算进去。</p>
-<p><strong>当内存数据页跟磁盘数据页内容不一致的时候，我们称这个内存页为“脏页”。内存数据写入到磁盘后，内存和磁盘上的数据页的内容就一致了，称为“干净页”</strong>。</p>
-<p>不论是脏页还是干净页，都在内存中。在这个例子里，内存对应的就是掌柜的记忆。</p>
-<p>接下来，我们用一个示意图来展示一下“孔乙己赊账”的整个操作过程。假设原来孔乙己欠账10文，这次又要赊9文。</p>
-<p><img src="/2024/09/11/MySQL12/image-20240911105754102.png" alt="image-20240911105754102"></p>
-<p>回到文章开头的问题，<strong>你不难想象，平时执行很快的更新操作，其实就是在写内存和日志，而MySQL偶尔“抖”一下的那个瞬间，可能就是在刷脏页（flush）</strong>。</p>
-<p>那么，什么情况会引发数据库的flush过程呢？</p>
-<p>我们还是继续用咸亨酒店掌柜的这个例子，想一想：掌柜在什么情况下会把粉板上的赊账记录改到账本上？</p>
+                <p>一般情况下，<strong>如果我跟你说查询性能优化，你首先会想到一些复杂的语句，想到查询需要返回大量的数据。但有些情况下，“查一行”，也会执行得特别慢</strong>。今天，我就跟你聊聊这个有趣的话题，看看什么情况下，会出现这个现象。</p>
+<p>需要说明的是，<strong>如果MySQL数据库本身就有很大的压力，导致数据库服务器CPU占用率很高或ioutil（IO利用率）很高，这种情况下所有语句的执行都有可能变慢</strong>，不属于我们今天的讨论范围。</p>
+<p>为了便于描述，我还是构造一个表，基于这个表来说明今天的问题。这个表有两个字段id和c，并且我在里面插入了10万行记录。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; CREATE TABLE `t` (</span><br><span class="line">  `id` int(11) NOT NULL,</span><br><span class="line">  `c` int(11) DEFAULT NULL,</span><br><span class="line">  PRIMARY KEY (`id`)</span><br><span class="line">) ENGINE=InnoDB;</span><br><span class="line"></span><br><span class="line">delimiter ;;</span><br><span class="line">create procedure idata()</span><br><span class="line">begin</span><br><span class="line">  declare i int;</span><br><span class="line">  set i=1;</span><br><span class="line">  while(i&lt;=100000)do</span><br><span class="line">    insert into t values(i,i);</span><br><span class="line">    set i=i+1;</span><br><span class="line">  end while;</span><br><span class="line">end;;</span><br><span class="line">delimiter ;</span><br><span class="line"></span><br><span class="line">call idata();</span><br></pre></td></tr></table></figure>
+
+<p>接下来，我会用几个不同的场景来举例，有些是前面的文章中我们已经介绍过的知识点，你看看能不能一眼看穿，来检验一下吧。</p>
+<h3 id="第一类：查询长时间不返回"><a href="#第一类：查询长时间不返回" class="headerlink" title="第一类：查询长时间不返回"></a>第一类：查询长时间不返回</h3><p>如图1所示，在表t执行下面的SQL语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from t where id=1;</span><br></pre></td></tr></table></figure>
+
+<p>查询结果长时间不返回。</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912084741861.png" alt="image-20240912084741861"></p>
+<p><strong>一般碰到这种情况的话，大概率是表t被锁住了。接下来分析原因的时候，一般都是首先执行一下show processlist命令，看看当前语句处于什么状态。</strong></p>
+<p>对于不太了解的可以看看这几篇文章：</p>
 <ul>
-<li>第一种场景是，<strong>粉板满了，记不下了。这时候如果再有人来赊账，掌柜就只得放下手里的活儿，将粉板上的记录擦掉一些，留出空位以便继续记账。</strong>当然在擦掉之前，他必须先将正确的账目记录到账本中才行。 这个场景，<strong>对应的就是InnoDB的redo log写满了。这时候系统会停止所有更新操作（STW），把checkpoint往前推进，redo log留出空间可以继续写</strong>。我在第二讲画了一个redo log的示意图，这里我改成环形，便于大家理解。</li>
-</ul>
-<p><img src="/2024/09/11/MySQL12/image-20240911105804571.png" alt="image-20240911105804571"></p>
-<p>checkpoint可不是随便往前修改一下位置就可以的。比如图2中，<strong>把checkpoint位置从CP推进到CP’</strong>，就需要将两个点之间的日志（浅绿色部分），<strong>对应的所有脏页都flush到磁盘上。之后，图中从write pos到CP’之间就是可以再写入的redo log的区域。</strong></p>
-<ul>
-<li>第二种场景是，这一天生意太好，要记住的事情太多，掌柜发现自己快记不住了，<strong>赶紧找出账本把孔乙己这笔账先加进去。 这种场景，对应的就是系统内存不足</strong>。当需要新的内存页，而内存不够用的时候，<strong>就要淘汰一些数据页，空出内存给别的数据页使用。如果淘汰的是“脏页”，就要先将脏页写到磁盘。</strong> 你一定会说，<strong>这时候难道不能直接把内存淘汰掉，下次需要请求的时候，从磁盘读入数据页，然后拿redo log出来应用不就行了？这里其实是从性能考虑的。如果刷脏页一定会写盘</strong>，就保证了每个数据页有两种状态：<ul>
-<li><strong>一种是内存里存在，内存里就肯定是正确的结果，直接返回；</strong></li>
-<li><strong>另一种是内存里没有数据，就可以肯定数据文件上是正确的结果，读入内存后返回。 这样的效率最高。</strong></li>
-</ul>
+<li><p><a target="_blank" rel="noopener" href="https://blog.csdn.net/chen_jimo_c/article/details/104921212">MySQL中 show processlist命令详解_mysql show processlist-CSDN博客</a></p>
+<p>show processlist：通过查看mysql的官网，可以发现，<strong>其主要是查询数据库中哪些线程正在执行，针对比较慢的线程（time的数值比较大的线程）我们可以将其kill掉</strong>。此外，show full processlist 返回的结果是实时变化的。</p>
 </li>
-<li><strong>第三种场景是，生意不忙的时候，或者打烊之后。这时候柜台没事，掌柜闲着也是闲着，不如更新账本。</strong> 这种场景，<strong>对应的就是MySQL认为系统“空闲”的时候</strong>。当然，MySQL“这家酒店”的生意好起来可是会很快就能把粉板记满的，所以“掌柜”要合理地安排时间，<strong>即使是“生意好”的时候，也要见缝插针地找时间，只要有机会就刷一点“脏页”</strong>。</li>
-<li><strong>第四种场景是，年底了咸亨酒店要关门几天，需要把账结清一下。</strong>这时候掌柜要把所有账都记到账本上，这样过完年重新开张的时候，就能就着账本明确账目情况了。 <strong>这种场景，对应的就是MySQL正常关闭的情况。这时候，MySQL会把内存的脏页都flush到磁盘上，这样下次MySQL启动的时候，就可以直接从磁盘上读数据，启动速度会很快</strong>。</li>
+<li><p><a target="_blank" rel="noopener" href="https://www.cnblogs.com/libaiyun/p/16462461.html">mysql之show processlist详解 - 云白Li - 博客园 (cnblogs.com)</a></p>
+<p>这个讲的挺详细的，可以好好看看。</p>
+</li>
 </ul>
-<p>接下来，<strong>你可以分析一下上面四种场景对性能的影响。</strong></p>
-<p>其中，<strong>第三种情况是属于MySQL空闲时的操作，这时系统没什么压力，而第四种场景是数据库本来就要关闭了。这两种情况下，你不会太关注“性能”问题</strong>。所以这里，我们主要来分析一下前两种场景下的性能问题。</p>
-<p>第一种是“redo log写满了，要flush脏页”，这种情况是InnoDB要尽量避免的。<strong>因为出现这种情况的时候，整个系统就不能再接受更新了，所有的更新都必须堵住。如果你从监控上看，这时候更新数会跌为0。</strong></p>
-<p>第二种是“内存不够用了，要先将脏页写到磁盘”，这种情况其实是常态。<strong>InnoDB用缓冲池（buffer pool）管理内存，缓冲池中的内存页有三种状态：</strong></p>
-<ul>
-<li><strong>第一种是，还没有使用的；</strong></li>
-<li><strong>第二种是，使用了并且是干净页；</strong></li>
-<li><strong>第三种是，使用了并且是脏页。</strong></li>
-</ul>
-<p>InnoDB的策略是<strong>尽量使用内存，因此对于一个长时间运行的库来说，未被使用的页面很少</strong>。</p>
-<p>而当要读入的数据页没有在内存的时候，就必须到缓冲池中申请一个数据页。<strong>这时候只能把最久不使用的数据页从内存中淘汰掉：如果要淘汰的是一个干净页，就直接释放出来复用；但如果是脏页呢，就必须将脏页先刷到磁盘，变成干净页后才能复用。</strong></p>
-<p>所以，<strong>刷脏页虽然是常态</strong>，但是出现以下这两种情况，都是会明显影响性能的：</p>
+<p>然后我们再针对每种状态，去分析它们产生的原因、如何复现，以及如何处理。</p>
+<h3 id="等MDL锁"><a href="#等MDL锁" class="headerlink" title="等MDL锁"></a>等MDL锁</h3><p>如图2所示，就是使用show processlist命令查看Waiting for table metadata lock的示意图。</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912084802650.png" alt="image-20240912084802650"></p>
+<p>出现<strong>这个状态表示的是，现在有一个线程正在表t上请求或者持有MDL写锁，把select语句堵住了。</strong></p>
+<p>在第6篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/69862">《全局锁和表锁 ：给表加个字段怎么有这么多阻碍？》</a>中，我给你介绍过一种复现方法。<strong>但需要说明的是，那个复现过程是基于MySQL 5.6版本的。而MySQL 5.7版本修改了MDL的加锁策略，所以就不能复现这个场景了。</strong></p>
+<p>不过，在MySQL 5.7版本下复现这个场景，也很容易。如图3所示，我给出了简单的复现步骤。</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912084821808.png" alt="image-20240912084821808"></p>
+<p>session A 通过lock table命令持有表t的MDL写锁，而session B的查询需要获取MDL读锁。<strong>所以，session B进入等待状态。</strong></p>
+<p>这类问题的处理方式，<strong>就是找到谁持有MDL写锁，然后把它kill掉。</strong></p>
+<p>但是，由于在show processlist的结果里面，session A的Command列是“Sleep”，导致查找起来很不方便。不过有了performance_schema和sys系统库以后，就方便多了。<strong>（MySQL启动时需要设置performance_schema&#x3D;on，相比于设置为off会有10%左右的性能损失)</strong></p>
+<p>通过查询sys.schema_table_lock_waits这张表，<strong>我们就可以直接找出造成阻塞的process id，把这个连接用kill 命令断开即可。</strong></p>
+<p><img src="/2024/09/12/MySQL19/image-20240912084834562.png" alt="image-20240912084834562"></p>
+<h3 id="等flush"><a href="#等flush" class="headerlink" title="等flush"></a>等flush</h3><p>接下来，我给你举另外一种查询被堵住的情况。</p>
+<p>我在表t上，执行下面的SQL语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from information_schema.processlist where id=1;</span><br></pre></td></tr></table></figure>
+
+<p>这里，我先卖个关子。</p>
+<p>你可以看一下图5。我查出来这个线程的状态是Waiting for table flush，你可以设想一下这是什么原因。</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090014801.png" alt="image-20240912090014801"></p>
+<p>这个状态表示的是，<strong>现在有一个线程正要对表t做flush操作。MySQL里面对表做flush操作的用法，一般有以下两个：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">flush tables t with read lock;</span><br><span class="line"></span><br><span class="line">flush tables with read lock;</span><br></pre></td></tr></table></figure>
+
+<p><strong>这两个flush语句，如果指定表t的话，代表的是只关闭表t；如果没有指定具体的表名，则表示关闭MySQL里所有打开的表。</strong></p>
+<p>但是正常这<strong>两个语句执行起来都很快，除非它们也被别的线程堵住了。</strong></p>
+<p>所以，出现Waiting for table flush状态的可能情况是：<strong>有一个flush tables命令被别的语句堵住了，然后它又堵住了我们的select语句。</strong></p>
+<p>现在，我们一起来复现一下这种情况，<strong>复现步骤</strong>如图6所示：</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090103176.png" alt="image-20240912090103176"></p>
+<p>在session A中，<strong>我故意每行都调用一次sleep(1)，这样这个语句默认要执行10万秒，在这期间表t一直是被session A“打开”着。然后，session B的flush tables t命令再要去关闭表t，就需要等session A的查询结束。这样，session C要再次查询的话，就会被flush 命令堵住了。</strong></p>
+<p>图7是这个复现步骤的show processlist结果。这个例子的排查也很简单，<strong>你看到这个show processlist的结果，肯定就知道应该怎么做了。</strong></p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090115314.png" alt="image-20240912090115314"></p>
+<h3 id="等行锁"><a href="#等行锁" class="headerlink" title="等行锁"></a>等行锁</h3><p>现在，<strong>经过了表级锁的考验，我们的select 语句终于来到引擎里了。</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from t where id=1 lock in share mode; </span><br></pre></td></tr></table></figure>
+
+<p>上面这条语句的用法你也很熟悉了，我们在第8篇<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/70562">《事务到底是隔离的还是不隔离的？》</a>文章介绍当前读时提到过。</p>
+<p>由于访问id&#x3D;1这个记录时要<strong>加读锁，如果这时候已经有一个事务在这行记录上持有一个写锁，我们的select语句就会被堵住。</strong></p>
+<p>复现步骤和现场如下：</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090144226.png" alt="image-20240912090144226"></p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090158681.png" alt="image-20240912090158681"></p>
+<p>显然，session A启动了事务，<strong>占有写锁，还不提交，是导致session B被堵住的原因。</strong></p>
+<p>这个问题并不难分析，但问题是怎么查出是谁占着这个写锁。如果你用的是MySQL 5.7版本，可以通过sys.innodb_lock_waits 表查到。</p>
+<p>查询方法是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from t sys.innodb_lock_waits where locked_table=`&#x27;test&#x27;.&#x27;t&#x27;`\G</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2024/09/12/MySQL19/image-20240912090236152.png" alt="image-20240912090236152"></p>
+<p>可以看到，这个信息很全，4号线程是造成堵塞的罪魁祸首。而干掉这个罪魁祸首的方式，就是KILL QUERY 4或KILL 4。</p>
+<p>不过，<strong>这里不应该显示“KILL QUERY 4”。这个命令表示停止4号线程当前正在执行的语句，而这个方法其实是没有用的。因为占有行锁的是update语句，这个语句已经是之前执行完成了的，现在执行KILL QUERY，无法让这个事务去掉id&#x3D;1上的行锁。</strong></p>
+<p>实际上，<strong>KILL 4才有效，也就是说直接断开这个连接。这里隐含的一个逻辑就是，连接被断开的时候，会自动回滚这个连接里面正在执行的线程</strong>，也就<strong>释放了id&#x3D;1上的行锁</strong>。</p>
+<h3 id="第二类：查询慢"><a href="#第二类：查询慢" class="headerlink" title="第二类：查询慢"></a>第二类：查询慢</h3><p>经过了重重封“锁”，我们再来看看一些查询慢的例子。</p>
+<p>先来看一条你一定知道原因的SQL语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from t where c=50000 limit 1;</span><br></pre></td></tr></table></figure>
+
+<p><strong>由于字段c上没有索引，这个语句只能走id主键顺序扫描，因此需要扫描5万行。</strong></p>
+<p>作为确认，你可以看一下慢查询日志。注意，这里为了把所有语句记录到slow log里，<strong>我在连接后先执行了 set long_query_time&#x3D;0，将慢查询日志的时间阈值设置为0。</strong></p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090313828.png" alt="image-20240912090313828"></p>
+<p>Rows_examined显示扫描了50000行。你可能会说，不是很慢呀，11.5毫秒就返回了，我们线上一般都配置超过1秒才算慢查询。但你要记住：<strong>坏查询不一定是慢查询</strong>。我们这个例子里面只有10万行记录，<strong>数据量大起来的话，执行时间就线性涨上去了</strong>。</p>
+<p>扫描行数多，所以执行慢，这个很好理解。</p>
+<p>但是接下来，我们再看一个只扫描一行，但是执行很慢的语句。</p>
+<p>如图12所示，是这个例子的slow log。可以看到，执行的语句是</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from t where id=1；</span><br></pre></td></tr></table></figure>
+
+<p>虽然扫描行数是1，但执行时间却长达800毫秒。</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090348548.png" alt="image-20240912090348548"></p>
+<p>是不是有点奇怪呢，这些时间都花在哪里了？</p>
+<p>如果我把这个slow log的截图再往下拉一点，你可以看到下一个语句，select * from t where id&#x3D;1 lock in share mode，执行时扫描行数也是1行，执行时间是0.2毫秒。</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090404478.png" alt="image-20240912090404478"></p>
+<p>看上去是不是更奇怪了？<strong>按理说lock in share mode还要加锁，时间应该更长才对啊。</strong></p>
+<p>可能有的同学已经有答案了。如果你还没有答案的话，我再给你一个提示信息，图14是这两个语句的执行输出结果。</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090417710.png" alt="image-20240912090417710"></p>
+<p>第一个语句的查询结果里c&#x3D;1，带lock in share mode的语句返回的是c&#x3D;1000001。看到这里应该有更多的同学知道原因了。如果你还是没有头绪的话，也别着急。我先跟你说明一下复现步骤，再分析原因。</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090433278.png" alt="image-20240912090433278"></p>
+<p>你看到了，<strong>session A先用start transaction with consistent snapshot命令启动了一个事务，之后session B才开始执行update 语句。</strong></p>
+<p>session B执行完100万次update语句后，id&#x3D;1这一行处于什么状态呢？你可以从图16中找到答案。</p>
+<p><img src="/2024/09/12/MySQL19/image-20240912090445372.png" alt="image-20240912090445372"></p>
+<p><strong>session B更新完100万次，生成了100万个回滚日志(undo log)。</strong></p>
+<p>带lock in share mode的SQL语句，<strong>是当前读</strong>，因此会直接读到1000001这个结果，所以速度很快；<strong>而select * from t where id&#x3D;1这个语句，是一致性读，因此需要从1000001开始，依次执行undo log，执行了100万次以后，才将1这个结果返回。</strong></p>
+<p>注意，undo log里记录的其实是“把2改成1”，“把3改成2”这样的操作逻辑，画成减1的目的是方便你看图。</p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天我给你举了在一个简单的表上，执行“查一行”，可能会出现的<strong>被锁住和执行慢</strong>的例子。<strong>这其中涉及到了表锁、行锁和一致性读的概念。</strong></p>
+<p>在实际使用中，碰到的场景会更复杂。但大同小异，你可以按照我在文章中介绍的定位方法，来定位并解决问题。</p>
+<p>我们在举例加锁读的时候，用的是这个语句，select * from t where id&#x3D;1 lock in share mode。<strong>由于id上有索引，所以可以直接定位到id&#x3D;1这一行，因此读锁也是只加在了这一行上</strong>。</p>
+<p>但如果是下面的SQL语句，</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">begin;</span><br><span class="line">select * from t where c=5 for update;</span><br><span class="line">commit;</span><br></pre></td></tr></table></figure>
+
+<p>这个语句序列是怎么加锁的呢？加的锁又是什么时候释放呢？</p>
+<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>在上一篇文章最后，我留给你的问题是，希望你可以分享一下之前碰到过的、与文章中类似的场景。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; CREATE TABLE `table_a` (</span><br><span class="line">  `id` int(11) NOT NULL,</span><br><span class="line">  `b` varchar(10) DEFAULT NULL,</span><br><span class="line">  PRIMARY KEY (`id`),</span><br><span class="line">  KEY `b` (`b`)</span><br><span class="line">) ENGINE=InnoDB;</span><br></pre></td></tr></table></figure>
+
+<p>假设现在表里面，有100万行数据，其中有10万行数据的b的值是’1234567890’， 假设现在执行语句是这么写的:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from table_a where b=&#x27;1234567890abcd&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p>这时候，MySQL会怎么执行呢？</p>
+<p>最理想的情况是，MySQL看到字段b定义的是varchar(10)，那肯定返回空呀。<strong>可惜，MySQL并没有这么做。</strong></p>
+<p>那要不，<strong>就是把’1234567890abcd’拿到索引里面去做匹配，肯定也没能够快速判断出索引树b上并没有这个值，也很快就能返回空结果。</strong></p>
+<p>但实际上，MySQL也不是这么做的。</p>
+<p>这条SQL语句的执行很慢，流程是这样的：</p>
 <ol>
-<li><strong>一个查询要获取的新的数据页较多，会淘汰太多脏页，导致查询的响应时间明显变长；</strong></li>
-<li><strong>日志写满，更新全部堵住，写性能跌为0，这种情况对敏感业务来说，是不能接受的。</strong></li>
+<li>在传给引擎执行的时候，<strong>做了字符截断。因为引擎里面这个行只定义了长度是10，所以只截了前10个字节，就是’1234567890’进去做匹配；（这个字符截断很久以前还不太清楚，不过现在倒是清楚了）</strong></li>
+<li>这样满足条件的数据有10万行；</li>
+<li>因为是select *， <strong>所以要做10万次回表；</strong></li>
+<li><strong>但是每次回表以后查出整行，到server层一判断，b的值都不是’1234567890abcd’;</strong></li>
+<li>返回结果是空。</li>
 </ol>
-<p>所以，InnoDB需要有控制脏页比例的机制，来尽量避免上面的这两种情况。</p>
-<h3 id="InnoDB刷脏页的控制策略"><a href="#InnoDB刷脏页的控制策略" class="headerlink" title="InnoDB刷脏页的控制策略"></a>InnoDB刷脏页的控制策略</h3><p>接下来，我就来和你说说InnoDB脏页的控制策略，以及和这些策略相关的参数。</p>
-<p><strong>首先，你要正确地告诉InnoDB所在主机的IO能力，这样InnoDB才能知道需要全力刷脏页的时候，可以刷多快。</strong></p>
-<p>这就要用到<strong>innodb_io_capacity这个参数了，它会告诉InnoDB你的磁盘能力</strong>。<strong>这个值我建议你设置成磁盘的IOPS。磁盘的IOPS可以通过fio这个工具来测试，下面的语句是我用来测试磁盘随机读写的命令：</strong></p>
-<p>关于IOPS可以看看这篇文章：</p>
-<ul>
-<li><p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/668976764">一文读懂：IOPS、延迟和吞吐量等存储性能指标 - 知乎 (zhihu.com)</a></p>
-<p><strong>我们举个简单的栗子</strong>，就像我们上班坐地铁一样，<strong>地铁上一个和下一个人可以看作存储系统的I&#x2F;O，IOPS就相当于（地铁上的人+地铁下的人）&#x2F;停留时间（秒）。</strong></p>
-</li>
-</ul>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">fio -filename=$filename -direct=1 -iodepth 1 -thread -rw=randrw -ioengine=psync -bs=16k -size=500M -numjobs=10 -runtime=10 -group_reporting -name=mytest </span><br></pre></td></tr></table></figure>
-
-<p>其实，<strong>因为没能正确地设置innodb_io_capacity参数，而导致的性能问题也比比皆是</strong>。之前，就曾有其他公司的开发负责人找我看一个库的性能问题，说<strong>MySQL的写入速度很慢，TPS很低，但是数据库主机的IO压力并不大。经过一番排查，发现罪魁祸首就是这个参数的设置出了问题</strong>。</p>
-<p>他的主机磁盘用的是SSD，<strong>但是innodb_io_capacity的值设置的是300。于是，InnoDB认为这个系统的能力就这么差，所以刷脏页刷得特别慢，甚至比脏页生成的速度还慢，这样就造成了脏页累积，影响了查询和更新性能</strong>。</p>
-<p><strong>虽然我们现在已经定义了“全力刷脏页”的行为，但平时总不能一直是全力刷吧？毕竟磁盘能力不能只用来刷脏页，还需要服务用户请求。所以接下来，我们就一起看看InnoDB怎么控制引擎按照“全力”的百分比来刷脏页。</strong></p>
-<p>根据我前面提到的知识点，试想一下，<strong>如果你来设计策略控制刷脏页的速度，会参考哪些因素呢？</strong></p>
-<p>这个问题可以这么想，如果刷太慢，会出现什么情况？<strong>首先是内存脏页太多，其次是redo log写满。</strong></p>
-<p>所以，InnoDB的刷盘速度就是要参考这两个因素：<strong>一个是脏页比例，一个是redo log写盘速度。</strong></p>
-<p>InnoDB会根据这两个因素先单独算出两个数字。</p>
-<p>参数innodb_max_dirty_pages_pct是脏页比例上限，默认值是75%。InnoDB会根据当前的脏页比例（假设为M），算出一个范围在0到100之间的数字，计算这个数字的伪代码类似这样：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">F1(M)</span><br><span class="line">&#123;</span><br><span class="line">  if M&gt;=innodb_max_dirty_pages_pct then</span><br><span class="line">      return 100;</span><br><span class="line">  return 100*M/innodb_max_dirty_pages_pct;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>InnoDB每次写入的日志都有一个序号，<strong>当前写入的序号跟checkpoint对应的序号之间的差值，我们假设为N</strong>。InnoDB会根据这个N算出一个<strong>范围在0到100之间的数字</strong>，这个计算公式可以记为F2(N)。F2(N)算法比较复杂，你只要知道N越大，算出来的值越大就好了。</p>
-<p>然后，<strong>根据上述算得的F1(M)和F2(N)两个值，取其中较大的值记为R，之后引擎就可以按照innodb_io_capacity定义的能力乘以R%来控制刷脏页的速度。</strong></p>
-<p>上述的计算流程比较抽象，不容易理解，所以我画了一个简单的流程图。图中的F1、F2就是上面我们通过脏页比例和redo log写入速度算出来的两个值。</p>
-<p><img src="/2024/09/11/MySQL12/image-20240911105833495.png" alt="image-20240911105833495"></p>
-<p>现在你知道了，<strong>InnoDB会在后台刷脏页，而刷脏页的过程是要将内存页写入磁盘。所以，无论是你的查询语句在需要内存的时候可能要求淘汰一个脏页，还是由于刷脏页的逻辑会占用IO资源并可能影响到了你的更新语句</strong>，都可能是造成你从业务端感知到MySQL“抖”了一下的原因。</p>
-<p>要尽量避免这种情况，你就要<strong>合理地设置innodb_io_capacity</strong>的值，并且**平时要多关注脏页比例，不要让它经常接近75%**。</p>
-<p>其中，脏页比例是通过Innodb_buffer_pool_pages_dirty&#x2F;Innodb_buffer_pool_pages_total得到的，具体的命令参考下面的代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select VARIABLE_VALUE into @a from global_status where VARIABLE_NAME = &#x27;Innodb_buffer_pool_pages_dirty&#x27;;</span><br><span class="line">select VARIABLE_VALUE into @b from global_status where VARIABLE_NAME = &#x27;Innodb_buffer_pool_pages_total&#x27;;</span><br><span class="line">select @a/@b;</span><br></pre></td></tr></table></figure>
-
-<p>接下来，我们再看一个有趣的策略。</p>
-<p><strong>一旦一个查询请求需要在执行过程中先flush掉一个脏页时，这个查询就可能要比平时慢了</strong>。而MySQL中的一个机制，可能让你的查询会更慢：<strong>在准备刷一个脏页的时候，如果这个数据页旁边的数据页刚好是脏页，就会把这个“邻居”也带着一起刷掉；而且这个把“邻居”拖下水的逻辑还可以继续蔓延，也就是对于每个邻居数据页，如果跟它相邻的数据页也还是脏页的话，也会被放到一起刷</strong>。</p>
-<p>在InnoDB中，innodb_flush_neighbors 参数就是用来控制这个行为的，<strong>值为1的时候会有上述的“连坐”机制，值为0时表示不找邻居，自己刷自己的</strong>。</p>
-<p>找“邻居”这个优化在机械硬盘时代是很有意义的，<strong>可以减少很多随机IO。机械硬盘的随机IOPS一般只有几百，相同的逻辑操作减少随机IO就意味着系统性能的大幅度提升</strong>。</p>
-<p>而如果使用的是SSD这类IOPS比较高的设备的话，<strong>我就建议你把innodb_flush_neighbors的值设置成0。因为这时候IOPS往往不是瓶颈，而“只刷自己”，就能更快地执行完必要的刷脏页操作，减少SQL语句响应时间。</strong></p>
-<p><strong>在MySQL 8.0中，innodb_flush_neighbors参数的默认值已经是0了。</strong></p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天这篇文章，我延续第2篇中介绍的WAL的概念，<strong>和你解释了这个机制后续需要的刷脏页操作和执行时机</strong>。利用WAL技术，<strong>数据库将随机写转换成了顺序写，大大提升了数据库的性能</strong>。</p>
-<p>但是，<strong>由此也带来了内存脏页的问题。脏页会被后台线程自动flush，也会由于数据页淘汰而触发flush，而刷脏页的过程由于会占用资源，可能会让你的更新和查询语句的响应时间长一些</strong>。在文章里，我也给你介绍了控制刷脏页的方法和对应的监控方式。</p>
-<p>一个内存配置为128GB、innodb_io_capacity设置为20000的大规格实例，正常会建议你将redo log设置成4个1GB的文件。</p>
-<p>但如果你在配置的时候不慎将redo log设置成了1个100M的文件，会发生什么情况呢？又为什么会出现这样的情况呢？</p>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期我留给你的问题是，给一个学号字段创建索引，有哪些方法。</p>
-<p>由于这个学号的规则，<strong>无论是正向还是反向的前缀索引，重复度都比较高。因为维护的只是一个学校的，因此前面6位（其中，前三位是所在城市编号、第四到第六位是学校编号）其实是固定</strong>的，邮箱后缀都是@gamil.com，<strong>因此可以只存入学年份加顺序编号，它们的长度是9位</strong>。</p>
-<p>而其实在此基础上，<strong>可以用数字类型来存这9位数字。比如201100001，这样只需要占4个字节。其实这个就是一种hash</strong>，只是它用了最简单的转换规则：<strong>字符串转数字的规则，而刚好我们设定的这个背景，可以保证这个转换后结果的唯一性</strong>。</p>
-<p>一个学校的总人数这种数据量，50年才100万学生，这个表肯定是小表。<strong>为了业务简单，直接存原来的字符串。这个答复里面包含了“优化成本和收益”的思想，我觉得值得at出来</strong>。</p>
-<p>如果碰到表数据量特别大的场景，通过这种方式的收益是很不错的。</p>
+<p>这个例子，是我们文章内容的一个很好的补充。虽然执行过程中可能经过函数操作，但是最终在拿到结果后，server层还是要做一轮判断的。</p>
 <blockquote>
-<p>用整型存<strong>“四位年份+五位编号”</strong>的方法； <strong>由于整个学号的值超过了int上限，用8个字节的bigint来存的方法。</strong></p>
+<p>等号顺序问题，<strong>时间上MySQL优化器执行过程中，where 条件部分， a&#x3D;b和 b&#x3D;a的写法是一样的。</strong></p>
+<p>相同的模板语句，<strong>但是匹配行数不同，语句执行时间相差很大。这种情况，在语句里面有order by这样的操作时会更明显。</strong></p>
+<p>如果id 的类型是整数，<strong>传入的参数类型是字符串的时候，可以用上索引。</strong></p>
 </blockquote>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/12-wei-shi-mo-wo-de-mysql-hui-dou-yi-xia">12 为什么我的MySQL会“抖”一下？ | MySql实战45讲 (gitbook.io)</a></p>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/19-wei-shi-mo-wo-zhi-cha-yi-hang-de-yu-ju-ye-zhi-hang-zhe-mo-man">19 为什么我只查一行的语句，也执行这么慢？ | MySql实战45讲 (gitbook.io)</a></p>
 
                 
             </div>
@@ -507,7 +544,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/11/MySQL12/">http://example.com/2024/09/11/MySQL12/</a>
+                    <a href="http://example.com/2024/09/12/MySQL19/">http://example.com/2024/09/12/MySQL19/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -892,17 +929,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/11/MySQL13/">
+                <a href="/2024/09/12/MySQL19/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/22.jpg" class="responsive-img" alt="为什么表数据删掉一半，表文件大小不变？">
+                        <img src="/medias/featureimages/10.jpg" class="responsive-img" alt="为什么我只查一行的语句，也执行这么慢？">
                         
-                        <span class="card-title">为什么表数据删掉一半，表文件大小不变？</span>
+                        <span class="card-title">为什么我只查一行的语句，也执行这么慢？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -912,9 +950,9 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-11
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-12
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
@@ -927,6 +965,7 @@
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
@@ -945,13 +984,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/11/MySQL11/">
+                <a href="/2024/09/12/MySQL18/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/2.jpg" class="responsive-img" alt="怎么给字符串字段加索引？">
+                        <img src="/medias/featureimages/6.jpg" class="responsive-img" alt="为什么这些SQL语句逻辑相同，性能却差异巨大？">
                         
-                        <span class="card-title">怎么给字符串字段加索引？</span>
+                        <span class="card-title">为什么这些SQL语句逻辑相同，性能却差异巨大？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -962,7 +1001,7 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-11
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-12
                             </span>
                         <span class="publish-author">
                             
