@@ -4,9 +4,10 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="一条SQL查询语句是如何执行的？, zoloy">
-    <meta name="description" content="一条SQL查询语句是如何执行的？平时我们使用数据库，看到的通常都是一个整体。比如，你有个最简单的表，表里只有一个ID字段，在执行下面这个查询语句时：
-1mysql&amp;gt; select * from table where ID = 10;">
+    <meta name="keywords" content="幻读是什么，幻读有什么问题？, zoloy">
+    <meta name="description" content="在上一篇文章最后，我给你留了一个关于加锁规则的问题。今天，我们就从这个问题说起吧。
+为了便于说明问题，这一篇文章，我们就先使用一个小一点儿的表。建表和初始化语句如下（为了便于本期的例子说明，我把上篇文章中用到的表结构做了点儿修改）：
+123">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -18,7 +19,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>一条SQL查询语句是如何执行的？ | zoloy&#39;s blog</title>
+    <title>幻读是什么，幻读有什么问题？ | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -291,12 +292,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/16.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/9.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">一条SQL查询语句是如何执行的？</h1>
+                    <h1 class="description center-align post-title">幻读是什么，幻读有什么问题？</h1>
                 </div>
             </div>
         </div>
@@ -345,28 +346,28 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-09
+                    2024-09-12
                 </div>
                 
 
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
-                    2024-09-10
+                    2024-09-12
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    6.5k
+                    5k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    22 分
+                    18 分
                 </div>
                 
 
@@ -389,187 +390,149 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <h1 id="一条SQL查询语句是如何执行的？"><a href="#一条SQL查询语句是如何执行的？" class="headerlink" title="一条SQL查询语句是如何执行的？"></a>一条SQL查询语句是如何执行的？</h1><p>平时我们使用数据库，看到的通常都是一个整体。比如，你有个最简单的表，表里只有一个ID字段，在执行下面这个查询语句时：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from table where ID = 10;</span><br></pre></td></tr></table></figure>
+                <p>在上一篇文章最后，我给你留了一个关于加锁规则的问题。今天，我们就从这个问题说起吧。</p>
+<p>为了便于说明问题，这一篇文章，我们就先使用一个小一点儿的表。建表和初始化语句如下（为了便于本期的例子说明，我把上篇文章中用到的表结构做了点儿修改）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">CREATE TABLE `t` (</span><br><span class="line">  `id` int(11) NOT NULL,</span><br><span class="line">  `c` int(11) DEFAULT NULL,</span><br><span class="line">  `d` int(11) DEFAULT NULL,</span><br><span class="line">  PRIMARY KEY (`id`),</span><br><span class="line">  KEY `c` (`c`)</span><br><span class="line">) ENGINE=InnoDB;</span><br><span class="line"></span><br><span class="line">insert into t values(0,0,0),(5,5,5),</span><br><span class="line">(10,10,10),(15,15,15),(20,20,20),(25,25,25);</span><br></pre></td></tr></table></figure>
 
-<p>我们看到的只是输入一条语句，返回一个结果，却不知道这条语句在MySQL内部的执行过程。</p>
-<p>其实这也和SQL这门语言有关系，SQL这门语言的定位就是一种声明式编程的语言，具体可以看看这个<a target="_blank" rel="noopener" href="https://composingprograms.netlify.app/4/3">声明式编程</a>，本来就是不直接描述计算过程，而是描述一些计算的预期结果，比如上面SQL语句的意思是我想从这张表中获得所有ID为10的数据，并将获得到的数据按字段全部映射到结果中。</p>
-<p>下面给出的是MySQL的基本架构示意图，从中你可以清楚地看到SQL语句在MySQL的各个功能模块中的执行过程。</p>
-<p><img src="/2024/09/09/MySQL01/image-20240909122001902.png" alt="image-20240909122001902"></p>
-<p>大体来说，MySQL可以分为Server层和存储引擎层两部分。</p>
-<p><strong>Server层</strong>包括<strong>连接器、查询缓存、分析器、优化器、执行器</strong>等，涵盖MySQL的大多数核心服务功能，<strong>以及所有的内置函数（如日期、时间、数学和加密函数等）</strong>，<strong>所有跨存储引擎的功能都在这一层实现，比如存储过程、触发器、视图等</strong>。</p>
-<p>而<strong>存储引擎层</strong>负责数据的<strong>存储和提取</strong>。其架构模式是<strong>插件式的</strong>，<strong>支持InnoDB、MyISAM、Memory等多个存储引擎</strong>。现在<strong>最常用的存储引擎是InnoDB</strong>，它从<strong>MySQL 5.5.5</strong>版本开始成为了默认存储引擎。</p>
-<p>也就是说，你执行create table建表的时候，如果不指定引擎类型，<strong>默认使用的就是InnoDB</strong>。不过，你也可以通过指定存储引擎的类型来选择别的引擎，<strong>比如在create table语句中使用engine&#x3D;memory, 来指定使用内存引擎创建表</strong>。不同存储引擎的表数据存取方式不同，支持的功能也不同，在后面的文章中，我们会讨论到引擎的选择。</p>
-<p>从图中不难看出，不同的存储引擎共用一个<strong>Server层</strong>，也就是从连接器到执行器的部分。你可以先对每个组件的名字有个印象，接下来会结合开头提到的那条SQL语句，带你走一遍整个执行流程，依次看下每个组件的作用。</p>
-<h2 id="连接器"><a href="#连接器" class="headerlink" title="连接器"></a>连接器</h2><p>第一步，你要操作数据库，首先你就要连接到这个数据库上，这时候接待你的就是连接器。连接器负责跟客户端建立连接、获取权限、维持和管理连接。连接命令一般是这么写的：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql -h$ip -P$port -u$user -p</span><br></pre></td></tr></table></figure>
+<p>这个表除了主键id外，还有一个索引c，初始化语句在表中插入了6行数据。</p>
+<p>上期我留给你的问题是，下面的语句序列，是怎么加锁的，加的锁又是什么时候释放的呢？</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">begin;</span><br><span class="line">select * from t where d=5 for update;</span><br><span class="line">commit;</span><br></pre></td></tr></table></figure>
 
-<p><strong>输完命令之后，你就需要在交互对话里面输入密码。虽然密码也可以直接跟在-p后面写在命令行中，但这样可能会导致你的密码泄露。如果你连的是生产服务器，强烈建议你不要这么做。</strong></p>
-<p>大概就是这个样子</p>
-<p><img src="/2024/09/09/MySQL01/image-20240909122445750.png" alt="image-20240909122445750"></p>
-<p>连接命令中的mysql是客户端工具，<strong>主要就是用来跟服务端建立连接的</strong>。在完成经典的TCP握手后，连接器就要开始<strong>认证你的身份</strong>，这个时候用的就是你输入的用户名和密码。</p>
-<ul>
-<li>如果用户名或密码不对，你就会收到一个”Access denied for user”的错误，然后客户端程序结束执行。</li>
-<li>如果用户名密码认证通过，连接器会到权限表里面查出你拥有的权限。<strong>之后，这个连接里面的权限判断逻辑，都将依赖于此时读到的权限</strong>。</li>
-</ul>
-<p>这就意味着，<strong>一个用户成功建立连接后，即使你用管理员账号对这个用户的权限做了修改，也不会影响已经存在连接的权限。修改完成后，只有再新建的连接才会使用新的权限设置。</strong></p>
-<p>对于上面过程还有一个比较详细的解释，建议看看</p>
-<ul>
-<li><a target="_blank" rel="noopener" href="https://blog.csdn.net/LYue123/article/details/89256577">彻底弄懂mysql（一）–mysql的通信协议_mysql tcp protocol url-CSDN博客</a></li>
-<li><a target="_blank" rel="noopener" href="https://blog.csdn.net/LYue123/article/details/89285157?spm=1001.2014.3001.5502">彻底弄懂mysql（二）–连接方式_mysql连接池怎么算开启一次连接-CSDN博客</a></li>
-</ul>
-<p>这里我再提示一下，这个MySQL报文其实我们很久之前就见过了，特别是在IDEA中，那个数据连接的左下角就是报文。</p>
-<p>总结一下，上面两篇文章：</p>
-<p>第一篇主要是介绍了MySQL的通信具体是什么样的，先TCP三次握手，然后再到握手认证阶段（登陆认证报文就是在这个时候用的），最后就是命令执行阶段（我们可以输入命令啦）</p>
-<p>有两个问题问的特别好：</p>
-<ul>
-<li>为什么还要进行三次握手认证？</li>
-<li>因为TCP三次握手，<strong>只是将客户端与服务端建立起了连接，然后通过端口知道我要访问的是MySQL这个服务</strong>，但是MySQL它不同于HTTP，只要你知道URL就能得到一个响应，<strong>MySQL必须登陆后你才能进行操作</strong>。所以这个过程最重要的就是<strong>验证客户端的登陆权限</strong>。</li>
-<li>为什么是服务端主动给客户端发送认证呢？</li>
-<li>HTTP不是说<strong>只有客户端主动与服务端进行请求</strong>，<strong>服务端不是不能在没有请求的情况下主动进行响应吗</strong>？<br>首先，大家也不要陷入误区，<strong>在进行认证的这个交互中，实际上客户端与服务端还没有进行任何业务上的往来，只是进行一个认证</strong>，所以与上面说的HTTP的不同，如果细心的话你会发现，<strong>认证成功后，在命令执行阶段，MySQL这种通信方式是与HTTP非常类似的，在没有请求的情况下，服务端的MySQL也不会主动给你发送任何数据，所以这里不要混淆</strong>。<br>再说为什么服务端先发送，那肯定是因为他有不得不发送的道理，所以我们就需要理解一下，他发送的是什么东西。</li>
-</ul>
-<p>还包括了一个例子：</p>
-<ul>
-<li>小明找工作，投了一个简历给某个公司（TCP三次握手成功）<br>这时候，某公司就主动打电话了，告诉他，我们需要笔试，笔试的时间，网址，以及一些别的相关信息，规则等</li>
-<li>小明接收到这个消息之后，到了那个时间他就会请求那个网址，并将自己的信息告诉他</li>
-<li>这时候公司验证你的信息，验证成功后，你就可以开始笔试了</li>
-</ul>
-<p>特别是这个挑战随机数，有点意思：</p>
-<p>MySQL报文<strong>挑战随机数</strong>（通常称为“随机数”或“挑战数字”）是在MySQL客户端与服务器之间进行身份验证时使用的一种机制。具体来说，它在以下场景中发挥作用：</p>
+<p>比较好理解的是，<strong>这个语句会命中d&#x3D;5的这一行，对应的主键id&#x3D;5，因此在select 语句执行完成后，id&#x3D;5这一行会加一个写锁，而且由于两阶段锁协议，这个写锁会在执行commit语句的时候释放。</strong></p>
+<p>由于字段d上没有索引，<strong>因此这条查询语句会做全表扫描。那么，其他被扫描到的，但是不满足条件的5行记录上，会不会被加锁呢？</strong></p>
+<p>我们知道，InnoDB的默认事务隔离级别是可重复读，所以本文接下来没有特殊说明的部分，都是设定在可重复读隔离级别下。</p>
+<h3 id="幻读是什么？"><a href="#幻读是什么？" class="headerlink" title="幻读是什么？"></a>幻读是什么？</h3><p>现在，我们就来分析一下，如果只在id&#x3D;5这一行加锁，而其他行的不加锁的话，会怎么样。</p>
+<p>下面先来看一下这个场景（注意：这是我假设的一个场景）：</p>
+<p><img src="/2024/09/12/MySQL20/image-20240912102746933.png" alt="image-20240912102746933"></p>
+<p>可以看到，session A里执行了三次查询，分别是Q1、Q2和Q3。它们的SQL语句相同，都是select * from t where d&#x3D;5 for update。这个语句的意思你应该很清楚了，查所有d&#x3D;5的行，<strong>而且使用的是当前读</strong>，并且加上写锁。现在，我们来看一下这三条SQL语句，分别会返回什么结果。</p>
 <ol>
-<li><strong>身份验证</strong>: 当客户端连接到MySQL服务器时，服务器会生成一个随机数并发送给客户端。这个随机数用于生成加密的身份验证信息。</li>
-<li><strong>提高安全性</strong>: 通过使用随机数，服务器可以确保每次连接的身份验证过程都是唯一的，防止重放攻击。</li>
-<li><strong>握手协议</strong>: 在MySQL的握手协议中，随机数是服务器发送给客户端的一部分，客户端使用这个随机数与用户的密码结合，生成最终的身份验证信息。</li>
+<li>Q1只返回id&#x3D;5这一行；</li>
+<li>在T2时刻，session B把id&#x3D;0这一行的d值改成了5，因此T3时刻Q2查出来的是id&#x3D;0和id&#x3D;5这两行；</li>
+<li>在T4时刻，session C又插入一行（1,1,5），因此T5时刻Q3查出来的是id&#x3D;0、id&#x3D;1和id&#x3D;5的这三行。</li>
 </ol>
-<p>说实话有点像盐值加密</p>
-<p>MySQL 客户端的<strong>权能标志</strong>（Client Capability Flags）是一个用于表示客户端所支持功能的位标志。这些标志在客户端与 MySQL 服务器进行连接时起着重要的作用，确保双方能够有效地通信。</p>
+<p>其中，Q3读到id&#x3D;1这一行的现象，<strong>被称为“幻读”。也就是说，幻读指的是一个事务在前后两次查询同一个范围的时候，后一次查询看到了前一次查询没有看到的行</strong>。</p>
+<p>这里，我需要对“幻读”做一个说明：</p>
 <ol>
-<li><strong>功能协商</strong>: 客户端在建立连接时会发送其支持的功能标志，服务器根据这些标志来决定如何处理请求。</li>
-<li><strong>兼容性</strong>: 通过交换权能标志，客户端和服务器可以确保双方功能的兼容性，避免因不兼容的功能导致的错误。</li>
-<li><strong>优化性能</strong>: 权能标志可以帮助服务器优化数据传输方式，选择最适合双方的协议和功能。</li>
+<li>在可重复读隔离级别下，<strong>普通的查询是快照读，是不会看到别的事务插入的数据的。因此，幻读在“当前读”下才会出现。</strong></li>
+<li>上面session B的修改结果，被session A之后的select语句用“当前读”看到，<strong>不能称为幻读。幻读仅专指“新插入的行”。</strong></li>
 </ol>
-<p>第二篇主要是比较了一下短链接和长连接的区别，然后建议一般还是使用连接池来提升性能。</p>
-<p>总结一下这篇文章的重点部分：</p>
-<ul>
-<li>短连接：<br><strong>客户端连接–创建socket认证连接–维护连接–数据传输–关闭连接</strong></li>
-<li>长连接：<br><strong>客户端连接–创建socket认证连接–维护连接–数据传输–维护连接–数据传输…-关闭连接</strong></li>
-<li>连接池：<br>连接池的一个核心思想就是<strong>连接复用</strong>，<strong>通过建立一个数据库连接池以及一套连接使用、分配和管理策略</strong>，使得该连接池中的连接可以得到高效、安全的复用，<strong>避免了数据库连接频繁建立、关闭的开销</strong>。</li>
-</ul>
-<p>因为常见数据库的连接是一个比较影响性能的一个事情，所以使用连接池的目的也是尽量少的创建连接，然后呢又要避免去维护很多空闲的连接</p>
-<p>所以建议了解一下连接池的一些参数设置：（感觉我们只用关心下面四个被加粗的就行了）</p>
-<ul>
-<li><strong>初始化连接就是，创建的时候想池里放入的连接对象数</strong></li>
-<li>最大连接数量，就是允许同一时间能都进行工作的最大数量，如果是0表示没有限制</li>
-<li><strong>最大空闲连接，就是连接池中最大空闲连接数，如果超了，就要释放一部分空闲超时连接，如果是0表示不需要释放</strong></li>
-<li><strong>最小空闲连接数，太少了就要进行创建</strong></li>
-<li><strong>超时等待时间，如果一个访问到来的时候，已经到达了最大连接数，那这个请求会被放在请求等待队列中，开启一个计时器，如果经过这个时间后，还没有可用连接，就直接抛出异常给此用户。如果是-1表示无限等待。</strong></li>
-</ul>
-<p>后面感觉还是有一点不够用，又找了一些文章来看</p>
-<ul>
-<li><p><a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_44296929/article/details/102738568">连接池总结（作用、对比、参数含义、以及讲解）-CSDN博客</a></p>
-<p>看完之后感觉连接池就是类似公交车的长连接，用了很久才会被回收，但是每一个人都可以用，不像TCP长连接只能供一个人使用</p>
-</li>
-<li><p><a target="_blank" rel="noopener" href="https://www.jianshu.com/p/6c61cc49a0ed">数据库连接池-常用参数配置及含义 - 简书 (jianshu.com)</a></p>
-<p>这个讲的配置相对详细一点</p>
-</li>
-</ul>
-<p>连接完成后，如果你没有后续的动作，这个连接就处于空闲状态，你可以在show processlist命令中看到它。文本中这个图是show processlist的结果，其中的Command列显示为“Sleep”的这一行，就表示现在系统里面有一个空闲连接。</p>
-<p>客户端如果太长时间没动静，连接器就会自动将它断开。这个时间是由参数wait_timeout控制的，默认值是8小时。</p>
-<p><img src="/2024/09/09/MySQL01/image-20240909145917788.png" alt="image-20240909145917788"></p>
-<p>如果在连接被断开之后，客户端再次发送请求的话，就会收到一个错误提醒： <strong>Lost connection</strong> to MySQL server during query。<strong>这时候如果你要继续，就需要重连，然后再执行请求了。（这个情况我之前好像遇到过）</strong></p>
-<p>数据库里面，<strong>长连接是指连接成功后，如果客户端持续有请求，则一直使用同一个连接。短连接则是指每次执行完很少的几次查询就断开连接，下次查询再重新建立一个</strong>。</p>
-<p><strong>建立连接的过程通常是比较复杂的，所以我建议你在使用中要尽量减少建立连接的动作，也就是尽量使用长连接。</strong></p>
-<p>建议再看一篇文章，再看下面的东西</p>
-<p>[<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/43941022">玩转MySQL之二]MySQL连接机制浅析及运维 - 知乎 (zhihu.com)</a></p>
-<p>这篇文章很好的解释了为什么有的时候是不能使用短连接的：</p>
-<ul>
-<li><p>在<a target="_blank" rel="noopener" href="https://zhida.zhihu.com/search?q=%E6%85%A2%E9%80%9F%E7%BD%91%E7%BB%9C&zhida_source=entity&is_preview=1">慢速网络</a>下使用短连接，连接的开销会很大；在生产繁忙的系统中，连接也可能会受到系统端口数的限制，如果要每秒建立几千个连接，<strong>那么连接断开后，端口不会被马上回收利用，必须经历一个“FIN”阶段的等待，直到可被回收利用为止，这样就可能会导致端口资源不够用</strong>。</p>
-</li>
-<li><p>从客户端的角度来说，<strong>使用长连接有一个好处，可以不用每次创建新连接，若客户端对MySQL服务器的连接请求很频繁，永久连接将更加高效</strong>。对于**<a target="_blank" rel="noopener" href="https://zhida.zhihu.com/search?q=%E9%AB%98%E5%B9%B6%E5%8F%91&zhida_source=entity&is_preview=1">高并发</a>业务<strong>，如果可能会碰到连接的冲击，</strong>推荐使用长连接或连接池。**</p>
-</li>
-<li><p>从服务器的角度来看，情况则略有不同，<strong>它可以节省创建连接的开销，但维持连接也是需要内存的</strong>。如果滥用长连接的话，可能会使用过多的MySQL<a target="_blank" rel="noopener" href="https://zhida.zhihu.com/search?q=%E6%9C%8D%E5%8A%A1%E5%99%A8%E8%BF%9E%E6%8E%A5&zhida_source=entity&is_preview=1">服务器连接</a>。<strong>现代的操作系统可以拥有几千个MySQL连接，但很有可能绝大部分都是睡眠（sleep）状态的，这样的工作方式不够高效，而且连接占据内存，也会导致内存的浪费。</strong></p>
-</li>
-<li><p>对于扩展性好的站点来说，其实大部分的访问并不需要连接数据库。<strong>如果用户需要频繁访问数据库，那么可能会在流量增大的时候产生性能问题</strong>，此时长短连接都是无法解决问题的，<strong>所以应该进行合理的设计和优化来避免性能问题。</strong></p>
-</li>
-<li><p>为了确保扩展性好的站点在高流量情况下仍能保持良好的性能，以下是一些<strong>合理的设计和优化策略</strong>：</p>
-<p>\1. <strong>优化应用层</strong>—从应用程序代码来看</p>
-<p>减少数据库请求: 在应用逻辑中优化数据访问，尽量减少数据库请求的次数。例如，<strong>通过批量查询或合并请求。</strong></p>
-<p>使用分页: 对于大数据集，<strong>使用分页而不是一次性加载所有数据。</strong></p>
-<p>\2.  <strong>缓存机制</strong>—从缓存中间件来看</p>
-<p>使用缓存: <strong>在数据库前面引入缓存层（如 Redis、Memcached）来存储频繁访问的数据</strong>。这样可以减少数据库的直接查询次数。</p>
-<p>页面缓存: <strong>对于静态内容或不常变化的页面，使用页面缓存可以减少数据库的压力</strong>。<strong>该放Nginx的放Nginx，该放CDN的放CDN。</strong></p>
-<p>\3. **负载均衡 **—大的方面，从数据库实例来看</p>
-<p><strong>多实例部署</strong>: 将数据库部署为<strong>主从复制或集群模式，使用负载均衡器分散请求，提高并发处理能力。</strong></p>
-<p><strong>读写分离</strong>: 将读请求和写请求分开，<strong>写操作发送到主数据库，读操作发送到从数据库。</strong></p>
-<p><strong>数据分片</strong>: 对于大规模数据，可以考虑数据分片，将数据分散到不同的数据库实例中，<strong>减少单个数据库的压力。</strong></p>
-<p>\4.<strong>数据库优化</strong>—小的方面，从数据库表来看</p>
-<p><strong>索引优化</strong>: 确保数据库表中的索引设置合理，以加速查询。</p>
-<p><strong>查询优化</strong>: 使用 EXPLAIN 分析 SQL 查询，优化慢查询，减少不必要的数据检索。</p>
-</li>
-</ul>
-<p>下面这个感觉又可以出一个场景题了</p>
-<p>但是全部使用长连接后，你可能会发现，<strong>有些时候MySQL占用内存涨得特别快，这是因为MySQL在执行过程中临时使用的内存是管理在连接对象里面的。这些资源会在连接断开的时候才释放。所以如果长连接累积下来，可能导致内存占用太大，被系统强行杀掉（OOM），从现象看就是MySQL异常重启了。</strong></p>
-<p>怎么解决这个问题呢？你可以考虑以下两种方案。（至于为什么是这样，你看后面的查询缓存就知道了）</p>
+<p>如果只从第8篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/70562">《事务到底是隔离的还是不隔离的？》</a>我们学到的事务可见性规则来分析的话，上面这三条SQL语句的返回结果都没有问题。</p>
+<p><strong>因为这三个查询都是加了for update，都是当前读。而当前读的规则，就是要能读到所有已经提交的记录的最新值。</strong>并且，session B和sessionC的两条语句，执行后就会提交，所以Q2和Q3就是应该看到这两个事务的操作效果，而且也看到了，这跟事务的可见性规则并不矛盾。</p>
+<p>但是，这是不是真的没问题呢？</p>
+<p>不，这里还真就有问题。</p>
+<h3 id="幻读有什么问题？"><a href="#幻读有什么问题？" class="headerlink" title="幻读有什么问题？"></a>幻读有什么问题？</h3><p><strong>首先是语义上的。</strong>session A在T1时刻就声明了，<strong>“我要把所有d&#x3D;5的行锁住，不准别的事务进行读写操作”。而实际上，这个语义被破坏了。</strong></p>
+<p>如果现在这样看感觉还不明显的话，我再往session B和session C里面分别加一条SQL语句，你再看看会出现什么现象。</p>
+<p><img src="/2024/09/12/MySQL20/image-20240912102802316.png" alt="image-20240912102802316"></p>
+<p>session B的第二条语句update t set c&#x3D;5 where id&#x3D;0，语义是“我把id&#x3D;0、d&#x3D;5这一行的c值，改成了5”。</p>
+<p>由于在T1时刻，session A 还只是给id&#x3D;5这一行加了行锁， 并没有给id&#x3D;0这行加上锁。因此，session B在T2时刻，是可以执行这两条update语句的。<strong>这样，就破坏了 session A 里Q1语句要锁住所有d&#x3D;5的行的加锁声明。</strong></p>
+<p><strong>session C也是一样的道理，对id&#x3D;1这一行的修改，也是破坏了Q1的加锁声明。</strong></p>
+<p><strong>其次，是数据一致性的问题。</strong></p>
+<p>我们知道<strong>，锁的设计是为了保证数据的一致性。而这个一致性，不止是数据库内部数据状态在此刻的一致性，还包含了数据和日志在逻辑上的一致性。</strong></p>
+<p>为了说明这个问题，我给session A在T1时刻再加一个更新语句，即：update t set d&#x3D;100 where d&#x3D;5。</p>
+<p><img src="/2024/09/12/MySQL20/image-20240912102818585.png" alt="image-20240912102818585"></p>
+<p>update的加锁语义和select …for update 是一致的，所以这时候加上这条update语句也很合理。session A声明说“要给d&#x3D;5的语句加上锁”，就是为了要更新数据，<strong>新加的这条update语句就是把它认为加上了锁的这一行的d值修改成了100</strong>。</p>
+<p>现在，我们来分析一下图3执行完成后，数据库里会是什么结果。</p>
 <ol>
-<li>定期断开长连接。使用一段时间，或者程序里面判断执行过一个占用内存的大查询后，断开连接，之后要查询再重连。</li>
-<li>如果你用的是MySQL 5.7或更新版本，可以在每次执行一个比较大的操作后，通过执行 mysql_reset_connection来重新初始化连接资源。这个过程不需要重连和重新做权限验证，但是会将连接恢复到刚刚创建完时的状态。</li>
+<li>经过T1时刻，id&#x3D;5这一行变成 (5,5,100)，当然这个结果最终是在T6时刻正式提交的;</li>
+<li>经过T2时刻，id&#x3D;0这一行变成(0,5,5);</li>
+<li>经过T4时刻，表里面多了一行(1,5,5);</li>
+<li>其他行跟这个执行序列无关，保持不变。</li>
 </ol>
-<h2 id="查询缓存"><a href="#查询缓存" class="headerlink" title="查询缓存"></a>查询缓存</h2><p>连接建立完成后，你就可以执行select语句了。执行逻辑就会来到第二步：查询缓存。</p>
-<p>MySQL拿到一个查询请求后，<strong>会先到查询缓存看看，之前是不是执行过这条语句。之前执行过的语句及其结果可能会以key-value对的形式，被直接缓存在内存中。key是查询的语句，value是查询的结果。如果你的查询能够直接在这个缓存中找到key，那么这个value就会被直接返回给客户端。</strong></p>
-<p>如果语句不在查询缓存中，就会继续后面的执行阶段。<strong>执行完成后，执行结果会被存入查询缓存中。</strong>你可以看到，<strong>如果查询命中缓存，MySQL不需要执行后面的复杂操作，就可以直接返回结果，这个效率会很高。</strong></p>
-<p><strong>但是大多数情况下我会建议你不要使用查询缓存，为什么呢？因为查询缓存往往弊大于利。</strong></p>
-<p>查询缓存的失效非常频繁，<strong>只要有对一个表的更新，这个表上所有的查询缓存都会被清空</strong>。因此很可能你费劲地把结果存起来，还没使用呢，就被一个更新全清空了。对于更新压力大的数据库来说，<strong>查询缓存的命中率会非常低</strong>。除非你的业务就是有一张<strong>静态表</strong>，很长时间才会更新一次。比如，一个系统配置表，那这张表上的查询<strong>才适合使用查询缓存</strong>。</p>
-<p>好在MySQL也提供了这种“按需使用”的方式。你可以将参数query_cache_type设置成DEMAND，这样对于默认的SQL语句都不使用查询缓存。<strong>而对于你确定要使用查询缓存的语句，可以用SQL_CACHE显式指定，像下面这个语句一样：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select SQL_CACHE * from table where ID = 10;</span><br></pre></td></tr></table></figure>
-
-<p>需要注意的是，MySQL 8.0版本直接将查询缓存的整块功能删掉了，<strong>也就是说8.0开始彻底没有这个功能了</strong>。</p>
-<h2 id="分析器"><a href="#分析器" class="headerlink" title="分析器"></a>分析器</h2><p><strong>如果没有命中查询缓存，就要开始真正执行语句了。首先，MySQL需要知道你要做什么，因此需要对SQL语句做解析。</strong></p>
-<p>分析器先会做“<strong>词法分析</strong>”。<strong>你输入的是由多个字符串和空格组成的一条SQL语句，MySQL需要识别出里面的字符串分别是什么，代表什么。</strong></p>
-<p>这个有点像SICP讲的Scheme分析器啊<a target="_blank" rel="noopener" href="https://composingprograms.netlify.app/3/4">组合语言的解释器 (composingprograms.netlify.app)</a></p>
-<p>还有一点像ES的IK分词器，那个分词器里面我记得还有具体的算法来进行分词</p>
-<p>MySQL从你输入的”select”这个关键字识别出来，这是一个查询语句。它也要把字符串“T”识别成“表名T”，把字符串“ID”识别成“列ID”。</p>
-<p>做完了这些识别以后，就要做“<strong>语法分析</strong>”。根据词法分析的结果，语法分析器会根据语法规则，判断你输入的这个SQL语句是否满足MySQL语法。</p>
-<p>如果你的语句不对，就会收到“You have an error in your SQL syntax”的错误提醒，比如下面这个语句select少打了开头的字母“s”。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; elect * from t where ID=1;</span><br><span class="line"></span><br><span class="line">ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near &#x27;elect * from t where ID=1&#x27; at line 1</span><br></pre></td></tr></table></figure>
-
-<p>一般语法错误会提示第一个出现错误的位置，所以你要关注的是紧接“use near”的内容。</p>
-<h2 id="优化器"><a href="#优化器" class="headerlink" title="优化器"></a>优化器</h2><p>经过了<strong>分析器，MySQL就知道你要做什么了</strong>。在开始执行之前，还要先经过<strong>优化器的处理</strong>。</p>
-<p>优化器是在表里面有多个索引的时候，决定使用哪个索引；或者在一个语句有多表关联（join）的时候，决定各个表的连接顺序。比如你执行下面这样的语句，这个语句是执行两个表的join：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from t1 join t2 using(ID)  where t1.c=10 and t2.d=20;</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li>既可以先从表t1里面取出c&#x3D;10的记录的ID值，再根据ID值关联到表t2，再判断t2里面d的值是否等于20。</li>
-<li>也可以先从表t2里面取出d&#x3D;20的记录的ID值，再根据ID值关联到t1，再判断t1里面c的值是否等于10。</li>
-</ul>
-<p>这两种执行方法的逻辑结果是一样的，但是执行的效率会有不同，而优化器的作用就是决定选择使用哪一个方案。</p>
-<p><strong>优化器阶段完成后，这个语句的执行方案就确定下来了，然后进入执行器阶段。</strong>如果你还有一些疑问，比如优化器是怎么选择索引的，有没有可能选择错等等，没关系，我会在后面的文章中单独展开说明优化器的内容。</p>
-<h2 id="执行器"><a href="#执行器" class="headerlink" title="执行器"></a>执行器</h2><p>MySQL<strong>通过分析器知道了你要做什么，通过优化器知道了该怎么做，于是就进入了执行器阶段，开始执行语句</strong>。</p>
-<p>开始执行的时候，<strong>要先判断一下你对这个表T有没有执行查询的权限，如果没有，就会返回没有权限的错误</strong>，如下所示。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from T where ID=10;</span><br><span class="line"></span><br><span class="line">ERROR 1142 (42000): SELECT command denied to user &#x27;b&#x27;@&#x27;localhost&#x27; for table &#x27;T&#x27;</span><br></pre></td></tr></table></figure>
-
-<p>如果有权限，就<strong>打开表继续执行</strong>。打开表的时候，<strong>执行器就会根据表的引擎定义，去使用这个引擎提供的接口</strong>。</p>
-<p>比如我们这个例子中的表T中，ID字段没有索引，那么执行器的执行流程是这样的：</p>
+<p>这样看，这些数据也没啥问题，但是我们再来看看这时候binlog里面的内容。</p>
 <ol>
-<li><strong>调用InnoDB引擎接口</strong>取这个表的第一行，判断ID值是不是10，如果不是则跳过，如果是则将这行存在结果集中；</li>
-<li>调用引擎接口取“下一行”，重复相同的判断逻辑，直到取到这个表的最后一行。</li>
-<li>执行器将上述遍历过程中所有满足条件的行组成的记录集作为结果集返回给客户端。</li>
+<li>T2时刻，session B事务提交，写入了两条语句；</li>
+<li>T4时刻，session C事务提交，写入了两条语句；</li>
+<li>T6时刻，session A事务提交，写入了update t set d&#x3D;100 where d&#x3D;5 这条语句。</li>
 </ol>
-<p>至此，这个语句就执行完成了。</p>
-<p>对于有索引的表，执行的逻辑也差不多。<strong>第一次调用的是“取满足条件的第一行”这个接口，之后循环取“满足条件的下一行”这个接口</strong>，这些接口都是引擎中已经定义好的。</p>
-<p>你会在数据库的<strong>慢查询日志</strong>中看到一个<strong>rows_examined的字段</strong>，表示这个语句执行过程中扫描了多少行。<strong>这个值就是在执行器每次调用引擎获取数据行的时候累加的</strong>。</p>
-<p>在有些场景下，执行器调用一次，在引擎内部则扫描了多行，因此<strong>引擎扫描行数跟rows_examined并不是完全相同的。</strong></p>
-<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>如果表T中没有字段k，而你执行了这个语句 select * from T where k&#x3D;1, 那肯定是会报“不存在这个列”的错误： “Unknown column ‘k’ in ‘where clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？</p>
+<p>我统一放到一起的话，就是这样的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">update t set d=5 where id=0; /*(0,0,5)*/</span><br><span class="line">update t set c=5 where id=0; /*(0,5,5)*/</span><br><span class="line"></span><br><span class="line">insert into t values(1,1,5); /*(1,1,5)*/</span><br><span class="line">update t set c=5 where id=1; /*(1,5,5)*/</span><br><span class="line"></span><br><span class="line">update t set d=100 where d=5;/*所有d=5的行，d改成100*/</span><br></pre></td></tr></table></figure>
+
+<p>好，你应该看出问题了。这<strong>个语句序列，不论是拿到备库去执行，还是以后用binlog来克隆一个库，这三行的结果，都变成了 (0,5,100)、(1,5,100)和(5,5,100)。</strong></p>
+<p><strong>也就是说，id&#x3D;0和id&#x3D;1这两行，发生了数据不一致。这个问题很严重，是不行的。</strong></p>
+<p>到这里，我们再回顾一下，<strong>这个数据不一致到底是怎么引入的？</strong></p>
+<p>我们分析一下可以知道，<strong>这是我们假设“select * from t where d&#x3D;5 for update这条语句只给d&#x3D;5这一行，也就是id&#x3D;5的这一行加锁”导致的。</strong></p>
+<p>所以我们认为，上面的设定不合理，要改。</p>
+<p>那怎么改呢？<strong>我们把扫描过程中碰到的行，也都加上写锁，再来看看执行效果。</strong></p>
+<p><img src="/2024/09/12/MySQL20/image-20240912102845127.png" alt="image-20240912102845127"></p>
+<p><strong>由于session A把所有的行都加了写锁，所以session B在执行第一个update语句的时候就被锁住了。需要等到T6时刻session A提交以后，session B才能继续执行。</strong></p>
+<p>这样对于id&#x3D;0这一行，在数据库里的最终结果还是 (0,5,5)。在binlog里面，执行序列是这样的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">insert into t values(1,1,5); /*(1,1,5)*/</span><br><span class="line">update t set c=5 where id=1; /*(1,5,5)*/</span><br><span class="line"></span><br><span class="line">update t set d=100 where d=5;/*所有d=5的行，d改成100*/</span><br><span class="line"></span><br><span class="line">update t set d=5 where id=0; /*(0,0,5)*/</span><br><span class="line">update t set c=5 where id=0; /*(0,5,5)*/</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，按照日志顺序执行，id&#x3D;0这一行的最终结果也是(0,5,5)。所以，id&#x3D;0这一行的问题解决了。</p>
+<p>但同时你也可以看到，id&#x3D;1这一行，在数据库里面的结果是(1,5,5)，而根据binlog的执行结果是(1,5,100)，也就是说幻读的问题还是没有解决。<strong>为什么我们已经这么“凶残”地，把所有的记录都上了锁，还是阻止不了id&#x3D;1这一行的插入和更新呢？</strong></p>
+<p><strong>原因很简单。在T3时刻，我们给所有行加锁的时候，id&#x3D;1这一行还不存在，不存在也就加不上锁。</strong></p>
+<p><strong>也就是说，即使把所有的记录都加上锁，还是阻止不了新插入的记录，</strong>这也是为什么“幻读”会被单独拿出来解决的原因。</p>
+<p>到这里，其实我们刚说明完文章的标题 ：幻读的定义和幻读有什么问题。</p>
+<p>接下来，我们再看看InnoDB怎么解决幻读的问题。</p>
+<h3 id="如何解决幻读？"><a href="#如何解决幻读？" class="headerlink" title="如何解决幻读？"></a>如何解决幻读？</h3><p><strong>现在你知道了，产生幻读的原因是，行锁只能锁住行，但是新插入记录这个动作，要更新的是记录之间的“间隙”。因此，为了解决幻读问题，InnoDB只好引入新的锁，也就是间隙锁(Gap Lock)。</strong></p>
+<p>顾名思义，间隙锁，<strong>锁的就是两个值之间的空隙</strong>。比如文章开头的表t，初始化插入了6个记录，这就产生了7个间隙。</p>
+<p><img src="/2024/09/12/MySQL20/image-20240912102909138.png" alt="image-20240912102909138"></p>
+<p>这样，当你执行 select * from t where d&#x3D;5 for update的时候，<strong>就不止是给数据库中已有的6个记录加上了行锁，还同时加了7个间隙锁。这样就确保了无法再插入新的记录</strong>。</p>
+<p>也就是说这时候，在一行行扫描的过程中，不仅将给行加上了行锁，<strong>还给行两边的空隙，也加上了间隙锁</strong>。</p>
+<p>现在你知道了，<strong>数据行是可以加上锁的实体，数据行之间的间隙，也是可以加上锁的实体。但是间隙锁跟我们之前碰到过的锁都不太一样</strong>。</p>
+<p>比如行锁，分成读锁和写锁。下图就是这两种类型行锁的冲突关系。</p>
+<p><img src="/2024/09/12/MySQL20/image-20240912102918732.png" alt="image-20240912102918732"></p>
+<p>也就是说，跟行锁有冲突关系的是“另外一个行锁”。</p>
+<p>但是间隙锁不一样，<strong>跟间隙锁存在冲突关系的，是“往这个间隙中插入一个记录”这个操作。</strong>间隙锁之间都<strong>不存在</strong>冲突关系。</p>
+<p>这句话不太好理解，我给你举个例子：</p>
+<p><img src="/2024/09/12/MySQL20/image-20240912102929394.png" alt="image-20240912102929394"></p>
+<p>这里session B并不会被堵住。<strong>因为表t里并没有c&#x3D;7这个记录，因此session A加的是间隙锁(5,10)。而session B也是在这个间隙加的间隙锁。它们有共同的目标，即：保护这个间隙，不允许插入值。但，它们之间是不冲突的。</strong></p>
+<p>间隙锁和行锁合称next-key lock，每个next-key lock是前开后闭区间。也就是说，我们的表t初始化以后，如果用select * from t for update要把整个表所有记录锁起来，就形成了7个next-key lock，分别是 (-∞,0]、(0,5]、(5,10]、(10,15]、(15,20]、(20, 25]、(25, +supremum]。</p>
 <blockquote>
-<p>在执行 SQL 查询的过程中，当出现类似于 “Unknown column ‘k’ in ‘where clause’” 的错误信息时，这是在语义分析阶段报出的错误。</p>
-<p>具体的解析和执行过程如下：</p>
-<ol>
-<li><strong>词法分析和语法分析阶段</strong>：在这个阶段，MySQL 解析器将输入的 SQL 查询语句进行词法分析和语法分析，<strong>生成语法树（Parse Tree）或语法分析树（Parse Tree）</strong>。<strong>这个阶段主要是验证查询语句的语法正确性，检查语句中的关键字、标识符、运算符等是否符合语法规则。</strong></li>
-<li><strong>语义分析阶段</strong>：<strong>在语义分析阶段，MySQL 对语法树进行进一步的分析和验证。这个阶段主要是检查语句的语义正确性，包括验证列和表的存在性、数据类型的匹配、约束条件的合法性等。</strong>在执行 SQL 查询时，MySQL 需要确保查询中使用的列和表是存在的。</li>
-</ol>
-<p>当执行语句 “SELECT * FROM T WHERE k&#x3D;1” 时，MySQL 会在<strong>语义分析阶段尝试解析和验证其中的列名</strong>。如果表 T 中不存在名为 ‘k’ 的列，MySQL 将报告 “Unknown column ‘k’ in ‘where clause’” 错误，表示查询中引用了不存在的列。</p>
-<p>因此，<strong>该错误是在语义分析阶段报出的，即在验证查询语句的语义正确性时发现的</strong>。在这个阶段，MySQL 检查查询语句是否符合数据库模式的定义和约束条件。</p>
+<p>备注：这篇文章中，如果没有特别说明，<strong>我们把间隙锁记为开区间，把next-key lock记为前开后闭区间。</strong></p>
 </blockquote>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/01-ji-chu-jia-gou-yi-tiao-sql-cha-xun-yu-ju-shi-ru-he-zhi-hang-de">01 基础架构：一条SQL查询语句是如何执行的？ | MySql实战45讲 (gitbook.io)</a></p>
+<p>你可能会问说，这个supremum从哪儿来的呢？</p>
+<p><strong>这是因为+∞是开区间。实现上，InnoDB给每个索引加了一个不存在的最大值supremum，这样才符合我们前面说的“都是前开后闭区间”。</strong></p>
+<p><strong>间隙锁和next-key lock的引入，帮我们解决了幻读的问题，但同时也带来了一些“困扰”。</strong></p>
+<p>在前面的文章中，就有同学提到了这个问题。我把他的问题转述一下，对应到我们这个例子的表来说，业务逻辑这样的：任意锁住一行，如果这一行不存在的话就插入，如果存在这一行就更新它的数据，代码如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">begin;</span><br><span class="line">select * from t where id=N for update;</span><br><span class="line"></span><br><span class="line">/*如果行不存在*/</span><br><span class="line">insert into t values(N,N,N);</span><br><span class="line">/*如果行存在*/</span><br><span class="line">update t set d=N set id=N;</span><br><span class="line"></span><br><span class="line">commit;</span><br></pre></td></tr></table></figure>
+
+<p>可能你会说，<strong>这个不是insert … on duplicate key update 就能解决吗</strong>？但其实在有多个唯一键的时候，这个方法是不能满足这位提问同学的需求的。至于为什么，我会在后面的文章中再展开说明。</p>
+<p>这里介绍一下<code>insert … on duplicate key update </code>是什么：</p>
+<p><code>insert … on duplicate key update </code> 是 MySQL 中的一种语法，<strong>用于在插入数据时处理重复键的情况</strong>。其基本含义是：</p>
+<ul>
+<li><strong>如果插入的行在表中不存在，则执行插入操作。</strong></li>
+<li><strong>如果插入的行在表中已存在（即出现了主键或唯一索引冲突），则执行更新操作。（我记得Mybatis-Plus里面有个API好像就是使用的这个SQL语句）</strong></li>
+</ul>
+<p>现在，我们就只讨论这个逻辑。</p>
+<p>这个同学碰到的现象是，这个逻辑一旦有并发，就会碰到死锁。你一定也觉得奇怪，这个逻辑每次操作前用for update锁起来，已经是最严格的模式了，怎么还会有死锁呢？</p>
+<p>这里，我用两个session来模拟并发，并假设N&#x3D;9。</p>
+<p><img src="/2024/09/12/MySQL20/image-20240912102952820.png" alt="image-20240912102952820"></p>
+<p>你看到了，其实都不需要用到后面的update语句，就已经形成死锁了。我们按语句执行顺序来分析一下：</p>
+<ol>
+<li><strong>session A 执行select … for update语句，由于id&#x3D;9这一行并不存在，因此会加上间隙锁(5,10);</strong></li>
+<li><strong>session B 执行select … for update语句，同样会加上间隙锁(5,10)，间隙锁之间不会冲突，因此这个语句可以执行成功；</strong></li>
+<li><strong>session B 试图插入一行(9,9,9)，被session A的间隙锁挡住了，只好进入等待；</strong></li>
+<li><strong>session A试图插入一行(9,9,9)，被session B的间隙锁挡住了。</strong></li>
+</ol>
+<p>至此，两个session进入互相等待状态，形成死锁。<strong>当然，InnoDB的死锁检测马上就发现了这对死锁关系，让session A的insert语句报错返回了。</strong></p>
+<p>你现在知道了，<strong>间隙锁的引入，可能会导致同样的语句锁住更大的范围，这其实是影响了并发度的</strong>。其实，这还只是一个简单的例子，在下一篇文章中我们还会碰到更多、更复杂的例子。</p>
+<p>你可能会说，<strong>为了解决幻读的问题，我们引入了这么一大串内容，有没有更简单一点的处理方法呢。</strong></p>
+<p>我在文章一开始就说过，如果没有特别说明，今天和你分析的问题都是在可重复读隔离级别下的<strong>，间隙锁是在可重复读隔离级别下才会生效的。所以，你如果把隔离级别设置为读提交的话，就没有间隙锁了</strong>。但同时，<strong>你要解决可能出现的数据和日志不一致问题，需要把binlog格式设置为row。这，也是现在不少公司使用的配置组合</strong>。</p>
+<p>前面文章的评论区有同学留言说，他们公司就使用的是<strong>读提交隔离级别加binlog_format&#x3D;row的组合</strong>。他曾问他们公司的DBA说，你为什么要这么配置。DBA直接答复说，因为大家都这么用呀。</p>
+<p>所以，这个同学在评论区就问说，这个配置到底合不合理。</p>
+<p>关于这个问题本身的答案是，<strong>如果读提交隔离级别够用，也就是说，业务不需要可重复读的保证，这样考虑到读提交下操作数据的锁范围更小（没有间隙锁）</strong>，这个选择是合理的。</p>
+<p>但其实我想说的是，<strong>配置是否合理，跟业务场景有关，需要具体问题具体分析。</strong></p>
+<p>但是，如果DBA认为之所以这么用的原因是“大家都这么用”，那就有问题了，或者说，迟早会出问题。</p>
+<p>比如说，大家都用读提交，可是逻辑备份的时候，mysqldump为什么要把备份线程设置成可重复读呢？（这个我在前面的文章中已经解释过了，你可以再回顾下第6篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/69862">《全局锁和表锁 ：给表加个字段怎么有这么多阻碍？》</a>的内容）</p>
+<p>然后，在备份期间，<strong>备份线程用的是可重复读，而业务线程用的是读提交。同时存在两种事务隔离级别，会不会有问题？</strong></p>
+<p>进一步地，这两个不同的隔离级别现象有什么不一样的，关于我们的业务，“用读提交就够了”这个结论是怎么得到的？</p>
+<p>如果业务开发和运维团队这些问题都没有弄清楚，那么“没问题”这个结论，本身就是有问题的。</p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天我们从上一篇文章的课后问题说起，提到了全表扫描的加锁方式。<strong>我们发现即使给所有的行都加上行锁，仍然无法解决幻读问题，因此引入了间隙锁的概念。</strong></p>
+<p>我碰到过很多对数据库有一定了解的业务开发人员，他们在设计数据表结构和业务SQL语句的时候，<strong>对行锁有很准确的认识，但却很少考虑到间隙锁。最后的结果，就是生产库上会经常出现由于间隙锁导致的死锁现象</strong>。</p>
+<p><strong>行锁确实比较直观，判断规则也相对简单，间隙锁的引入会影响系统的并发度，也增加了锁分析的复杂度，但也有章可循。</strong>下一篇文章，我就会为你讲解InnoDB的加锁规则，帮你理顺这其中的“章法”。</p>
+<p><img src="/2024/09/12/MySQL20/image-20240912103017577.png" alt="image-20240912103017577"></p>
+<p>如果你之前没有了解过本篇文章的相关内容，一定觉得这三个语句简直是风马牛不相及。但实际上，这里session B和session C的insert 语句都会进入锁等待状态。</p>
+<p>你可以试着分析一下，出现这种情况的原因是什么？</p>
+<p>这里需要说明的是，这其实是我在下一篇文章介绍加锁规则后才能回答的问题，是留给你作为预习的，其中session C被锁住这个分析是有点难度的。如果你没有分析出来，也不要气馁，我会在下一篇文章和你详细说明。</p>
+<p>你也可以说说，<strong>你的线上MySQL配置的是什么隔离级别，为什么会这么配置？你有没有碰到什么场景，是必须使用可重复读隔离级别的呢？</strong></p>
+<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>我们在本文的开头回答了上期问题。有同学的回答中还说明了读提交隔离级别下，<strong>在语句执行完成后，是只有行锁的。而且语句执行完成后，InnoDB就会把不满足条件的行行锁去掉。</strong></p>
+<p>当然了，c&#x3D;5这一行的行锁，还是会等到commit的时候才释放的。</p>
+<blockquote>
+<p><strong>在读提交隔离级别下，是只有行锁的。</strong></p>
+<p>需要说明一下，需要在启动配置里面增加<strong>performance_schema&#x3D;on，才能用上这个功能，performance_schema库里的表才有数据。</strong></p>
+</blockquote>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/20-huan-du-shi-shi-mo-huan-du-you-shi-mo-wen-ti">20 幻读是什么，幻读有什么问题？ | MySql实战45讲 (gitbook.io)</a></p>
 
                 
             </div>
@@ -596,7 +559,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/09/MySQL01/">http://example.com/2024/09/09/MySQL01/</a>
+                    <a href="http://example.com/2024/09/12/MySQL20/">http://example.com/2024/09/12/MySQL20/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -981,17 +944,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/09/MySQL02/">
+                <a href="/2024/09/12/MySQL20/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/19.jpg" class="responsive-img" alt="日志系统：一条SQL更新语句是如何执行的？">
+                        <img src="/medias/featureimages/9.jpg" class="responsive-img" alt="幻读是什么，幻读有什么问题？">
                         
-                        <span class="card-title">日志系统：一条SQL更新语句是如何执行的？</span>
+                        <span class="card-title">幻读是什么，幻读有什么问题？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -1001,9 +965,9 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-09
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-12
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
@@ -1016,6 +980,7 @@
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
@@ -1034,13 +999,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/07/My-Backend-Learning-Journey/">
+                <a href="/2024/09/12/MySQL19/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/13.jpg" class="responsive-img" alt="My-Backend-Learning-Journey">
+                        <img src="/medias/featureimages/10.jpg" class="responsive-img" alt="为什么我只查一行的语句，也执行这么慢？">
                         
-                        <span class="card-title">My-Backend-Learning-Journey</span>
+                        <span class="card-title">为什么我只查一行的语句，也执行这么慢？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -1051,14 +1016,14 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-07
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-12
                             </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/Java/" class="post-category">
-                                    Java
+                            <a href="/categories/MySQL/" class="post-category">
+                                    MySQL
                                 </a>
                             
                             
@@ -1068,12 +1033,8 @@
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/Java/">
-                        <span class="chip bg-color">Java</span>
-                    </a>
-                    
-                    <a href="/tags/Backend/">
-                        <span class="chip bg-color">Backend</span>
+                    <a href="/tags/MySQL/">
+                        <span class="chip bg-color">MySQL</span>
                     </a>
                     
                 </div>
