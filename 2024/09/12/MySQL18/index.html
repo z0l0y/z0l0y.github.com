@@ -4,11 +4,10 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="普通索引和唯一索引，应该怎么选择？, zoloy">
-    <meta name="description" content="在前面的基础篇文章中，我给你介绍过索引的基本概念，相信你已经了解了唯一索引和普通索引的区别。今天我们就继续来谈谈，在不同的业务场景下，应该选择普通索引，还是唯一索引？
-不太清楚唯一索引和普通索引的右转看这篇文章：
-
-MySQL的普通索引和唯">
+    <meta name="keywords" content="为什么这些SQL语句逻辑相同，性能却差异巨大？, zoloy">
+    <meta name="description" content="在MySQL中，有很多看上去逻辑相同，但性能却差异巨大的SQL语句。对这些语句使用不当的话，就会不经意间导致整个数据库的压力变大。
+我今天挑选了三个这样的案例和你分享。希望再遇到相似的问题时，你可以做到举一反三、快速解决问题。
+案例一：条件">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -20,7 +19,7 @@ MySQL的普通索引和唯">
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>普通索引和唯一索引，应该怎么选择？ | zoloy&#39;s blog</title>
+    <title>为什么这些SQL语句逻辑相同，性能却差异巨大？ | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -293,12 +292,12 @@ MySQL的普通索引和唯">
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/17.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/6.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">普通索引和唯一索引，应该怎么选择？</h1>
+                    <h1 class="description center-align post-title">为什么这些SQL语句逻辑相同，性能却差异巨大？</h1>
                 </div>
             </div>
         </div>
@@ -347,28 +346,28 @@ MySQL的普通索引和唯">
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-10
+                    2024-09-12
                 </div>
                 
 
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
-                    2024-09-10
+                    2024-09-12
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    6k
+                    4.1k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    20 分
+                    15 分
                 </div>
                 
 
@@ -391,195 +390,147 @@ MySQL的普通索引和唯">
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <p>在前面的基础篇文章中，我给你介绍过索引的基本概念，相信你已经了解了<strong>唯一索引和普通索引</strong>的区别。今天我们就继续来谈谈，在不同的业务场景下，应该选择普通索引，还是唯一索引？</p>
-<p>不太清楚唯一索引和普通索引的右转看这篇文章：</p>
-<ul>
-<li><a target="_blank" rel="noopener" href="https://cloud.tencent.com/developer/article/1948984">MySQL的普通索引和唯一索引到底什么区别？-腾讯云开发者社区-腾讯云 (tencent.com)</a></li>
-</ul>
-<p>提取了一些重点出来：</p>
-<p><strong>主键 V.S 唯一索引：</strong></p>
-<p>主键保证DB的每一行都是<strong>唯一、不重复</strong>，比如身份证，学号等，不重复。 唯一索引的作用跟主键一样。 <strong>但在一张表里面只能有一个主键，不能为空，唯一索引可有多个。唯一索引可有一条记录为null。</strong></p>
-<p>比如学生表：</p>
-<ul>
-<li>在学校，一般用学号做主键，身份证号作为唯一索引</li>
-<li>在教育局，就把身份证号弄成主键，学号作为唯一索引</li>
-</ul>
-<p>所以选谁做主键，取决于业务需求。</p>
-<p><strong>更新性能：</strong></p>
-<p>往表中插入一个新记录(4,400)，InnoDB会有什么反应？</p>
-<p>这要看该记录要更新的目标页是否在内存：</p>
-<p>在内存：</p>
-<ul>
-<li>普通索引 找到3和5之间的位置，插入值，结束。 </li>
-<li>唯一索引 找到3和5之间的位置，<code>判断到没有冲突</code>，插入值，结束。</li>
-</ul>
-<p>只是一个判断的差别，耗费微小CPU时间。</p>
-<p>不在内存：</p>
-<ul>
-<li>唯一索引将数据页读入内存，判断到没有冲突，插入值，结束。 </li>
-<li>普通索引将更新记录在change buffer，结束。</li>
-</ul>
-<p><strong>将数据从磁盘读入内存涉及随机I&#x2F;O访问，是DB里成本最高的操作之一。而change buffer可以减少随机磁盘访问，所以更新性能提升明显。</strong></p>
-<p><strong>索引选择最佳实践：</strong></p>
-<p><strong>普通索引、唯一索引在查询性能上无差别，主要考虑更新性能。所以，推荐尽量选择普通索引。</strong></p>
-<p>若所有更新后面，都紧跟对该记录的查询，就该关闭change buffer。其它情况下，change buffer都能提升更新性能。 <strong>普通索引和change buffer的配合使用，对数据量大的表的更新优化还是明显的。</strong></p>
-<p><strong>在使用机械硬盘时，change buffer收益也很大。</strong>所以，当你有“历史数据”库，且出于成本考虑用机械硬盘，应该关注这些表里的索引，尽量用普通索引，把change buffer开大，确保“历史数据”表的数据写性能。</p>
-<p>建议看完这几篇文章之后再看下面的内容</p>
-<ul>
-<li><p><a target="_blank" rel="noopener" href="https://www.cnblogs.com/mengxinJ/p/14211427.html">MySQL 中的WAL机制 - 萌新J - 博客园 (cnblogs.com)</a></p>
-<p><strong>WAL，全称是Write-Ahead Logging， 预写日志系统。</strong>指的是 MySQL 的写操作<strong>并不是立刻更新到磁盘上，而是先记录在日志上，然后在合适的时间再更新到磁盘上</strong>。这样的好处是错开高峰期。日志主要分为 <strong>undo log（MVCC）、redo log（防止写操作因为宕机而丢失）、binlog（写操作的备份，保证主从一致）</strong>。这三种在之前的博客已经详细说过了，作用分别是 “ <strong>完成MVCC从而实现 MySQL 的隔离级别</strong> “、” <strong>降低随机写的性能消耗（转成顺序写），同时防止写操作因为宕机而丢失</strong> “、” <strong>写操作的备份，保证主从一致</strong> “。关于这三种日志的内容讲的比较分散且具体的执行过程没有提到，所以这里来总结一下这三种日志。</p>
-</li>
-<li><p><a target="_blank" rel="noopener" href="https://www.cnblogs.com/mengxinJ/p/14045520.html">一条 sql 的执行过程详解 - 萌新J - 博客园 (cnblogs.com)</a></p>
-<p>这个可以搭配着45讲看</p>
-</li>
-</ul>
-<p><strong>插入流程：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">insert into t(id,k)</span><br><span class="line">values (id1,k1),(id2,k2);</span><br></pre></td></tr></table></figure>
+                <p>在MySQL中，有很多看上去<strong>逻辑相同，但性能却差异巨大的SQL语句</strong>。<strong>对这些语句使用不当的话，就会不经意间导致整个数据库的压力变大</strong>。</p>
+<p>我今天挑选了三个这样的案例和你分享。希望再遇到相似的问题时，你可以做到举一反三、快速解决问题。</p>
+<h3 id="案例一：条件字段函数操作"><a href="#案例一：条件字段函数操作" class="headerlink" title="案例一：条件字段函数操作"></a>案例一：条件字段函数操作</h3><p>假设你现在维护了一个交易系统，其中交易记录表tradelog包含交易流水号（tradeid）、交易员id（operator）、交易时间（t_modified）等字段。为了便于描述，我们先忽略其他字段。这个表的建表语句如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; CREATE TABLE `tradelog` (</span><br><span class="line">  `id` int(11) NOT NULL,</span><br><span class="line">  `tradeid` varchar(32) DEFAULT NULL,</span><br><span class="line">  `operator` int(11) DEFAULT NULL,</span><br><span class="line">  `t_modified` datetime DEFAULT NULL,</span><br><span class="line">  PRIMARY KEY (`id`),</span><br><span class="line">  KEY `tradeid` (`tradeid`),</span><br><span class="line">  KEY `t_modified` (`t_modified`)</span><br><span class="line">) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</span><br></pre></td></tr></table></figure>
 
-<p>假设当前k索引树的状态，查找到位置后：</p>
+<p>假设，现在已经记录了从2016年初到2018年底的所有数据，运营部门有一个需求是，<strong>要统计发生在所有年份中7月份的交易记录总数。这个逻辑看上去并不复杂，你的SQL语句可能会这么写：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select count(*) from tradelog where month(t_modified)=7;</span><br></pre></td></tr></table></figure>
+
+<p>由于t_modified字段上有索引，<strong>于是你就很放心地在生产库中执行了这条语句，但却发现执行了特别久，才返回了结果。</strong></p>
+<p>如果你问DBA同事为什么会出现这样的情况，他大概会告诉你：<strong>如果对字段做了函数计算，就用不上索引了，这是MySQL的规定。</strong></p>
+<p>现在你已经学过了InnoDB的索引结构了，可以再追问一句为什么？为什么条件是where t_modified&#x3D;’2018-7-1’的时候可以用上索引，而改成where month(t_modified)&#x3D;7的时候就不行了？</p>
+<p>下面是这个t_modified索引的示意图。方框上面的数字就是month()函数对应的值。</p>
+<p><img src="/2024/09/12/MySQL18/image-20240912080302192.png" alt="image-20240912080302192"></p>
+<p>如果你的SQL语句条件用的是where t_modified&#x3D;’2018-7-1’的话，引擎就会按照上面绿色箭头的路线，快速定位到 t_modified&#x3D;’2018-7-1’需要的结果。</p>
+<p><strong>实际上，B+树提供的这个快速定位能力，来源于同一层兄弟节点的有序性。</strong></p>
+<p><strong>但是，如果计算month()函数的话，你会看到传入7的时候，在树的第一层就不知道该怎么办了。（我们建立索引之后日期是有序的，但是月份并不保证有序）</strong></p>
+<p>也就是说，<strong>对索引字段做函数操作，可能会破坏索引值的有序性，因此优化器就决定放弃走树搜索功能。</strong></p>
+<p>需要注意的是，优化器并不是要放弃使用这个索引。</p>
+<p>在这个例子里，放弃了树搜索功能，优化器可以选择遍历主键索引，也可以选择遍历索引t_modified，<strong>优化器对比索引大小后发现，索引t_modified更小，遍历这个索引比遍历主键索引来得更快。因此最终还是会选择索引t_modified。</strong></p>
+<p>接下来，我们使用explain命令，查看一下这条SQL语句的执行结果。</p>
+<p><img src="/2024/09/12/MySQL18/image-20240912080317773.png" alt="image-20240912080317773"></p>
+<p><strong>key&#x3D;”t_modified”表示的是，使用了t_modified这个索引</strong>；我在测试表数据中插入了10万行数据，rows&#x3D;100335，说明这条语句<strong>扫描了整个索引的所有值</strong>；<strong>Extra字段的Using index，表示的是使用了覆盖索引。</strong></p>
+<p>也就是说，由于在t_modified字段加了month()函数操作，导致了全索引扫描。<strong>为了能够用上索引的快速定位能力，我们就要把SQL语句改成基于字段本身的范围查询。按照下面这个写法，优化器就能按照我们预期的，用上t_modified索引的快速定位能力了。</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select count(*) from tradelog where</span><br><span class="line">    -&gt; (t_modified &gt;= &#x27;2016-7-1&#x27; and t_modified&lt;&#x27;2016-8-1&#x27;) or</span><br><span class="line">    -&gt; (t_modified &gt;= &#x27;2017-7-1&#x27; and t_modified&lt;&#x27;2017-8-1&#x27;) or </span><br><span class="line">    -&gt; (t_modified &gt;= &#x27;2018-7-1&#x27; and t_modified&lt;&#x27;2018-8-1&#x27;);</span><br></pre></td></tr></table></figure>
+
+<p>当然，如果你的系统上线时间更早，或者后面又插入了之后年份的数据的话，你就需要再把其他年份补齐。</p>
+<p>到这里我给你说明了，<strong>由于加了month()函数操作，MySQL无法再使用索引快速定位功能，而只能使用全索引扫描。</strong></p>
+<p>不过优化器在个问题上确实有“偷懒”行为，<strong>即使是对于不改变有序性的函数，也不会考虑使用索引。比如，对于select * from tradelog where id + 1 &#x3D; 10000这个SQL语句，这个加1操作并不会改变有序性，但是MySQL优化器还是不能用id索引快速定位到9999这一行。所以，需要你在写SQL语句的时候，手动改写成 where id &#x3D; 10000 -1才可以。（这也和MySQL索引使用的规则有关系。MySQL 的索引优化基于列的值，而不是基于表达式或计算结果。<code>id + 1</code> 是一个计算表达式，MySQL 不能将其直接映射到索引上的值。）</strong></p>
+<h3 id="案例二：隐式类型转换"><a href="#案例二：隐式类型转换" class="headerlink" title="案例二：隐式类型转换"></a>案例二：隐式类型转换</h3><p>接下来我再跟你说一说，另一个经常让程序员掉坑里的例子。</p>
+<p>我们一起看一下这条SQL语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from tradelog where tradeid=110717;</span><br></pre></td></tr></table></figure>
+
+<p>交易编号tradeid这个字段上，<strong>本来就有索引，但是explain的结果却显示，这条语句需要走全表扫描。你可能也发现了，tradeid的字段类型是varchar(32)，而输入的参数却是整型，所以需要做类型转换。</strong></p>
+<p>那么，现在这里就有两个问题：</p>
+<ol>
+<li>数据类型转换的规则是什么？</li>
+<li>为什么有数据类型转换，就需要走全索引扫描？</li>
+</ol>
+<p>先来看第一个问题，你可能会说，数据库里面类型这么多，这种数据类型转换规则更多，我记不住，应该怎么办呢？</p>
+<p>这里有一个简单的方法，看 select “10” &gt; 9的结果：</p>
+<ol>
+<li><strong>如果规则是“将字符串转成数字”，那么就是做数字比较，结果应该是1；</strong></li>
+<li><strong>如果规则是“将数字转成字符串”，那么就是做字符串比较，结果应该是0。</strong></li>
+</ol>
+<p>验证结果如图3所示。</p>
+<p><img src="/2024/09/12/MySQL18/image-20240912080358504.png" alt="image-20240912080358504"></p>
+<p>从图中可知，select “10” &gt; 9返回的是1，所以你就能确认MySQL里的转换规则了：<strong>在MySQL中，字符串和数字做比较的话，是将字符串转换成数字（原来在MySQL中也有数据类型转换）</strong>。</p>
+<p>这时，你再看这个全表扫描的语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from tradelog where tradeid=110717;</span><br></pre></td></tr></table></figure>
+
+<p>就知道对于优化器来说，这个语句相当于：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from tradelog where  CAST(tradid AS signed int) = 110717;</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，<strong>这条语句触发了我们上面说到的规则：对索引字段做函数操作，优化器会放弃走树搜索功能</strong>。</p>
+<p>现在，我留给你一个小问题，id的类型是int，如果执行下面这个语句，是否会导致全表扫描呢？</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select * from tradelog where id=&quot;83126&quot;;</span><br></pre></td></tr></table></figure>
+
+<p>你可以先自己分析一下，再到数据库里面去验证确认。</p>
+<p>接下来，我们再来看一个稍微复杂点的例子。</p>
+<h3 id="案例三：隐式字符编码转换"><a href="#案例三：隐式字符编码转换" class="headerlink" title="案例三：隐式字符编码转换"></a>案例三：隐式字符编码转换</h3><p>假设系统里还有另外一个表trade_detail，用于记录交易的操作细节。为了便于量化分析和复现，我往交易日志表tradelog和交易详情表trade_detail这两个表里插入一些数据。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; CREATE TABLE `trade_detail` (</span><br><span class="line">  `id` int(11) NOT NULL,</span><br><span class="line">  `tradeid` varchar(32) DEFAULT NULL,</span><br><span class="line">  `trade_step` int(11) DEFAULT NULL, /*操作步骤*/</span><br><span class="line">  `step_info` varchar(32) DEFAULT NULL, /*步骤信息*/</span><br><span class="line">  PRIMARY KEY (`id`),</span><br><span class="line">  KEY `tradeid` (`tradeid`)</span><br><span class="line">) ENGINE=InnoDB DEFAULT CHARSET=utf8;</span><br><span class="line"></span><br><span class="line">insert into tradelog values(1, &#x27;aaaaaaaa&#x27;, 1000, now());</span><br><span class="line">insert into tradelog values(2, &#x27;aaaaaaab&#x27;, 1000, now());</span><br><span class="line">insert into tradelog values(3, &#x27;aaaaaaac&#x27;, 1000, now());</span><br><span class="line"></span><br><span class="line">insert into trade_detail values(1, &#x27;aaaaaaaa&#x27;, 1, &#x27;add&#x27;);</span><br><span class="line">insert into trade_detail values(2, &#x27;aaaaaaaa&#x27;, 2, &#x27;update&#x27;);</span><br><span class="line">insert into trade_detail values(3, &#x27;aaaaaaaa&#x27;, 3, &#x27;commit&#x27;);</span><br><span class="line">insert into trade_detail values(4, &#x27;aaaaaaab&#x27;, 1, &#x27;add&#x27;);</span><br><span class="line">insert into trade_detail values(5, &#x27;aaaaaaab&#x27;, 2, &#x27;update&#x27;);</span><br><span class="line">insert into trade_detail values(6, &#x27;aaaaaaab&#x27;, 3, &#x27;update again&#x27;);</span><br><span class="line">insert into trade_detail values(7, &#x27;aaaaaaab&#x27;, 4, &#x27;commit&#x27;);</span><br><span class="line">insert into trade_detail values(8, &#x27;aaaaaaac&#x27;, 1, &#x27;add&#x27;);</span><br><span class="line">insert into trade_detail values(9, &#x27;aaaaaaac&#x27;, 2, &#x27;update&#x27;);</span><br><span class="line">insert into trade_detail values(10, &#x27;aaaaaaac&#x27;, 3, &#x27;update again&#x27;);</span><br><span class="line">insert into trade_detail values(11, &#x27;aaaaaaac&#x27;, 4, &#x27;commit&#x27;);</span><br></pre></td></tr></table></figure>
+
+<p>这时候，如果要查询id&#x3D;2的交易的所有操作步骤信息，SQL语句可以这么写：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select d.* from tradelog l, trade_detail d where d.tradeid=l.tradeid and l.id=2; /*语句Q1*/</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2024/09/12/MySQL18/image-20240912080532236.png" alt="image-20240912080532236"></p>
+<p>我们一起来看下这个结果：</p>
+<ol>
+<li>第一行显示优化器会先在交易记录表tradelog上查到id&#x3D;2的行，这个步骤用上了<strong>主键索引</strong>，rows&#x3D;1表示只扫描一行；</li>
+<li>第二行key&#x3D;NULL，表示没有用上交易详情表trade_detail上的tradeid索引，进行了全表扫描。</li>
+</ol>
+<p>在这个执行计划里，<strong>是从tradelog表中取tradeid字段，再去trade_detail表里查询匹配字段。因此，我们把tradelog称为驱动表，把trade_detail称为被驱动表，把tradeid称为关联字段。（这不就是关联表吗？）</strong></p>
+<p>接下来，我们看下这个explain结果表示的执行流程：</p>
+<p><img src="/2024/09/12/MySQL18/image-20240912080546148.png" alt="image-20240912080546148"></p>
+<p>图中：</p>
 <ul>
-<li>k1所在数据页在内存(buffer pool)</li>
-<li>k2数据页不在内存</li>
+<li>第1步，是根据id在tradelog表里找到L2这一行；</li>
+<li>第2步，是从L2中取出tradeid字段的值；</li>
+<li>第3步，是根据tradeid值到trade_detail表中查找条件匹配的行。explain的结果里面第二行的key&#x3D;NULL表示的就是，<strong>这个过程是通过遍历主键索引的方式，一个一个地判断tradeid的值是否匹配。</strong></li>
 </ul>
-<p>看如下流程：</p>
-<p><strong>带change buffer的更新流程</strong></p>
+<p>进行到这里，你会发现第3步不符合我们的预期。因为表trade_detail里tradeid字段上是有索引的，我们本来是希望通过使用tradeid索引能够快速定位到等值的行。但，这里并没有。</p>
+<p>如果你去问DBA同学，他们可能会告诉你，<strong>因为这两个表的字符集不同，一个是utf8，一个是utf8mb4，所以做表连接查询的时候用不上关联字段的索引。这个回答，也是通常你搜索这个问题时会得到的答案。（真的细节）</strong></p>
+<p>但是你应该再追问一下，为什么字符集不同就用不上索引呢？</p>
+<p>我们说问题是出在执行步骤的第3步，如果单独把这一步改成SQL语句的话，那就是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from trade_detail where tradeid=$L2.tradeid.value; </span><br></pre></td></tr></table></figure>
+
+<p><strong>其中，$L2.tradeid.value的字符集是utf8mb4。</strong></p>
+<p>参照前面的两个例子，你肯定就想到了，<strong>字符集utf8mb4是utf8的超集，所以当这两个类型的字符串在做比较的时候，MySQL内部的操作是，先把utf8字符串转成utf8mb4字符集，再做比较。</strong></p>
 <blockquote>
-<p> 图中箭头都是后台操作，不影响更新请求的响应。</p>
+<p><strong>这个设定很好理解，utf8mb4是utf8的超集。类似地，在程序设计语言里面，做自动类型转换的时候，为了避免数据在转换过程中由于截断导致数据错误，也都是“按数据长度增加的方向”进行转换的。</strong></p>
 </blockquote>
-<p><img src="/2024/09/10/MySQL09/image-20240910204423231.png" alt="image-20240910204423231"></p>
-<p>该更新做了如下操作：</p>
-<ol>
-<li>Page1在内存，直接更新内存</li>
-<li>Page2不在内存，<strong>就往change buffer区，缓存一个“往Page2插一行记录”的信息</strong></li>
-<li><strong>将前两个动作记入redo log</strong></li>
-</ol>
-<p>至此，事务完成。<strong>执行该更新语句成本很低，只是写两处内存，然后写一处磁盘（前两次操作合在一起写了一次磁盘），还是顺序写。</strong></p>
-<p><strong>处理之后的读请求：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">select * from t </span><br><span class="line">where k </span><br><span class="line">	in (k1, k2);</span><br></pre></td></tr></table></figure>
+<p>因此， 在执行上面这个语句的时候，<strong>需要将被驱动数据表里的字段一个个地转换成utf8mb4，再跟L2做比较</strong>。</p>
+<p>也就是说，实际上这个语句等同于下面这个写法：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select * from trade_detail  where CONVERT(traideid USING utf8mb4)=$L2.tradeid.value; </span><br></pre></td></tr></table></figure>
 
-<p>读语句紧随更新语句之后，<strong>这时内存中的数据都还在，所以此时这俩读操作就与系统表空间和 redo log 无关。</strong></p>
-<p><img src="/2024/09/10/MySQL09/image-20240910204622083.png" alt="image-20240910204622083"></p>
-<p>读Page1时，<strong>直接从内存返回</strong>。</p>
-<p>WAL之后若读数据，是否一定要读盘？一定要从redo log将数据更新后才能返回？ 其实不用。看上图状态，虽然磁盘上还是之前的数据，但这里直接从内存返回结果，结果是正确的。</p>
-<p>读Page2时，需将Page2从磁盘读入内存，然后应用change buffer里的操作日志，生成一个正确版本并返回结果。<strong>所以一直到需要读Page2时，该数据页才会被从磁盘读入内存。</strong></p>
-<p>综上，这俩机制的更新性能：</p>
-<ul>
-<li><strong>redo log 主要节省随机写磁盘的I&#x2F;O消耗（转成顺序写）</strong></li>
-<li><strong>change buffer主要节省随机读磁盘的I&#x2F;O消耗</strong></li>
-</ul>
-<h5 id="带change-buffer的读过程"><a href="#带change-buffer的读过程" class="headerlink" title="带change buffer的读过程"></a>带change buffer的读过程</h5><p><strong>总结：</strong></p>
-<p>因为<strong>唯一索引用不了change buffer</strong>，若业务可以接受，<strong>从性能角度，优先考虑非唯一索引</strong>。</p>
-<p><strong>到底何时使用唯一索引：</strong></p>
-<p>问题就在于“业务可能无法确保”，而本文前提是“业务代码已保证不会写入重复数据”，才讨论的性能问题。</p>
-<ul>
-<li><strong>若业务无法保证或业务就是要求<a target="_blank" rel="noopener" href="https://cloud.tencent.com/solution/database?from_column=20065&from=20065">数据库</a>来做约束 没有撤退可言，必须创建唯一索引。</strong>那本文意义就在于，若碰上大量插入数据慢、内存命中率低时，多提供了一个排查思路</li>
-<li><strong>“归档库”场景，可考虑使用唯一索引。</strong>比如线上数据只需保留半年，然后历史数据存在归档库。此时，归档数据已是确保没有唯一键冲突。要提高归档效率，可考虑把表的唯一索引改为普通索引。</li>
-</ul>
-<p>若某次写入使用了change buffer，之后主机异常重启，是否会丢失change buffer数据</p>
-<p>不会！虽然是只更新内存，<strong>但在事务提交时，change buffer的操作也被记录到了redo log。所以崩溃恢复时，change buffer也能找回。</strong></p>
-<p>接下来再看</p>
-<p>假设你在维护一个市民系统，每个人都有一个唯一的身份证号，而且业务代码已经保证了不会写入两个重复的身份证号。<strong>如果市民系统需要按照身份证号查姓名，就会执行类似这样的SQL语句：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select name from CUser where id_card = &#x27;xxxxxxxyyyyyyzzzzz&#x27;;</span><br></pre></td></tr></table></figure>
+<p><strong>CONVERT()函数，在这里的意思是把输入的字符串转成utf8mb4字符集。</strong></p>
+<p><strong>这就再次触发了我们上面说到的原则：对索引字段做函数操作，优化器会放弃走树搜索功能。</strong></p>
+<p>到这里，你终于明确了，<strong>字符集不同只是条件之一</strong>，<strong>连接过程中要求在被驱动表的索引字段上加函数操作</strong>，是直接导致对被驱动表做全表扫描的原因。</p>
+<p>作为对比验证，我给你提另外一个需求，“查找trade_detail表里id&#x3D;4的操作，对应的操作者是谁”，再来看下这个语句和它的执行计划。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt;select l.operator from tradelog l , trade_detail d where d.tradeid=l.tradeid and d.id=4;</span><br></pre></td></tr></table></figure>
 
-<p><strong>所以，你一定会考虑在id_card字段上建索引。</strong></p>
-<p>由于身份证号<strong>字段比较大</strong>，我<strong>不建议</strong>你把身份证号当做主键，那么现在你有两个选择，<strong>要么给id_card字段创建唯一索引，要么创建一个普通索引。如果业务代码已经保证了不会写入重复的身份证号，那么这两个选择逻辑上都是正确的。</strong></p>
-<p>现在我要问你的是，<strong>从性能的角度考虑</strong>，你选择唯一索引还是普通索引呢？选择的依据是什么呢？</p>
-<p>简单起见，我们还是用第4篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/69236">《深入浅出索引（上）》</a>中的例子来说明，假设字段 k 上的值都不重复。</p>
-<p><img src="/2024/09/10/MySQL09/image-20240910210027396.png" alt="image-20240910210027396"></p>
-<p>接下来，我们就从这两种索引对查询语句和更新语句的性能影响来进行分析。</p>
-<h3 id="查询过程"><a href="#查询过程" class="headerlink" title="查询过程"></a>查询过程</h3><p>假设，执行查询的语句是 select id from T where k&#x3D;5。这个查询语句在索引树上查找的过程，<strong>先是通过B+树从树根开始，按层搜索到叶子节点，也就是图中右下角的这个数据页，然后可以认为数据页内部通过二分法来定位记录。</strong></p>
+<p><img src="/2024/09/12/MySQL18/image-20240912080737873.png" alt="image-20240912080737873"></p>
+<p>这个语句里trade_detail 表成了驱动表，但是explain结果的第二行显示，**这次的查询操作用上了被驱动表tradelog里的索引(tradeid)**，扫描行数是1。</p>
+<p>这也是两个tradeid字段的join操作，为什么这次能用上被驱动表的tradeid索引呢？我们来分析一下。</p>
+<p>假设驱动表trade_detail里id&#x3D;4的行记为R4，那么在连接的时候（图5的第3步），被驱动表tradelog上执行的就是类似这样的SQL 语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select operator from tradelog  where traideid =$R4.tradeid.value; </span><br></pre></td></tr></table></figure>
+
+<p>这时候**$R4.tradeid.value的字符集是utf8, 按照字符集转换规则，要转成utf8mb4，所以这个过程就被改写成：**</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select operator from tradelog  where traideid =CONVERT($R4.tradeid.value USING utf8mb4); </span><br></pre></td></tr></table></figure>
+
+<p>你看，<strong>这里的CONVERT函数是加在输入参数上的</strong>，这样就可以用上被驱动表的traideid索引。</p>
+<p>理解了原理以后，就可以用来指导操作了。如果要优化语句</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select d.* from tradelog l, trade_detail d where d.tradeid=l.tradeid and l.id=2;</span><br></pre></td></tr></table></figure>
+
+<p>的执行过程，有两种做法：</p>
 <ul>
-<li><strong>对于普通索引来说，查找到满足条件的第一个记录(5,500)后，需要查找下一个记录，直到碰到第一个不满足k&#x3D;5条件的记录。</strong></li>
-<li><strong>对于唯一索引来说，由于索引定义了唯一性，查找到第一个满足条件的记录后，就会停止继续检索。</strong></li>
+<li><p>比较常见的优化方法是，<strong>把trade_detail表上的tradeid字段的字符集也改成utf8mb4，这样就没有字符集转换的问题了。</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">alter table trade_detail modify tradeid varchar(32) CHARACTER SET utf8mb4 default null;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>如果能够修改字段的字符集的话，是最好不过了。<strong>但如果数据量比较大， 或者业务上暂时不能做这个DDL的话，那就只能采用修改SQL语句的方法了。</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select d.* from tradelog l , trade_detail d where d.tradeid=CONVERT(l.tradeid USING utf8) and l.id=2; </span><br></pre></td></tr></table></figure></li>
 </ul>
-<p>那么，这个不同带来的性能差距会有多少呢？<strong>答案是，微乎其微。</strong></p>
-<p><strong>你知道的，InnoDB的数据是按数据页为单位来读写的。也就是说，当需要读一条记录的时候，并不是将这个记录本身从磁盘读出来，而是以页为单位，将其整体读入内存。在InnoDB中，每个数据页的大小默认是16KB。（这里就是想要说明InnoDB读数据不是一条一条读的，而是一页一页读的）</strong></p>
-<p><strong>因为引擎是按页读写的，所以说，当找到k&#x3D;5的记录的时候，它所在的数据页就都在内存里了。那么，对于普通索引来说，要多做的那一次“查找和判断下一条记录”的操作，就只需要一次指针寻找和一次计算。（简单的说，不是IO就行）</strong></p>
-<p>当然，<strong>如果k&#x3D;5这个记录刚好是这个数据页的最后一个记录，那么要取下一个记录，必须读取下一个数据页，这个操作会稍微复杂一些。</strong></p>
-<p>但是，我们之前计算过，<strong>对于整型字段，一个数据页可以放近千个key，因此出现这种情况的概率会很低</strong>。所以，我们计算平均性能差异时，仍可以认为这个操作成本对于现在的CPU来说可以忽略不计。</p>
-<h3 id="更新过程"><a href="#更新过程" class="headerlink" title="更新过程"></a>更新过程</h3><p>为了说明普通索引和唯一索引对更新语句性能的影响这个问题，我需要先跟你介绍一下change buffer。</p>
-<p>当需要更新一个数据页时，<strong>如果数据页在内存中就直接更新</strong>，而如果这个数据页<strong>还没有在内存</strong>中的话，在不影响数据一致性的前提下，<strong>InooDB会将这些更新操作缓存在change buffer中，这样就不需要从磁盘中读入这个数据页了（WAL）</strong>。在下次查询<strong>需要访问这个数据页的时候，将数据页读入内存，然后执行change buffer中与这个页有关的操作</strong>。通过这种方式就能保证这个数据逻辑的正确性。</p>
-<p>需要说明的是，<strong>虽然名字叫作change buffer，实际上它是可以持久化的数据</strong>。也就是说，<strong>change buffer在内存中有拷贝，也会被写入到磁盘上</strong>。</p>
-<p><strong>将change buffer中的操作应用到原数据页，得到最新结果的过程称为merge</strong>。除了访问这个数据页会触发merge外，<strong>系统有后台线程会定期merge</strong>。在数据库<strong>正常关闭（shutdown）的过程中，也会执行merge操作</strong>。</p>
-<p>显然，如果能够将更新操作<strong>先记录在change buffer，减少读磁盘，语句的执行速度会得到明显的提升</strong>。而且，数据读入内存是需要占用buffer pool的，所以这种方式还能够避免占用内存，提高内存利用率。</p>
-<p>那么，<strong>什么条件下可以使用change buffer呢？</strong></p>
-<p>对于唯一索引来说，<strong>所有的更新操作都要先判断这个操作是否违反唯一性约束</strong>。比如，要插入(4,400)这个记录，<strong>就要先判断现在表中是否已经存在k&#x3D;4的记录，而这必须要将数据页读入内存才能判断</strong>。<strong>如果都已经读入到内存了，那直接更新内存会更快，就没必要使用change buffer了</strong>。</p>
-<p>因此，唯一索引的更新就<strong>不能使用change buffer</strong>，实际上<strong>也只有普通索引可以使用</strong>。</p>
-<p><strong>change buffer用的是buffer pool里的内存，因此不能无限增大</strong>。change buffer的大小，可以通过参数innodb_change_buffer_max_size来动态设置。这个参数设置为50的时候，表示change buffer的大小最多只能占用buffer pool的50%。</p>
-<p>现在，你已经理解了change buffer的机制，那么我们再一起来看看<strong>如果要在这张表中插入一个新记录(4,400)的话，InnoDB的处理流程是怎样的。</strong></p>
-<p>第一种情况是，<strong>这个记录要更新的目标页在内存中</strong>。这时，InnoDB的处理流程如下：</p>
-<ul>
-<li><strong>对于唯一索引来说，找到3和5之间的位置，判断到没有冲突，插入这个值，语句执行结束；</strong></li>
-<li><strong>对于普通索引来说，找到3和5之间的位置，插入这个值，语句执行结束。</strong></li>
-</ul>
-<p>这样看来，普通索引和唯一索引对更新语句性能影响的差别，只是一个判断，只会耗费微小的CPU时间。</p>
-<p>但，这不是我们关注的重点。</p>
-<p>第二种情况是，<strong>这个记录要更新的目标页不在内存中</strong>。这时，InnoDB的处理流程如下：</p>
-<ul>
-<li>对于唯一索引来说，<strong>需要将数据页读入内存，判断到没有冲突</strong>，插入这个值，语句执行结束；</li>
-<li>对于普通索引来说，<strong>则是将更新记录在change buffer</strong>，语句执行就结束了。（充分体现了WAL）</li>
-</ul>
-<p><strong>将数据从磁盘读入内存涉及随机IO的访问，是数据库里面成本最高的操作之一</strong>。change buffer因为<strong>减少了随机磁盘访问，所以对更新性能的提升是会很明显的</strong>。</p>
-<p>之前我就碰到过一件事儿，有个DBA的同学跟我反馈说，他负责的某个业务的库内存命中率突然从99%降低到了75%，整个系统处于阻塞状态，更新语句全部堵住。而探究其原因后，<strong>我发现这个业务有大量插入数据的操作，而他在前一天把其中的某个普通索引改成了唯一索引</strong>。</p>
-<h3 id="change-buffer的使用场景"><a href="#change-buffer的使用场景" class="headerlink" title="change buffer的使用场景"></a>change buffer的使用场景</h3><p>通过上面的分析，你已经清楚了<strong>使用change buffer对更新过程的加速作用，也清楚了change buffer只限于用在普通索引的场景下，而不适用于唯一索引</strong>。那么，现在有一个问题就是：普通索引的所有场景，使用change buffer都可以起到加速作用吗？</p>
-<p><strong>因为merge的时候是真正进行数据更新的时刻，而change buffer的主要目的就是将记录的变更动作缓存下来，所以在一个数据页做merge之前，change buffer记录的变更越多（也就是这个页面上要更新的次数越多），收益就越大。</strong></p>
-<p>因此，<strong>对于写多读少的业务来说，页面在写完以后马上被访问到的概率比较小，此时change buffer的使用效果最好</strong>。这种业务模型常见的就是<strong>账单类、日志类的系统</strong>。</p>
-<p>反过来，假设一个业务的更新模式是<strong>写入之后马上会做查询</strong>，那么即使满足了条件，将更新先记录在change buffer，但之后由于<strong>马上要访问这个数据页</strong>，会<strong>立即触发merge过程</strong>。这样随机访问IO的次数<strong>不会减少</strong>，<strong>反而增加了change buffer的维护代价。所以，对于这种业务模式来说，change buffer反而起到了副作用</strong>。</p>
-<h3 id="索引选择和实践"><a href="#索引选择和实践" class="headerlink" title="索引选择和实践"></a>索引选择和实践</h3><p>回到我们文章开头的问题，普通索引和唯一索引应该怎么选择。<strong>其实，这两类索引在查询能力上是没差别的，主要考虑的是对更新性能的影响。所以，我建议你尽量选择普通索引。</strong></p>
-<p><strong>如果所有的更新后面，都马上伴随着对这个记录的查询，那么你应该关闭change buffer。而在其他情况下，change buffer都能提升更新性能。</strong></p>
-<p>在实际使用中，你会发现，<strong>普通索引和change buffer的配合使用，对于数据量大的表的更新优化还是很明显的</strong>。</p>
-<p>特别地，在使用机械硬盘时，change buffer这个机制的收效是非常显著的。所以，当你有一个类似“历史数据”的库，并且出于成本考虑用的是机械硬盘时，那你应该特别关注这些表里的索引，尽量使用普通索引，然后把change buffer 尽量开大，以确保这个“历史数据”表的数据写入速度。</p>
-<h3 id="change-buffer-和-redo-log"><a href="#change-buffer-和-redo-log" class="headerlink" title="change buffer 和 redo log"></a>change buffer 和 redo log</h3><p>理解了change buffer的原理，你可能会联想到我在前面文章中和你介绍过的redo log和WAL。</p>
-<p>在前面文章的评论中，我发现有同学混淆了redo log和change buffer。WAL 提升性能的核心机制，也的确是尽量减少随机读写，这两个概念确实容易混淆。所以，这里我把它们放到了同一个流程里来说明，便于你区分这两个概念。</p>
+<p><img src="/2024/09/12/MySQL18/image-20240912080945459.png" alt="image-20240912080945459"></p>
+<p>这里，<strong>我主动把 l.tradeid转成utf8（把传递过来的参数转化为这张表的字符编码，而不是将整张表都转换为传递过来参数的字符编码）</strong>，就避免了被驱动表上的字符编码转换，从explain结果可以看到，这次索引走对了。</p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天我给你举了三个例子，其实是在说同一件事儿，即：<strong>对索引字段做函数操作，可能会破坏索引值的有序性，因此优化器就决定放弃走树搜索功能。</strong></p>
+<p>第二个例子是<strong>隐式类型转换，第三个例子是隐式字符编码转换，它们都跟第一个例子一样，因为要求在索引字段上做函数操作而导致了全索引扫描</strong>。</p>
+<p>MySQL的优化器确实有“偷懒”的嫌疑，即使简单地把where id+1&#x3D;1000改写成where id&#x3D;1000-1就能够用上索引快速查找，也不会主动做这个语句重写。</p>
+<p>因此，<strong>每次你的业务代码升级时，把可能出现的、新的SQL语句explain一下，是一个很好的习惯（这个到时候我们可以具体去分析）</strong>。</p>
+<p>你遇到过别的、类似今天我们提到的性能问题吗？你认为原因是什么，又是怎么解决的呢？</p>
+<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>我在上篇文章的最后，留给你的问题是：我们文章中最后的一个方案是，通过三次limit Y,1 来得到需要的数据，你觉得有没有进一步的优化方法。</p>
+<p>这里我给出一种方法，<strong>取Y1、Y2和Y3里面最大的一个数，记为M，最小的一个数记为N</strong>，然后执行下面这条SQL语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from t limit N, M-N+1;</span><br></pre></td></tr></table></figure>
+
+<p><strong>再加上取整个表总行数的C行，这个方案的扫描行数总共只需要C+M+1行。</strong></p>
+<p><strong>当然也可以先取回id值，在应用中确定了三个id值以后，再执行三次where id&#x3D;X的语句也是可以的。</strong></p>
 <blockquote>
-<p>备注：这里，你可以再回顾下第2篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68633">《日志系统：一条SQL更新语句是如何执行的？》</a>中的相关内容。</p>
+<p>提出了重新整理的方法</p>
+<p>用rowid的方法，是类似的思路，就是让表里面保存一个无空洞的自增值，这样就可以用我们的随机算法1来实现； </p>
+<p>拿到第一个值以后，用id迭代往下找的方案，利用了主键索引的有序性。</p>
 </blockquote>
-<p>现在，我们要在表上执行这个插入语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; insert into t(id,k) values(id1,k1),(id2,k2);</span><br></pre></td></tr></table></figure>
-
-<p>这里，我们假设当前k索引树的状态，查找到位置后，k1所在的数据页在内存(InnoDB buffer pool)中，k2所在的数据页不在内存中。如图2所示是带change buffer的更新状态图。</p>
-<p><img src="/2024/09/10/MySQL09/image-20240910210049413.png" alt="image-20240910210049413"></p>
-<p>分析这条更新语句，你会发现它涉及了四个部分：内存、redo log（ib_log_fileX）、 数据表空间（t.ibd）、系统表空间（ibdata1）。</p>
-<p>这条更新语句做了如下的操作（按照图中的数字顺序）：</p>
-<ol>
-<li><strong>Page 1在内存中，直接更新内存；</strong></li>
-<li><strong>Page 2没有在内存中，就在内存的change buffer区域，记录下“我要往Page 2插入一行”这个信息</strong></li>
-<li><strong>将上述两个动作记入redo log中（图中3和4）。</strong></li>
-</ol>
-<p>做完上面这些，事务就可以完成了。所以，你会看到，执行这条更新语句的成本很低，就是写了两处内存，然后写了一处磁盘（两次操作合在一起写了一次磁盘），而且还是顺序写的。</p>
-<p>同时，图中的两个虚线箭头，是后台操作，不影响更新的响应时间。</p>
-<p>那在这之后的读请求，要怎么处理呢？</p>
-<p>比如，我们现在要执行 select * from t where k in (k1, k2)。这里，我画了这两个读请求的流程图。</p>
-<p><strong>如果读语句发生在更新语句后不久，内存中的数据都还在，</strong>那么此时的这两个读操作就与系统表空间（ibdata1）和 redo log（ib_log_fileX）无关了。所以，我在图中就没画出这两部分。</p>
-<p><img src="/2024/09/10/MySQL09/image-20240910210104418.png" alt="image-20240910210104418"></p>
-<p>从图中可以看到：</p>
-<ol>
-<li><strong>读Page 1的时候，直接从内存返回</strong>。WAL之后如果读数据，是不是一定要读盘，<strong>是不是一定要从redo log里面把数据更新以后才可以返回</strong>？其实是不用的。你可以看一下图3的这个状态，虽然磁盘上还是之前的数据，但是这里直接从内存返回结果，结果是正确的。（简单的说，WAL就是延迟更新的，拖到没有办法了再更新）</li>
-<li><strong>要读Page 2的时候，需要把Page 2从磁盘读入内存中，然后应用change buffer里面的操作日志，生成一个正确的版本并返回结果。</strong></li>
-</ol>
-<p>可以看到，直到需要读Page 2的时候，这个数据页才会被读入内存。</p>
-<p>所以，如果要简单地对比这两个机制在提升更新性能上的收益的话，<strong>redo log 主要节省的是随机写磁盘的IO消耗（转成顺序写），而change buffer主要节省的则是随机读磁盘的IO消耗。（一个优化了写磁盘，一个优化了读磁盘）</strong></p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天，我从普通索引和唯一索引的选择开始，和你分享了数据的查询和更新过程，然后说明了change buffer的机制以及应用场景，最后讲到了索引选择的实践。</p>
-<p><strong>由于唯一索引用不上change buffer的优化机制，因此如果业务可以接受，从性能角度出发我建议你优先考虑非唯一索引。</strong></p>
-<p>最后，又到了思考题时间。</p>
-<p><img src="/2024/09/10/MySQL09/image-20240910211808617.png" alt="image-20240910211808617"></p>
-<p>通过图2你可以看到，change buffer一开始是写内存的，那么如果这个时候机器掉电重启，会不会导致change buffer丢失呢？change buffer丢失可不是小事儿，再从磁盘读入数据可就没有了merge过程，就等于是数据丢失了。会不会出现这种情况呢？</p>
-<p><strong>补充：</strong> 大家对“是否使用唯一索引”有比较多的讨论，主要是纠结在“业务可能无法确保”的情况。这里，我再说明一下：</p>
-<ul>
-<li><strong>首先，业务正确性优先。</strong>咱们这篇文章的前提是“业务代码<strong>已经保证不会写入重复数据</strong>”的情况下，讨论性能问题。<strong>如果业务不能保证，或者业务就是要求数据库来做约束，那么没得选，必须创建唯一索引</strong>。这种情况下，本篇文章的意义在于，<strong>如果碰上了大量插入数据慢、内存命中率低的时候，可以给你多提供一个排查思路。</strong></li>
-<li><strong>然后，在一些“归档库”的场景，你是可以考虑使用唯一索引的。</strong>比如，线上数据只需要保留半年，然后历史数据保存在归档库。这时候，归档数据已经是确保没有唯一键冲突了。<strong>要提高归档效率，可以考虑把表里面的唯一索引改成普通索引。</strong></li>
-</ul>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期的问题是：如何构造一个“数据无法修改”的场景。</p>
-<p><img src="/2024/09/10/MySQL09/image-20240910212018837.png" alt="image-20240910212018837"></p>
-<p>这样，session A看到的就是我截图的效果了。</p>
-<p>其实，还有另外一种场景</p>
-<p><img src="/2024/09/10/MySQL09/image-20240910212034843.png" alt="image-20240910212034843"></p>
-<p>这个操作序列跑出来，session A看的内容也是能够复现我截图的效果的。这个session B’启动的事务比A要早，其实是上期我们描述事务版本的可见性规则时留的彩蛋，因为规则里还有一个“活跃事务的判断”，我是准备留到这里再补充的。</p>
-<p>当我试图在这里讲述完整规则的时候，发现第8篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/70562">《事务到底是隔离的还是不隔离的？》</a>中的解释引入了太多的概念，以致于分析起来非常复杂。</p>
-<p>因此，我重写了第8篇，这样我们人工去判断可见性的时候，才会更方便。【看到这里，我建议你能够再重新打开第8篇文章并认真学习一次。】</p>
-<p>用新的方式来分析session B’的更新为什么对session A不可见就是：在session A视图数组创建的瞬间，session B’是活跃的，属于“版本未提交，不可见”这种情况。</p>
-<p>业务中如果要绕过这类问题，可以尝试使用“乐观锁”解决。</p>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/09-pu-tong-suo-yin-he-wei-yi-suo-yin-ying-gai-zen-mo-xuan-ze">09 普通索引和唯一索引，应该怎么选择？ | MySql实战45讲 (gitbook.io)</a></p>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/18-wei-shi-mo-zhe-xie-sql-yu-ju-luo-ji-xiang-tong-xing-neng-que-cha-yi-ju-da">18 为什么这些SQL语句逻辑相同，性能却差异巨大？ | MySql实战45讲 (gitbook.io)</a></p>
 
                 
             </div>
@@ -606,7 +557,7 @@ MySQL的普通索引和唯">
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/10/MySQL09/">http://example.com/2024/09/10/MySQL09/</a>
+                    <a href="http://example.com/2024/09/12/MySQL18/">http://example.com/2024/09/12/MySQL18/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -991,17 +942,18 @@ MySQL的普通索引和唯">
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/10/MySQL10/">
+                <a href="/2024/09/12/MySQL18/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/22.jpg" class="responsive-img" alt="MySQL为什么有时候会选错索引？">
+                        <img src="/medias/featureimages/6.jpg" class="responsive-img" alt="为什么这些SQL语句逻辑相同，性能却差异巨大？">
                         
-                        <span class="card-title">MySQL为什么有时候会选错索引？</span>
+                        <span class="card-title">为什么这些SQL语句逻辑相同，性能却差异巨大？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -1011,9 +963,9 @@ MySQL的普通索引和唯">
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-12
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
@@ -1026,6 +978,7 @@ MySQL的普通索引和唯">
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
@@ -1044,13 +997,13 @@ MySQL的普通索引和唯">
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/10/MySQL08/">
+                <a href="/2024/09/11/MySQL17/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/7.jpg" class="responsive-img" alt="事务到底是隔离的还是不隔离的？">
+                        <img src="/medias/featureimages/1.jpg" class="responsive-img" alt="如何正确地显示随机消息？">
                         
-                        <span class="card-title">事务到底是隔离的还是不隔离的？</span>
+                        <span class="card-title">如何正确地显示随机消息？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -1061,7 +1014,7 @@ MySQL的普通索引和唯">
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-11
                             </span>
                         <span class="publish-author">
                             
