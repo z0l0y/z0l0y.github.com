@@ -298,6 +298,198 @@
       </tags>
   </entry>
   <entry>
+    <title>一条SQL查询语句是如何执行的？</title>
+    <url>/2024/09/09/MySQL01/</url>
+    <content><![CDATA[<h1 id="一条SQL查询语句是如何执行的？"><a href="#一条SQL查询语句是如何执行的？" class="headerlink" title="一条SQL查询语句是如何执行的？"></a>一条SQL查询语句是如何执行的？</h1><p>平时我们使用数据库，看到的通常都是一个整体。比如，你有个最简单的表，表里只有一个ID字段，在执行下面这个查询语句时：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from table where ID = 10;</span><br></pre></td></tr></table></figure>
+
+<p>我们看到的只是输入一条语句，返回一个结果，却不知道这条语句在MySQL内部的执行过程。</p>
+<p>其实这也和SQL这门语言有关系，SQL这门语言的定位就是一种声明式编程的语言，具体可以看看这个<a href="https://composingprograms.netlify.app/4/3">声明式编程</a>，本来就是不直接描述计算过程，而是描述一些计算的预期结果，比如上面SQL语句的意思是我想从这张表中获得所有ID为10的数据，并将获得到的数据按字段全部映射到结果中。</p>
+<p>下面给出的是MySQL的基本架构示意图，从中你可以清楚地看到SQL语句在MySQL的各个功能模块中的执行过程。</p>
+<p><img src="/2024/09/09/MySQL01/image-20240909122001902.png" alt="image-20240909122001902"></p>
+<p>大体来说，MySQL可以分为Server层和存储引擎层两部分。</p>
+<p><strong>Server层</strong>包括<strong>连接器、查询缓存、分析器、优化器、执行器</strong>等，涵盖MySQL的大多数核心服务功能，<strong>以及所有的内置函数（如日期、时间、数学和加密函数等）</strong>，<strong>所有跨存储引擎的功能都在这一层实现，比如存储过程、触发器、视图等</strong>。</p>
+<p>而<strong>存储引擎层</strong>负责数据的<strong>存储和提取</strong>。其架构模式是<strong>插件式的</strong>，<strong>支持InnoDB、MyISAM、Memory等多个存储引擎</strong>。现在<strong>最常用的存储引擎是InnoDB</strong>，它从<strong>MySQL 5.5.5</strong>版本开始成为了默认存储引擎。</p>
+<p>也就是说，你执行create table建表的时候，如果不指定引擎类型，<strong>默认使用的就是InnoDB</strong>。不过，你也可以通过指定存储引擎的类型来选择别的引擎，<strong>比如在create table语句中使用engine&#x3D;memory, 来指定使用内存引擎创建表</strong>。不同存储引擎的表数据存取方式不同，支持的功能也不同，在后面的文章中，我们会讨论到引擎的选择。</p>
+<p>从图中不难看出，不同的存储引擎共用一个<strong>Server层</strong>，也就是从连接器到执行器的部分。你可以先对每个组件的名字有个印象，接下来会结合开头提到的那条SQL语句，带你走一遍整个执行流程，依次看下每个组件的作用。</p>
+<h2 id="连接器"><a href="#连接器" class="headerlink" title="连接器"></a>连接器</h2><p>第一步，你要操作数据库，首先你就要连接到这个数据库上，这时候接待你的就是连接器。连接器负责跟客户端建立连接、获取权限、维持和管理连接。连接命令一般是这么写的：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql -h$ip -P$port -u$user -p</span><br></pre></td></tr></table></figure>
+
+<p><strong>输完命令之后，你就需要在交互对话里面输入密码。虽然密码也可以直接跟在-p后面写在命令行中，但这样可能会导致你的密码泄露。如果你连的是生产服务器，强烈建议你不要这么做。</strong></p>
+<p>大概就是这个样子</p>
+<p><img src="/2024/09/09/MySQL01/image-20240909122445750.png" alt="image-20240909122445750"></p>
+<p>连接命令中的mysql是客户端工具，<strong>主要就是用来跟服务端建立连接的</strong>。在完成经典的TCP握手后，连接器就要开始<strong>认证你的身份</strong>，这个时候用的就是你输入的用户名和密码。</p>
+<ul>
+<li>如果用户名或密码不对，你就会收到一个”Access denied for user”的错误，然后客户端程序结束执行。</li>
+<li>如果用户名密码认证通过，连接器会到权限表里面查出你拥有的权限。<strong>之后，这个连接里面的权限判断逻辑，都将依赖于此时读到的权限</strong>。</li>
+</ul>
+<p>这就意味着，<strong>一个用户成功建立连接后，即使你用管理员账号对这个用户的权限做了修改，也不会影响已经存在连接的权限。修改完成后，只有再新建的连接才会使用新的权限设置。</strong></p>
+<p>对于上面过程还有一个比较详细的解释，建议看看</p>
+<ul>
+<li><a href="https://blog.csdn.net/LYue123/article/details/89256577">彻底弄懂mysql（一）–mysql的通信协议_mysql tcp protocol url-CSDN博客</a></li>
+<li><a href="https://blog.csdn.net/LYue123/article/details/89285157?spm=1001.2014.3001.5502">彻底弄懂mysql（二）–连接方式_mysql连接池怎么算开启一次连接-CSDN博客</a></li>
+</ul>
+<p>这里我再提示一下，这个MySQL报文其实我们很久之前就见过了，特别是在IDEA中，那个数据连接的左下角就是报文。</p>
+<p>总结一下，上面两篇文章：</p>
+<p>第一篇主要是介绍了MySQL的通信具体是什么样的，先TCP三次握手，然后再到握手认证阶段（登陆认证报文就是在这个时候用的），最后就是命令执行阶段（我们可以输入命令啦）</p>
+<p>有两个问题问的特别好：</p>
+<ul>
+<li>为什么还要进行三次握手认证？</li>
+<li>因为TCP三次握手，<strong>只是将客户端与服务端建立起了连接，然后通过端口知道我要访问的是MySQL这个服务</strong>，但是MySQL它不同于HTTP，只要你知道URL就能得到一个响应，<strong>MySQL必须登陆后你才能进行操作</strong>。所以这个过程最重要的就是<strong>验证客户端的登陆权限</strong>。</li>
+<li>为什么是服务端主动给客户端发送认证呢？</li>
+<li>HTTP不是说<strong>只有客户端主动与服务端进行请求</strong>，<strong>服务端不是不能在没有请求的情况下主动进行响应吗</strong>？<br>首先，大家也不要陷入误区，<strong>在进行认证的这个交互中，实际上客户端与服务端还没有进行任何业务上的往来，只是进行一个认证</strong>，所以与上面说的HTTP的不同，如果细心的话你会发现，<strong>认证成功后，在命令执行阶段，MySQL这种通信方式是与HTTP非常类似的，在没有请求的情况下，服务端的MySQL也不会主动给你发送任何数据，所以这里不要混淆</strong>。<br>再说为什么服务端先发送，那肯定是因为他有不得不发送的道理，所以我们就需要理解一下，他发送的是什么东西。</li>
+</ul>
+<p>还包括了一个例子：</p>
+<ul>
+<li>小明找工作，投了一个简历给某个公司（TCP三次握手成功）<br>这时候，某公司就主动打电话了，告诉他，我们需要笔试，笔试的时间，网址，以及一些别的相关信息，规则等</li>
+<li>小明接收到这个消息之后，到了那个时间他就会请求那个网址，并将自己的信息告诉他</li>
+<li>这时候公司验证你的信息，验证成功后，你就可以开始笔试了</li>
+</ul>
+<p>特别是这个挑战随机数，有点意思：</p>
+<p>MySQL报文<strong>挑战随机数</strong>（通常称为“随机数”或“挑战数字”）是在MySQL客户端与服务器之间进行身份验证时使用的一种机制。具体来说，它在以下场景中发挥作用：</p>
+<ol>
+<li><strong>身份验证</strong>: 当客户端连接到MySQL服务器时，服务器会生成一个随机数并发送给客户端。这个随机数用于生成加密的身份验证信息。</li>
+<li><strong>提高安全性</strong>: 通过使用随机数，服务器可以确保每次连接的身份验证过程都是唯一的，防止重放攻击。</li>
+<li><strong>握手协议</strong>: 在MySQL的握手协议中，随机数是服务器发送给客户端的一部分，客户端使用这个随机数与用户的密码结合，生成最终的身份验证信息。</li>
+</ol>
+<p>说实话有点像盐值加密</p>
+<p>MySQL 客户端的<strong>权能标志</strong>（Client Capability Flags）是一个用于表示客户端所支持功能的位标志。这些标志在客户端与 MySQL 服务器进行连接时起着重要的作用，确保双方能够有效地通信。</p>
+<ol>
+<li><strong>功能协商</strong>: 客户端在建立连接时会发送其支持的功能标志，服务器根据这些标志来决定如何处理请求。</li>
+<li><strong>兼容性</strong>: 通过交换权能标志，客户端和服务器可以确保双方功能的兼容性，避免因不兼容的功能导致的错误。</li>
+<li><strong>优化性能</strong>: 权能标志可以帮助服务器优化数据传输方式，选择最适合双方的协议和功能。</li>
+</ol>
+<p>第二篇主要是比较了一下短链接和长连接的区别，然后建议一般还是使用连接池来提升性能。</p>
+<p>总结一下这篇文章的重点部分：</p>
+<ul>
+<li>短连接：<br><strong>客户端连接–创建socket认证连接–维护连接–数据传输–关闭连接</strong></li>
+<li>长连接：<br><strong>客户端连接–创建socket认证连接–维护连接–数据传输–维护连接–数据传输…-关闭连接</strong></li>
+<li>连接池：<br>连接池的一个核心思想就是<strong>连接复用</strong>，<strong>通过建立一个数据库连接池以及一套连接使用、分配和管理策略</strong>，使得该连接池中的连接可以得到高效、安全的复用，<strong>避免了数据库连接频繁建立、关闭的开销</strong>。</li>
+</ul>
+<p>因为常见数据库的连接是一个比较影响性能的一个事情，所以使用连接池的目的也是尽量少的创建连接，然后呢又要避免去维护很多空闲的连接</p>
+<p>所以建议了解一下连接池的一些参数设置：（感觉我们只用关心下面四个被加粗的就行了）</p>
+<ul>
+<li><strong>初始化连接就是，创建的时候想池里放入的连接对象数</strong></li>
+<li>最大连接数量，就是允许同一时间能都进行工作的最大数量，如果是0表示没有限制</li>
+<li><strong>最大空闲连接，就是连接池中最大空闲连接数，如果超了，就要释放一部分空闲超时连接，如果是0表示不需要释放</strong></li>
+<li><strong>最小空闲连接数，太少了就要进行创建</strong></li>
+<li><strong>超时等待时间，如果一个访问到来的时候，已经到达了最大连接数，那这个请求会被放在请求等待队列中，开启一个计时器，如果经过这个时间后，还没有可用连接，就直接抛出异常给此用户。如果是-1表示无限等待。</strong></li>
+</ul>
+<p>后面感觉还是有一点不够用，又找了一些文章来看</p>
+<ul>
+<li><p><a href="https://blog.csdn.net/weixin_44296929/article/details/102738568">连接池总结（作用、对比、参数含义、以及讲解）-CSDN博客</a></p>
+<p>看完之后感觉连接池就是类似公交车的长连接，用了很久才会被回收，但是每一个人都可以用，不像TCP长连接只能供一个人使用</p>
+</li>
+<li><p><a href="https://www.jianshu.com/p/6c61cc49a0ed">数据库连接池-常用参数配置及含义 - 简书 (jianshu.com)</a></p>
+<p>这个讲的配置相对详细一点</p>
+</li>
+</ul>
+<p>连接完成后，如果你没有后续的动作，这个连接就处于空闲状态，你可以在show processlist命令中看到它。文本中这个图是show processlist的结果，其中的Command列显示为“Sleep”的这一行，就表示现在系统里面有一个空闲连接。</p>
+<p>客户端如果太长时间没动静，连接器就会自动将它断开。这个时间是由参数wait_timeout控制的，默认值是8小时。</p>
+<p><img src="/2024/09/09/MySQL01/image-20240909145917788.png" alt="image-20240909145917788"></p>
+<p>如果在连接被断开之后，客户端再次发送请求的话，就会收到一个错误提醒： <strong>Lost connection</strong> to MySQL server during query。<strong>这时候如果你要继续，就需要重连，然后再执行请求了。（这个情况我之前好像遇到过）</strong></p>
+<p>数据库里面，<strong>长连接是指连接成功后，如果客户端持续有请求，则一直使用同一个连接。短连接则是指每次执行完很少的几次查询就断开连接，下次查询再重新建立一个</strong>。</p>
+<p><strong>建立连接的过程通常是比较复杂的，所以我建议你在使用中要尽量减少建立连接的动作，也就是尽量使用长连接。</strong></p>
+<p>建议再看一篇文章，再看下面的东西</p>
+<p>[<a href="https://zhuanlan.zhihu.com/p/43941022">玩转MySQL之二]MySQL连接机制浅析及运维 - 知乎 (zhihu.com)</a></p>
+<p>这篇文章很好的解释了为什么有的时候是不能使用短连接的：</p>
+<ul>
+<li><p>在<a href="https://zhida.zhihu.com/search?q=%E6%85%A2%E9%80%9F%E7%BD%91%E7%BB%9C&zhida_source=entity&is_preview=1">慢速网络</a>下使用短连接，连接的开销会很大；在生产繁忙的系统中，连接也可能会受到系统端口数的限制，如果要每秒建立几千个连接，<strong>那么连接断开后，端口不会被马上回收利用，必须经历一个“FIN”阶段的等待，直到可被回收利用为止，这样就可能会导致端口资源不够用</strong>。</p>
+</li>
+<li><p>从客户端的角度来说，<strong>使用长连接有一个好处，可以不用每次创建新连接，若客户端对MySQL服务器的连接请求很频繁，永久连接将更加高效</strong>。对于**<a href="https://zhida.zhihu.com/search?q=%E9%AB%98%E5%B9%B6%E5%8F%91&zhida_source=entity&is_preview=1">高并发</a>业务<strong>，如果可能会碰到连接的冲击，</strong>推荐使用长连接或连接池。**</p>
+</li>
+<li><p>从服务器的角度来看，情况则略有不同，<strong>它可以节省创建连接的开销，但维持连接也是需要内存的</strong>。如果滥用长连接的话，可能会使用过多的MySQL<a href="https://zhida.zhihu.com/search?q=%E6%9C%8D%E5%8A%A1%E5%99%A8%E8%BF%9E%E6%8E%A5&zhida_source=entity&is_preview=1">服务器连接</a>。<strong>现代的操作系统可以拥有几千个MySQL连接，但很有可能绝大部分都是睡眠（sleep）状态的，这样的工作方式不够高效，而且连接占据内存，也会导致内存的浪费。</strong></p>
+</li>
+<li><p>对于扩展性好的站点来说，其实大部分的访问并不需要连接数据库。<strong>如果用户需要频繁访问数据库，那么可能会在流量增大的时候产生性能问题</strong>，此时长短连接都是无法解决问题的，<strong>所以应该进行合理的设计和优化来避免性能问题。</strong></p>
+</li>
+<li><p>为了确保扩展性好的站点在高流量情况下仍能保持良好的性能，以下是一些<strong>合理的设计和优化策略</strong>：</p>
+<p>\1. <strong>优化应用层</strong>—从应用程序代码来看</p>
+<p>减少数据库请求: 在应用逻辑中优化数据访问，尽量减少数据库请求的次数。例如，<strong>通过批量查询或合并请求。</strong></p>
+<p>使用分页: 对于大数据集，<strong>使用分页而不是一次性加载所有数据。</strong></p>
+<p>\2.  <strong>缓存机制</strong>—从缓存中间件来看</p>
+<p>使用缓存: <strong>在数据库前面引入缓存层（如 Redis、Memcached）来存储频繁访问的数据</strong>。这样可以减少数据库的直接查询次数。</p>
+<p>页面缓存: <strong>对于静态内容或不常变化的页面，使用页面缓存可以减少数据库的压力</strong>。<strong>该放Nginx的放Nginx，该放CDN的放CDN。</strong></p>
+<p>\3. **负载均衡 **—大的方面，从数据库实例来看</p>
+<p><strong>多实例部署</strong>: 将数据库部署为<strong>主从复制或集群模式，使用负载均衡器分散请求，提高并发处理能力。</strong></p>
+<p><strong>读写分离</strong>: 将读请求和写请求分开，<strong>写操作发送到主数据库，读操作发送到从数据库。</strong></p>
+<p><strong>数据分片</strong>: 对于大规模数据，可以考虑数据分片，将数据分散到不同的数据库实例中，<strong>减少单个数据库的压力。</strong></p>
+<p>\4.<strong>数据库优化</strong>—小的方面，从数据库表来看</p>
+<p><strong>索引优化</strong>: 确保数据库表中的索引设置合理，以加速查询。</p>
+<p><strong>查询优化</strong>: 使用 EXPLAIN 分析 SQL 查询，优化慢查询，减少不必要的数据检索。</p>
+</li>
+</ul>
+<p>下面这个感觉又可以出一个场景题了</p>
+<p>但是全部使用长连接后，你可能会发现，<strong>有些时候MySQL占用内存涨得特别快，这是因为MySQL在执行过程中临时使用的内存是管理在连接对象里面的。这些资源会在连接断开的时候才释放。所以如果长连接累积下来，可能导致内存占用太大，被系统强行杀掉（OOM），从现象看就是MySQL异常重启了。</strong></p>
+<p>怎么解决这个问题呢？你可以考虑以下两种方案。（至于为什么是这样，你看后面的查询缓存就知道了）</p>
+<ol>
+<li>定期断开长连接。使用一段时间，或者程序里面判断执行过一个占用内存的大查询后，断开连接，之后要查询再重连。</li>
+<li>如果你用的是MySQL 5.7或更新版本，可以在每次执行一个比较大的操作后，通过执行 mysql_reset_connection来重新初始化连接资源。这个过程不需要重连和重新做权限验证，但是会将连接恢复到刚刚创建完时的状态。</li>
+</ol>
+<h2 id="查询缓存"><a href="#查询缓存" class="headerlink" title="查询缓存"></a>查询缓存</h2><p>连接建立完成后，你就可以执行select语句了。执行逻辑就会来到第二步：查询缓存。</p>
+<p>MySQL拿到一个查询请求后，<strong>会先到查询缓存看看，之前是不是执行过这条语句。之前执行过的语句及其结果可能会以key-value对的形式，被直接缓存在内存中。key是查询的语句，value是查询的结果。如果你的查询能够直接在这个缓存中找到key，那么这个value就会被直接返回给客户端。</strong></p>
+<p>如果语句不在查询缓存中，就会继续后面的执行阶段。<strong>执行完成后，执行结果会被存入查询缓存中。</strong>你可以看到，<strong>如果查询命中缓存，MySQL不需要执行后面的复杂操作，就可以直接返回结果，这个效率会很高。</strong></p>
+<p><strong>但是大多数情况下我会建议你不要使用查询缓存，为什么呢？因为查询缓存往往弊大于利。</strong></p>
+<p>查询缓存的失效非常频繁，<strong>只要有对一个表的更新，这个表上所有的查询缓存都会被清空</strong>。因此很可能你费劲地把结果存起来，还没使用呢，就被一个更新全清空了。对于更新压力大的数据库来说，<strong>查询缓存的命中率会非常低</strong>。除非你的业务就是有一张<strong>静态表</strong>，很长时间才会更新一次。比如，一个系统配置表，那这张表上的查询<strong>才适合使用查询缓存</strong>。</p>
+<p>好在MySQL也提供了这种“按需使用”的方式。你可以将参数query_cache_type设置成DEMAND，这样对于默认的SQL语句都不使用查询缓存。<strong>而对于你确定要使用查询缓存的语句，可以用SQL_CACHE显式指定，像下面这个语句一样：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select SQL_CACHE * from table where ID = 10;</span><br></pre></td></tr></table></figure>
+
+<p>需要注意的是，MySQL 8.0版本直接将查询缓存的整块功能删掉了，<strong>也就是说8.0开始彻底没有这个功能了</strong>。</p>
+<h2 id="分析器"><a href="#分析器" class="headerlink" title="分析器"></a>分析器</h2><p><strong>如果没有命中查询缓存，就要开始真正执行语句了。首先，MySQL需要知道你要做什么，因此需要对SQL语句做解析。</strong></p>
+<p>分析器先会做“<strong>词法分析</strong>”。<strong>你输入的是由多个字符串和空格组成的一条SQL语句，MySQL需要识别出里面的字符串分别是什么，代表什么。</strong></p>
+<p>这个有点像SICP讲的Scheme分析器啊<a href="https://composingprograms.netlify.app/3/4">组合语言的解释器 (composingprograms.netlify.app)</a></p>
+<p>还有一点像ES的IK分词器，那个分词器里面我记得还有具体的算法来进行分词</p>
+<p>MySQL从你输入的”select”这个关键字识别出来，这是一个查询语句。它也要把字符串“T”识别成“表名T”，把字符串“ID”识别成“列ID”。</p>
+<p>做完了这些识别以后，就要做“<strong>语法分析</strong>”。根据词法分析的结果，语法分析器会根据语法规则，判断你输入的这个SQL语句是否满足MySQL语法。</p>
+<p>如果你的语句不对，就会收到“You have an error in your SQL syntax”的错误提醒，比如下面这个语句select少打了开头的字母“s”。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; elect * from t where ID=1;</span><br><span class="line"></span><br><span class="line">ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near &#x27;elect * from t where ID=1&#x27; at line 1</span><br></pre></td></tr></table></figure>
+
+<p>一般语法错误会提示第一个出现错误的位置，所以你要关注的是紧接“use near”的内容。</p>
+<h2 id="优化器"><a href="#优化器" class="headerlink" title="优化器"></a>优化器</h2><p>经过了<strong>分析器，MySQL就知道你要做什么了</strong>。在开始执行之前，还要先经过<strong>优化器的处理</strong>。</p>
+<p>优化器是在表里面有多个索引的时候，决定使用哪个索引；或者在一个语句有多表关联（join）的时候，决定各个表的连接顺序。比如你执行下面这样的语句，这个语句是执行两个表的join：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from t1 join t2 using(ID)  where t1.c=10 and t2.d=20;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>既可以先从表t1里面取出c&#x3D;10的记录的ID值，再根据ID值关联到表t2，再判断t2里面d的值是否等于20。</li>
+<li>也可以先从表t2里面取出d&#x3D;20的记录的ID值，再根据ID值关联到t1，再判断t1里面c的值是否等于10。</li>
+</ul>
+<p>这两种执行方法的逻辑结果是一样的，但是执行的效率会有不同，而优化器的作用就是决定选择使用哪一个方案。</p>
+<p><strong>优化器阶段完成后，这个语句的执行方案就确定下来了，然后进入执行器阶段。</strong>如果你还有一些疑问，比如优化器是怎么选择索引的，有没有可能选择错等等，没关系，我会在后面的文章中单独展开说明优化器的内容。</p>
+<h2 id="执行器"><a href="#执行器" class="headerlink" title="执行器"></a>执行器</h2><p>MySQL<strong>通过分析器知道了你要做什么，通过优化器知道了该怎么做，于是就进入了执行器阶段，开始执行语句</strong>。</p>
+<p>开始执行的时候，<strong>要先判断一下你对这个表T有没有执行查询的权限，如果没有，就会返回没有权限的错误</strong>，如下所示。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from T where ID=10;</span><br><span class="line"></span><br><span class="line">ERROR 1142 (42000): SELECT command denied to user &#x27;b&#x27;@&#x27;localhost&#x27; for table &#x27;T&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>如果有权限，就<strong>打开表继续执行</strong>。打开表的时候，<strong>执行器就会根据表的引擎定义，去使用这个引擎提供的接口</strong>。</p>
+<p>比如我们这个例子中的表T中，ID字段没有索引，那么执行器的执行流程是这样的：</p>
+<ol>
+<li><strong>调用InnoDB引擎接口</strong>取这个表的第一行，判断ID值是不是10，如果不是则跳过，如果是则将这行存在结果集中；</li>
+<li>调用引擎接口取“下一行”，重复相同的判断逻辑，直到取到这个表的最后一行。</li>
+<li>执行器将上述遍历过程中所有满足条件的行组成的记录集作为结果集返回给客户端。</li>
+</ol>
+<p>至此，这个语句就执行完成了。</p>
+<p>对于有索引的表，执行的逻辑也差不多。<strong>第一次调用的是“取满足条件的第一行”这个接口，之后循环取“满足条件的下一行”这个接口</strong>，这些接口都是引擎中已经定义好的。</p>
+<p>你会在数据库的<strong>慢查询日志</strong>中看到一个<strong>rows_examined的字段</strong>，表示这个语句执行过程中扫描了多少行。<strong>这个值就是在执行器每次调用引擎获取数据行的时候累加的</strong>。</p>
+<p>在有些场景下，执行器调用一次，在引擎内部则扫描了多行，因此<strong>引擎扫描行数跟rows_examined并不是完全相同的。</strong></p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>如果表T中没有字段k，而你执行了这个语句 select * from T where k&#x3D;1, 那肯定是会报“不存在这个列”的错误： “Unknown column ‘k’ in ‘where clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？</p>
+<blockquote>
+<p>在执行 SQL 查询的过程中，当出现类似于 “Unknown column ‘k’ in ‘where clause’” 的错误信息时，这是在语义分析阶段报出的错误。</p>
+<p>具体的解析和执行过程如下：</p>
+<ol>
+<li><strong>词法分析和语法分析阶段</strong>：在这个阶段，MySQL 解析器将输入的 SQL 查询语句进行词法分析和语法分析，<strong>生成语法树（Parse Tree）或语法分析树（Parse Tree）</strong>。<strong>这个阶段主要是验证查询语句的语法正确性，检查语句中的关键字、标识符、运算符等是否符合语法规则。</strong></li>
+<li><strong>语义分析阶段</strong>：<strong>在语义分析阶段，MySQL 对语法树进行进一步的分析和验证。这个阶段主要是检查语句的语义正确性，包括验证列和表的存在性、数据类型的匹配、约束条件的合法性等。</strong>在执行 SQL 查询时，MySQL 需要确保查询中使用的列和表是存在的。</li>
+</ol>
+<p>当执行语句 “SELECT * FROM T WHERE k&#x3D;1” 时，MySQL 会在<strong>语义分析阶段尝试解析和验证其中的列名</strong>。如果表 T 中不存在名为 ‘k’ 的列，MySQL 将报告 “Unknown column ‘k’ in ‘where clause’” 错误，表示查询中引用了不存在的列。</p>
+<p>因此，<strong>该错误是在语义分析阶段报出的，即在验证查询语句的语义正确性时发现的</strong>。在这个阶段，MySQL 检查查询语句是否符合数据库模式的定义和约束条件。</p>
+</blockquote>
+<p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/01-ji-chu-jia-gou-yi-tiao-sql-cha-xun-yu-ju-shi-ru-he-zhi-hang-de">01 基础架构：一条SQL查询语句是如何执行的？ | MySql实战45讲 (gitbook.io)</a></p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>My-Backend-Learning-Journey</title>
     <url>/2024/09/07/My-Backend-Learning-Journey/</url>
     <content><![CDATA[<h1 id="后端技术知识一览"><a href="#后端技术知识一览" class="headerlink" title="后端技术知识一览"></a>后端技术知识一览</h1><blockquote>
@@ -705,198 +897,6 @@
       <tags>
         <tag>Java</tag>
         <tag>Backend</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>一条SQL查询语句是如何执行的？</title>
-    <url>/2024/09/09/MySQL01/</url>
-    <content><![CDATA[<h1 id="一条SQL查询语句是如何执行的？"><a href="#一条SQL查询语句是如何执行的？" class="headerlink" title="一条SQL查询语句是如何执行的？"></a>一条SQL查询语句是如何执行的？</h1><p>平时我们使用数据库，看到的通常都是一个整体。比如，你有个最简单的表，表里只有一个ID字段，在执行下面这个查询语句时：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from table where ID = 10;</span><br></pre></td></tr></table></figure>
-
-<p>我们看到的只是输入一条语句，返回一个结果，却不知道这条语句在MySQL内部的执行过程。</p>
-<p>其实这也和SQL这门语言有关系，SQL这门语言的定位就是一种声明式编程的语言，具体可以看看这个<a href="https://composingprograms.netlify.app/4/3">声明式编程</a>，本来就是不直接描述计算过程，而是描述一些计算的预期结果，比如上面SQL语句的意思是我想从这张表中获得所有ID为10的数据，并将获得到的数据按字段全部映射到结果中。</p>
-<p>下面给出的是MySQL的基本架构示意图，从中你可以清楚地看到SQL语句在MySQL的各个功能模块中的执行过程。</p>
-<p><img src="/2024/09/09/MySQL01/image-20240909122001902.png" alt="image-20240909122001902"></p>
-<p>大体来说，MySQL可以分为Server层和存储引擎层两部分。</p>
-<p><strong>Server层</strong>包括<strong>连接器、查询缓存、分析器、优化器、执行器</strong>等，涵盖MySQL的大多数核心服务功能，<strong>以及所有的内置函数（如日期、时间、数学和加密函数等）</strong>，<strong>所有跨存储引擎的功能都在这一层实现，比如存储过程、触发器、视图等</strong>。</p>
-<p>而<strong>存储引擎层</strong>负责数据的<strong>存储和提取</strong>。其架构模式是<strong>插件式的</strong>，<strong>支持InnoDB、MyISAM、Memory等多个存储引擎</strong>。现在<strong>最常用的存储引擎是InnoDB</strong>，它从<strong>MySQL 5.5.5</strong>版本开始成为了默认存储引擎。</p>
-<p>也就是说，你执行create table建表的时候，如果不指定引擎类型，<strong>默认使用的就是InnoDB</strong>。不过，你也可以通过指定存储引擎的类型来选择别的引擎，<strong>比如在create table语句中使用engine&#x3D;memory, 来指定使用内存引擎创建表</strong>。不同存储引擎的表数据存取方式不同，支持的功能也不同，在后面的文章中，我们会讨论到引擎的选择。</p>
-<p>从图中不难看出，不同的存储引擎共用一个<strong>Server层</strong>，也就是从连接器到执行器的部分。你可以先对每个组件的名字有个印象，接下来会结合开头提到的那条SQL语句，带你走一遍整个执行流程，依次看下每个组件的作用。</p>
-<h2 id="连接器"><a href="#连接器" class="headerlink" title="连接器"></a>连接器</h2><p>第一步，你要操作数据库，首先你就要连接到这个数据库上，这时候接待你的就是连接器。连接器负责跟客户端建立连接、获取权限、维持和管理连接。连接命令一般是这么写的：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql -h$ip -P$port -u$user -p</span><br></pre></td></tr></table></figure>
-
-<p><strong>输完命令之后，你就需要在交互对话里面输入密码。虽然密码也可以直接跟在-p后面写在命令行中，但这样可能会导致你的密码泄露。如果你连的是生产服务器，强烈建议你不要这么做。</strong></p>
-<p>大概就是这个样子</p>
-<p><img src="/2024/09/09/MySQL01/image-20240909122445750.png" alt="image-20240909122445750"></p>
-<p>连接命令中的mysql是客户端工具，<strong>主要就是用来跟服务端建立连接的</strong>。在完成经典的TCP握手后，连接器就要开始<strong>认证你的身份</strong>，这个时候用的就是你输入的用户名和密码。</p>
-<ul>
-<li>如果用户名或密码不对，你就会收到一个”Access denied for user”的错误，然后客户端程序结束执行。</li>
-<li>如果用户名密码认证通过，连接器会到权限表里面查出你拥有的权限。<strong>之后，这个连接里面的权限判断逻辑，都将依赖于此时读到的权限</strong>。</li>
-</ul>
-<p>这就意味着，<strong>一个用户成功建立连接后，即使你用管理员账号对这个用户的权限做了修改，也不会影响已经存在连接的权限。修改完成后，只有再新建的连接才会使用新的权限设置。</strong></p>
-<p>对于上面过程还有一个比较详细的解释，建议看看</p>
-<ul>
-<li><a href="https://blog.csdn.net/LYue123/article/details/89256577">彻底弄懂mysql（一）–mysql的通信协议_mysql tcp protocol url-CSDN博客</a></li>
-<li><a href="https://blog.csdn.net/LYue123/article/details/89285157?spm=1001.2014.3001.5502">彻底弄懂mysql（二）–连接方式_mysql连接池怎么算开启一次连接-CSDN博客</a></li>
-</ul>
-<p>这里我再提示一下，这个MySQL报文其实我们很久之前就见过了，特别是在IDEA中，那个数据连接的左下角就是报文。</p>
-<p>总结一下，上面两篇文章：</p>
-<p>第一篇主要是介绍了MySQL的通信具体是什么样的，先TCP三次握手，然后再到握手认证阶段（登陆认证报文就是在这个时候用的），最后就是命令执行阶段（我们可以输入命令啦）</p>
-<p>有两个问题问的特别好：</p>
-<ul>
-<li>为什么还要进行三次握手认证？</li>
-<li>因为TCP三次握手，<strong>只是将客户端与服务端建立起了连接，然后通过端口知道我要访问的是MySQL这个服务</strong>，但是MySQL它不同于HTTP，只要你知道URL就能得到一个响应，<strong>MySQL必须登陆后你才能进行操作</strong>。所以这个过程最重要的就是<strong>验证客户端的登陆权限</strong>。</li>
-<li>为什么是服务端主动给客户端发送认证呢？</li>
-<li>HTTP不是说<strong>只有客户端主动与服务端进行请求</strong>，<strong>服务端不是不能在没有请求的情况下主动进行响应吗</strong>？<br>首先，大家也不要陷入误区，<strong>在进行认证的这个交互中，实际上客户端与服务端还没有进行任何业务上的往来，只是进行一个认证</strong>，所以与上面说的HTTP的不同，如果细心的话你会发现，<strong>认证成功后，在命令执行阶段，MySQL这种通信方式是与HTTP非常类似的，在没有请求的情况下，服务端的MySQL也不会主动给你发送任何数据，所以这里不要混淆</strong>。<br>再说为什么服务端先发送，那肯定是因为他有不得不发送的道理，所以我们就需要理解一下，他发送的是什么东西。</li>
-</ul>
-<p>还包括了一个例子：</p>
-<ul>
-<li>小明找工作，投了一个简历给某个公司（TCP三次握手成功）<br>这时候，某公司就主动打电话了，告诉他，我们需要笔试，笔试的时间，网址，以及一些别的相关信息，规则等</li>
-<li>小明接收到这个消息之后，到了那个时间他就会请求那个网址，并将自己的信息告诉他</li>
-<li>这时候公司验证你的信息，验证成功后，你就可以开始笔试了</li>
-</ul>
-<p>特别是这个挑战随机数，有点意思：</p>
-<p>MySQL报文<strong>挑战随机数</strong>（通常称为“随机数”或“挑战数字”）是在MySQL客户端与服务器之间进行身份验证时使用的一种机制。具体来说，它在以下场景中发挥作用：</p>
-<ol>
-<li><strong>身份验证</strong>: 当客户端连接到MySQL服务器时，服务器会生成一个随机数并发送给客户端。这个随机数用于生成加密的身份验证信息。</li>
-<li><strong>提高安全性</strong>: 通过使用随机数，服务器可以确保每次连接的身份验证过程都是唯一的，防止重放攻击。</li>
-<li><strong>握手协议</strong>: 在MySQL的握手协议中，随机数是服务器发送给客户端的一部分，客户端使用这个随机数与用户的密码结合，生成最终的身份验证信息。</li>
-</ol>
-<p>说实话有点像盐值加密</p>
-<p>MySQL 客户端的<strong>权能标志</strong>（Client Capability Flags）是一个用于表示客户端所支持功能的位标志。这些标志在客户端与 MySQL 服务器进行连接时起着重要的作用，确保双方能够有效地通信。</p>
-<ol>
-<li><strong>功能协商</strong>: 客户端在建立连接时会发送其支持的功能标志，服务器根据这些标志来决定如何处理请求。</li>
-<li><strong>兼容性</strong>: 通过交换权能标志，客户端和服务器可以确保双方功能的兼容性，避免因不兼容的功能导致的错误。</li>
-<li><strong>优化性能</strong>: 权能标志可以帮助服务器优化数据传输方式，选择最适合双方的协议和功能。</li>
-</ol>
-<p>第二篇主要是比较了一下短链接和长连接的区别，然后建议一般还是使用连接池来提升性能。</p>
-<p>总结一下这篇文章的重点部分：</p>
-<ul>
-<li>短连接：<br><strong>客户端连接–创建socket认证连接–维护连接–数据传输–关闭连接</strong></li>
-<li>长连接：<br><strong>客户端连接–创建socket认证连接–维护连接–数据传输–维护连接–数据传输…-关闭连接</strong></li>
-<li>连接池：<br>连接池的一个核心思想就是<strong>连接复用</strong>，<strong>通过建立一个数据库连接池以及一套连接使用、分配和管理策略</strong>，使得该连接池中的连接可以得到高效、安全的复用，<strong>避免了数据库连接频繁建立、关闭的开销</strong>。</li>
-</ul>
-<p>因为常见数据库的连接是一个比较影响性能的一个事情，所以使用连接池的目的也是尽量少的创建连接，然后呢又要避免去维护很多空闲的连接</p>
-<p>所以建议了解一下连接池的一些参数设置：（感觉我们只用关心下面四个被加粗的就行了）</p>
-<ul>
-<li><strong>初始化连接就是，创建的时候想池里放入的连接对象数</strong></li>
-<li>最大连接数量，就是允许同一时间能都进行工作的最大数量，如果是0表示没有限制</li>
-<li><strong>最大空闲连接，就是连接池中最大空闲连接数，如果超了，就要释放一部分空闲超时连接，如果是0表示不需要释放</strong></li>
-<li><strong>最小空闲连接数，太少了就要进行创建</strong></li>
-<li><strong>超时等待时间，如果一个访问到来的时候，已经到达了最大连接数，那这个请求会被放在请求等待队列中，开启一个计时器，如果经过这个时间后，还没有可用连接，就直接抛出异常给此用户。如果是-1表示无限等待。</strong></li>
-</ul>
-<p>后面感觉还是有一点不够用，又找了一些文章来看</p>
-<ul>
-<li><p><a href="https://blog.csdn.net/weixin_44296929/article/details/102738568">连接池总结（作用、对比、参数含义、以及讲解）-CSDN博客</a></p>
-<p>看完之后感觉连接池就是类似公交车的长连接，用了很久才会被回收，但是每一个人都可以用，不像TCP长连接只能供一个人使用</p>
-</li>
-<li><p><a href="https://www.jianshu.com/p/6c61cc49a0ed">数据库连接池-常用参数配置及含义 - 简书 (jianshu.com)</a></p>
-<p>这个讲的配置相对详细一点</p>
-</li>
-</ul>
-<p>连接完成后，如果你没有后续的动作，这个连接就处于空闲状态，你可以在show processlist命令中看到它。文本中这个图是show processlist的结果，其中的Command列显示为“Sleep”的这一行，就表示现在系统里面有一个空闲连接。</p>
-<p>客户端如果太长时间没动静，连接器就会自动将它断开。这个时间是由参数wait_timeout控制的，默认值是8小时。</p>
-<p><img src="/2024/09/09/MySQL01/image-20240909145917788.png" alt="image-20240909145917788"></p>
-<p>如果在连接被断开之后，客户端再次发送请求的话，就会收到一个错误提醒： <strong>Lost connection</strong> to MySQL server during query。<strong>这时候如果你要继续，就需要重连，然后再执行请求了。（这个情况我之前好像遇到过）</strong></p>
-<p>数据库里面，<strong>长连接是指连接成功后，如果客户端持续有请求，则一直使用同一个连接。短连接则是指每次执行完很少的几次查询就断开连接，下次查询再重新建立一个</strong>。</p>
-<p><strong>建立连接的过程通常是比较复杂的，所以我建议你在使用中要尽量减少建立连接的动作，也就是尽量使用长连接。</strong></p>
-<p>建议再看一篇文章，再看下面的东西</p>
-<p>[<a href="https://zhuanlan.zhihu.com/p/43941022">玩转MySQL之二]MySQL连接机制浅析及运维 - 知乎 (zhihu.com)</a></p>
-<p>这篇文章很好的解释了为什么有的时候是不能使用短连接的：</p>
-<ul>
-<li><p>在<a href="https://zhida.zhihu.com/search?q=%E6%85%A2%E9%80%9F%E7%BD%91%E7%BB%9C&zhida_source=entity&is_preview=1">慢速网络</a>下使用短连接，连接的开销会很大；在生产繁忙的系统中，连接也可能会受到系统端口数的限制，如果要每秒建立几千个连接，<strong>那么连接断开后，端口不会被马上回收利用，必须经历一个“FIN”阶段的等待，直到可被回收利用为止，这样就可能会导致端口资源不够用</strong>。</p>
-</li>
-<li><p>从客户端的角度来说，<strong>使用长连接有一个好处，可以不用每次创建新连接，若客户端对MySQL服务器的连接请求很频繁，永久连接将更加高效</strong>。对于**<a href="https://zhida.zhihu.com/search?q=%E9%AB%98%E5%B9%B6%E5%8F%91&zhida_source=entity&is_preview=1">高并发</a>业务<strong>，如果可能会碰到连接的冲击，</strong>推荐使用长连接或连接池。**</p>
-</li>
-<li><p>从服务器的角度来看，情况则略有不同，<strong>它可以节省创建连接的开销，但维持连接也是需要内存的</strong>。如果滥用长连接的话，可能会使用过多的MySQL<a href="https://zhida.zhihu.com/search?q=%E6%9C%8D%E5%8A%A1%E5%99%A8%E8%BF%9E%E6%8E%A5&zhida_source=entity&is_preview=1">服务器连接</a>。<strong>现代的操作系统可以拥有几千个MySQL连接，但很有可能绝大部分都是睡眠（sleep）状态的，这样的工作方式不够高效，而且连接占据内存，也会导致内存的浪费。</strong></p>
-</li>
-<li><p>对于扩展性好的站点来说，其实大部分的访问并不需要连接数据库。<strong>如果用户需要频繁访问数据库，那么可能会在流量增大的时候产生性能问题</strong>，此时长短连接都是无法解决问题的，<strong>所以应该进行合理的设计和优化来避免性能问题。</strong></p>
-</li>
-<li><p>为了确保扩展性好的站点在高流量情况下仍能保持良好的性能，以下是一些<strong>合理的设计和优化策略</strong>：</p>
-<p>\1. <strong>优化应用层</strong>—从应用程序代码来看</p>
-<p>减少数据库请求: 在应用逻辑中优化数据访问，尽量减少数据库请求的次数。例如，<strong>通过批量查询或合并请求。</strong></p>
-<p>使用分页: 对于大数据集，<strong>使用分页而不是一次性加载所有数据。</strong></p>
-<p>\2.  <strong>缓存机制</strong>—从缓存中间件来看</p>
-<p>使用缓存: <strong>在数据库前面引入缓存层（如 Redis、Memcached）来存储频繁访问的数据</strong>。这样可以减少数据库的直接查询次数。</p>
-<p>页面缓存: <strong>对于静态内容或不常变化的页面，使用页面缓存可以减少数据库的压力</strong>。<strong>该放Nginx的放Nginx，该放CDN的放CDN。</strong></p>
-<p>\3. **负载均衡 **—大的方面，从数据库实例来看</p>
-<p><strong>多实例部署</strong>: 将数据库部署为<strong>主从复制或集群模式，使用负载均衡器分散请求，提高并发处理能力。</strong></p>
-<p><strong>读写分离</strong>: 将读请求和写请求分开，<strong>写操作发送到主数据库，读操作发送到从数据库。</strong></p>
-<p><strong>数据分片</strong>: 对于大规模数据，可以考虑数据分片，将数据分散到不同的数据库实例中，<strong>减少单个数据库的压力。</strong></p>
-<p>\4.<strong>数据库优化</strong>—小的方面，从数据库表来看</p>
-<p><strong>索引优化</strong>: 确保数据库表中的索引设置合理，以加速查询。</p>
-<p><strong>查询优化</strong>: 使用 EXPLAIN 分析 SQL 查询，优化慢查询，减少不必要的数据检索。</p>
-</li>
-</ul>
-<p>下面这个感觉又可以出一个场景题了</p>
-<p>但是全部使用长连接后，你可能会发现，<strong>有些时候MySQL占用内存涨得特别快，这是因为MySQL在执行过程中临时使用的内存是管理在连接对象里面的。这些资源会在连接断开的时候才释放。所以如果长连接累积下来，可能导致内存占用太大，被系统强行杀掉（OOM），从现象看就是MySQL异常重启了。</strong></p>
-<p>怎么解决这个问题呢？你可以考虑以下两种方案。（至于为什么是这样，你看后面的查询缓存就知道了）</p>
-<ol>
-<li>定期断开长连接。使用一段时间，或者程序里面判断执行过一个占用内存的大查询后，断开连接，之后要查询再重连。</li>
-<li>如果你用的是MySQL 5.7或更新版本，可以在每次执行一个比较大的操作后，通过执行 mysql_reset_connection来重新初始化连接资源。这个过程不需要重连和重新做权限验证，但是会将连接恢复到刚刚创建完时的状态。</li>
-</ol>
-<h2 id="查询缓存"><a href="#查询缓存" class="headerlink" title="查询缓存"></a>查询缓存</h2><p>连接建立完成后，你就可以执行select语句了。执行逻辑就会来到第二步：查询缓存。</p>
-<p>MySQL拿到一个查询请求后，<strong>会先到查询缓存看看，之前是不是执行过这条语句。之前执行过的语句及其结果可能会以key-value对的形式，被直接缓存在内存中。key是查询的语句，value是查询的结果。如果你的查询能够直接在这个缓存中找到key，那么这个value就会被直接返回给客户端。</strong></p>
-<p>如果语句不在查询缓存中，就会继续后面的执行阶段。<strong>执行完成后，执行结果会被存入查询缓存中。</strong>你可以看到，<strong>如果查询命中缓存，MySQL不需要执行后面的复杂操作，就可以直接返回结果，这个效率会很高。</strong></p>
-<p><strong>但是大多数情况下我会建议你不要使用查询缓存，为什么呢？因为查询缓存往往弊大于利。</strong></p>
-<p>查询缓存的失效非常频繁，<strong>只要有对一个表的更新，这个表上所有的查询缓存都会被清空</strong>。因此很可能你费劲地把结果存起来，还没使用呢，就被一个更新全清空了。对于更新压力大的数据库来说，<strong>查询缓存的命中率会非常低</strong>。除非你的业务就是有一张<strong>静态表</strong>，很长时间才会更新一次。比如，一个系统配置表，那这张表上的查询<strong>才适合使用查询缓存</strong>。</p>
-<p>好在MySQL也提供了这种“按需使用”的方式。你可以将参数query_cache_type设置成DEMAND，这样对于默认的SQL语句都不使用查询缓存。<strong>而对于你确定要使用查询缓存的语句，可以用SQL_CACHE显式指定，像下面这个语句一样：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select SQL_CACHE * from table where ID = 10;</span><br></pre></td></tr></table></figure>
-
-<p>需要注意的是，MySQL 8.0版本直接将查询缓存的整块功能删掉了，<strong>也就是说8.0开始彻底没有这个功能了</strong>。</p>
-<h2 id="分析器"><a href="#分析器" class="headerlink" title="分析器"></a>分析器</h2><p><strong>如果没有命中查询缓存，就要开始真正执行语句了。首先，MySQL需要知道你要做什么，因此需要对SQL语句做解析。</strong></p>
-<p>分析器先会做“<strong>词法分析</strong>”。<strong>你输入的是由多个字符串和空格组成的一条SQL语句，MySQL需要识别出里面的字符串分别是什么，代表什么。</strong></p>
-<p>这个有点像SICP讲的Scheme分析器啊<a href="https://composingprograms.netlify.app/3/4">组合语言的解释器 (composingprograms.netlify.app)</a></p>
-<p>还有一点像ES的IK分词器，那个分词器里面我记得还有具体的算法来进行分词</p>
-<p>MySQL从你输入的”select”这个关键字识别出来，这是一个查询语句。它也要把字符串“T”识别成“表名T”，把字符串“ID”识别成“列ID”。</p>
-<p>做完了这些识别以后，就要做“<strong>语法分析</strong>”。根据词法分析的结果，语法分析器会根据语法规则，判断你输入的这个SQL语句是否满足MySQL语法。</p>
-<p>如果你的语句不对，就会收到“You have an error in your SQL syntax”的错误提醒，比如下面这个语句select少打了开头的字母“s”。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; elect * from t where ID=1;</span><br><span class="line"></span><br><span class="line">ERROR 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near &#x27;elect * from t where ID=1&#x27; at line 1</span><br></pre></td></tr></table></figure>
-
-<p>一般语法错误会提示第一个出现错误的位置，所以你要关注的是紧接“use near”的内容。</p>
-<h2 id="优化器"><a href="#优化器" class="headerlink" title="优化器"></a>优化器</h2><p>经过了<strong>分析器，MySQL就知道你要做什么了</strong>。在开始执行之前，还要先经过<strong>优化器的处理</strong>。</p>
-<p>优化器是在表里面有多个索引的时候，决定使用哪个索引；或者在一个语句有多表关联（join）的时候，决定各个表的连接顺序。比如你执行下面这样的语句，这个语句是执行两个表的join：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from t1 join t2 using(ID)  where t1.c=10 and t2.d=20;</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li>既可以先从表t1里面取出c&#x3D;10的记录的ID值，再根据ID值关联到表t2，再判断t2里面d的值是否等于20。</li>
-<li>也可以先从表t2里面取出d&#x3D;20的记录的ID值，再根据ID值关联到t1，再判断t1里面c的值是否等于10。</li>
-</ul>
-<p>这两种执行方法的逻辑结果是一样的，但是执行的效率会有不同，而优化器的作用就是决定选择使用哪一个方案。</p>
-<p><strong>优化器阶段完成后，这个语句的执行方案就确定下来了，然后进入执行器阶段。</strong>如果你还有一些疑问，比如优化器是怎么选择索引的，有没有可能选择错等等，没关系，我会在后面的文章中单独展开说明优化器的内容。</p>
-<h2 id="执行器"><a href="#执行器" class="headerlink" title="执行器"></a>执行器</h2><p>MySQL<strong>通过分析器知道了你要做什么，通过优化器知道了该怎么做，于是就进入了执行器阶段，开始执行语句</strong>。</p>
-<p>开始执行的时候，<strong>要先判断一下你对这个表T有没有执行查询的权限，如果没有，就会返回没有权限的错误</strong>，如下所示。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from T where ID=10;</span><br><span class="line"></span><br><span class="line">ERROR 1142 (42000): SELECT command denied to user &#x27;b&#x27;@&#x27;localhost&#x27; for table &#x27;T&#x27;</span><br></pre></td></tr></table></figure>
-
-<p>如果有权限，就<strong>打开表继续执行</strong>。打开表的时候，<strong>执行器就会根据表的引擎定义，去使用这个引擎提供的接口</strong>。</p>
-<p>比如我们这个例子中的表T中，ID字段没有索引，那么执行器的执行流程是这样的：</p>
-<ol>
-<li><strong>调用InnoDB引擎接口</strong>取这个表的第一行，判断ID值是不是10，如果不是则跳过，如果是则将这行存在结果集中；</li>
-<li>调用引擎接口取“下一行”，重复相同的判断逻辑，直到取到这个表的最后一行。</li>
-<li>执行器将上述遍历过程中所有满足条件的行组成的记录集作为结果集返回给客户端。</li>
-</ol>
-<p>至此，这个语句就执行完成了。</p>
-<p>对于有索引的表，执行的逻辑也差不多。<strong>第一次调用的是“取满足条件的第一行”这个接口，之后循环取“满足条件的下一行”这个接口</strong>，这些接口都是引擎中已经定义好的。</p>
-<p>你会在数据库的<strong>慢查询日志</strong>中看到一个<strong>rows_examined的字段</strong>，表示这个语句执行过程中扫描了多少行。<strong>这个值就是在执行器每次调用引擎获取数据行的时候累加的</strong>。</p>
-<p>在有些场景下，执行器调用一次，在引擎内部则扫描了多行，因此<strong>引擎扫描行数跟rows_examined并不是完全相同的。</strong></p>
-<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>如果表T中没有字段k，而你执行了这个语句 select * from T where k&#x3D;1, 那肯定是会报“不存在这个列”的错误： “Unknown column ‘k’ in ‘where clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？</p>
-<blockquote>
-<p>在执行 SQL 查询的过程中，当出现类似于 “Unknown column ‘k’ in ‘where clause’” 的错误信息时，这是在语义分析阶段报出的错误。</p>
-<p>具体的解析和执行过程如下：</p>
-<ol>
-<li><strong>词法分析和语法分析阶段</strong>：在这个阶段，MySQL 解析器将输入的 SQL 查询语句进行词法分析和语法分析，<strong>生成语法树（Parse Tree）或语法分析树（Parse Tree）</strong>。<strong>这个阶段主要是验证查询语句的语法正确性，检查语句中的关键字、标识符、运算符等是否符合语法规则。</strong></li>
-<li><strong>语义分析阶段</strong>：<strong>在语义分析阶段，MySQL 对语法树进行进一步的分析和验证。这个阶段主要是检查语句的语义正确性，包括验证列和表的存在性、数据类型的匹配、约束条件的合法性等。</strong>在执行 SQL 查询时，MySQL 需要确保查询中使用的列和表是存在的。</li>
-</ol>
-<p>当执行语句 “SELECT * FROM T WHERE k&#x3D;1” 时，MySQL 会在<strong>语义分析阶段尝试解析和验证其中的列名</strong>。如果表 T 中不存在名为 ‘k’ 的列，MySQL 将报告 “Unknown column ‘k’ in ‘where clause’” 错误，表示查询中引用了不存在的列。</p>
-<p>因此，<strong>该错误是在语义分析阶段报出的，即在验证查询语句的语义正确性时发现的</strong>。在这个阶段，MySQL 检查查询语句是否符合数据库模式的定义和约束条件。</p>
-</blockquote>
-<p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/01-ji-chu-jia-gou-yi-tiao-sql-cha-xun-yu-ju-shi-ru-he-zhi-hang-de">01 基础架构：一条SQL查询语句是如何执行的？ | MySql实战45讲 (gitbook.io)</a></p>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
       </tags>
   </entry>
   <entry>
@@ -1543,114 +1543,6 @@
       </tags>
   </entry>
   <entry>
-    <title>行锁功过：怎么减少行锁对性能的影响？</title>
-    <url>/2024/09/10/MySQL07/</url>
-    <content><![CDATA[<p>在上一篇文章中，<strong>介绍了MySQL的全局锁和表级锁，今天我们就来讲讲MySQL的行锁。</strong></p>
-<p><strong>MySQL的行锁是在引擎层由各个引擎自己实现的。但并不是所有的引擎都支持行锁，比如MyISAM引擎就不支持行锁。</strong>不支持行锁<strong>意味着并发控制只能使用表锁</strong>，对于这种引擎的表，<strong>同一张表上任何时刻只能有一个更新在执行，这就会影响到业务并发度。InnoDB是支持行锁的，这也是MyISAM被InnoDB替代的重要原因之一。</strong></p>
-<p>我们今天就主要来聊聊InnoDB的行锁，以及如何通过减少锁冲突来提升业务并发度。</p>
-<p>顾名思义，<strong>行锁就是针对数据表中行记录的锁。这很好理解，比如事务A更新了一行，而这时候事务B也要更新同一行，则必须等事务A的操作完成后才能进行更新。</strong></p>
-<p>当然，数据库中<strong>还有一些没那么一目了然的概念和设计，这些概念如果理解和使用不当，容易导致程序出现非预期行为，比如两阶段锁。</strong></p>
-<h3 id="从两阶段锁说起"><a href="#从两阶段锁说起" class="headerlink" title="从两阶段锁说起"></a>从两阶段锁说起</h3><p>我先给你举个例子。在下面的操作序列中，事务B的update语句执行时会是什么现象呢？假设字段id是表t的主键。</p>
-<p><img src="/2024/09/10/MySQL07/image-20240910130922763.png" alt="image-20240910130922763"></p>
-<p>这个问题的结论取决于事务A在执行完两条update语句后，持有哪些锁，以及在什么时候释放。<strong>你可以验证一下：实际上事务B的update语句会被阻塞，直到事务A执行commit之后，事务B才能继续执行。（这个我在最初学习MySQL的时候就试验过了）</strong></p>
-<p>知道了这个答案，你一定知道了事务A持有的两个记录的行锁，<strong>都是在commit的时候才释放的</strong>。</p>
-<p>也就是说，<strong>在InnoDB事务中，行锁是在需要的时候才加上的，但并不是不需要了就立刻释放，而是要等到事务结束时才释放。这个就是两阶段锁协议。</strong></p>
-<p>知道了这个设定，对我们使用事务有什么帮助呢？那就是，<strong>如果你的事务中需要锁多个行，要把最可能造成锁冲突、最可能影响并发度的锁尽量往后放。</strong>我给你举个例子。</p>
-<p>假设你负责实现一个电影票在线交易业务，顾客A要在影院B购买电影票。我们简化一点，这个业务需要涉及到以下操作：</p>
-<ol>
-<li>从顾客A账户余额中扣除电影票价；</li>
-<li>给影院B的账户余额增加这张电影票价；</li>
-<li>记录一条交易日志。</li>
-</ol>
-<p><strong>也就是说，要完成这个交易，我们需要update两条记录，并insert一条记录。当然，为了保证交易的原子性，我们要把这三个操作放在一个事务中。（我们在Spring程序中直接一个@Transactional注解就行了）</strong>那么，你会怎样安排这三个语句在事务中的顺序呢？</p>
-<p>试想如果同时有另外一个顾客C要在影院B买票，那么这两个事务冲突的部分就是语句2了。因为它们要更新同一个影院账户的余额，需要修改同一行数据。</p>
-<p>根据两阶段锁协议，不论你怎样安排语句顺序，所有的操作需要的行锁都是在事务提交的时候才释放的。<strong>所以，如果你把语句2安排在最后，比如按照3、1、2这样的顺序，那么影院账户余额这一行的锁时间就最少。这就最大程度地减少了事务之间的锁等待，提升了并发度。</strong></p>
-<p><strong>好了，现在由于你的正确设计，影院余额这一行的行锁在一个事务中不会停留很长时间。</strong>但是，这并没有完全解决你的困扰。</p>
-<p>如果这个影院做活动，可以低价预售一年内所有的电影票，而且这个活动只做一天。于是在活动时间开始的时候，你的MySQL就挂了。<strong>你登上服务器一看，CPU消耗接近100%，但整个数据库每秒就执行不到100个事务。</strong>这是什么原因呢？</p>
-<p>这里，我就要说到<strong>死锁和死锁检测了</strong>。</p>
-<h3 id="死锁和死锁检测"><a href="#死锁和死锁检测" class="headerlink" title="死锁和死锁检测"></a>死锁和死锁检测</h3><p><strong>当并发系统中不同线程出现循环资源依赖，涉及的线程都在等待别的线程释放资源时，就会导致这几个线程都进入无限等待的状态，称为死锁。</strong>这里我用数据库中的行锁举个例子。</p>
-<p><img src="/2024/09/10/MySQL07/image-20240910131442146.png" alt="image-20240910131442146"></p>
-<p><strong>这时候，事务A在等待事务B释放id&#x3D;2的行锁，而事务B在等待事务A释放id&#x3D;1的行锁。 事务A和事务B在互相等待对方的资源释放，就是进入了死锁状态。</strong>当出现死锁以后，有两种策略：</p>
-<ul>
-<li><strong>一种策略是，直接进入等待，直到超时。这个超时时间可以通过参数innodb_lock_wait_timeout来设置。</strong></li>
-<li>另一种策略是，<strong>发起死锁检测，发现死锁后，主动回滚死锁链条中的某一个事务，让其他事务得以继续执行。将参数innodb_deadlock_detect设置为on，表示开启这个逻辑。</strong></li>
-</ul>
-<p>在InnoDB中，innodb_lock_wait_timeout的<strong>默认值是50s</strong>，意味着如果采用第一个策略，当出现死锁以后，<strong>第一个被锁住的线程要过50s才会超时退出，然后其他线程才有可能继续执行。对于在线服务来说，这个等待时间往往是无法接受的。</strong></p>
-<p>但是，我们又不可能直接把这个时间设置成一个很小的值，比如1s。这样当出现死锁的时候，确实很快就可以解开，但如果不是死锁，而是简单的锁等待呢？所以，超时时间设置太短的话，会出现很多误伤。</p>
-<p>所以，<strong>正常情况下我们还是要采用第二种策略</strong>，即：<strong>主动死锁检测，而且innodb_deadlock_detect的默认值本身就是on</strong>。主动死锁检测在发生死锁的时候，<strong>是能够快速发现并进行处理的</strong>，但是它也是有额外负担的。</p>
-<p>你可以想象一下这个过程：<strong>每当一个事务被锁的时候，就要看看它所依赖的线程有没有被别人锁住，如此循环，最后判断是否出现了循环等待，也就是死锁</strong>。</p>
-<p>那如果是我们上面说到的所有事务都要更新同一行的场景呢？</p>
-<p>每个新来的被堵住的线程，都要判断会不会由于自己的加入导致了死锁，<strong>这是一个时间复杂度是O(n^2)的操作（1 + 2 + 3 + …… + n）</strong>。假设有1000个并发线程要同时更新同一行，那么死锁检测操作就是100万这个量级的。<strong>虽然最终检测的结果是没有死锁，但是这期间要消耗大量的CPU资源。因此，你就会看到CPU利用率很高，但是每秒却执行不了几个事务。</strong></p>
-<p>根据上面的分析，我们来讨论一下，怎么解决由这种<strong>热点行更新</strong>导致的性能问题呢？<strong>问题的症结在于，死锁检测要耗费大量的CPU资源。</strong></p>
-<p><strong>一种头痛医头的方法，就是如果你能确保这个业务一定不会出现死锁，可以临时把死锁检测关掉。</strong>但是这种操作本身带有一定的风险，因为业务设计的时候一般不会把死锁当做一个严重错误，毕竟出现死锁了，就回滚，然后通过业务重试一般就没问题了，这是业务无损的。<strong>而关掉死锁检测意味着可能会出现大量的超时，这是业务有损的。</strong></p>
-<p><strong>另一个思路是控制并发度。</strong>根据上面的分析，你会发现如果并发能够控制住，<strong>比如同一行同时最多只有10个线程在更新，那么死锁检测的成本很低</strong>，就不会出现这个问题。一个直接的想法就是，<strong>在客户端做并发控制</strong>。但是，你会很快发现这个方法不太可行，因为客户端很多。我见过一个应用，有600个客户端，<strong>这样即使每个客户端控制到只有5个并发线程，汇总到数据库服务端以后，峰值并发数也可能要达到3000。</strong></p>
-<p>因此，<strong>这个并发控制要做在数据库服务端。如果你有中间件，可以考虑在中间件实现；如果你的团队有能修改MySQL源码的人，也可以做在MySQL里面</strong>。基本思路就是，<strong>对于相同行的更新，在进入引擎之前排队。这样在InnoDB内部就不会有大量的死锁检测工作了。</strong></p>
-<p>可能你会问，<strong>如果团队里暂时没有数据库方面的专家，不能实现这样的方案，能不能从设计上优化这个问题呢？</strong></p>
-<p><strong>你可以考虑通过将一行改成逻辑上的多行来减少锁冲突。</strong>还是以影院账户为例，可以考虑放在多条记录上，<strong>比如10个记录，影院的账户总额等于这10个记录的值的总和。这样每次要给影院账户加金额的时候，随机选其中一条记录来加。这样每次冲突概率变成原来的1&#x2F;10，可以减少锁等待个数，也就减少了死锁检测的CPU消耗。（原来有时候这样设计不是屎山啊，这是为了避免并发死锁）</strong></p>
-<p>这个方案看上去是无损的，但其实这类方案需要根据业务逻辑做<strong>详细设计</strong>。<strong>如果账户余额可能会减少，比如退票逻辑，那么这时候就需要考虑当一部分行记录变成0的时候，代码要有特殊处理。</strong></p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天介绍了<strong>MySQL的行锁，涉及了两阶段锁协议、死锁和死锁检测这两大部分内容。</strong></p>
-<p>这里<strong>两阶段加锁（2PL(Two-phase locking)）协议</strong>可以看看这几篇文章：</p>
-<ul>
-<li><p>[关于MySQL 两阶段加锁（2PL(Two-phase locking)）协议 - _Origin - 博客园 (cnblogs.com)](<a href="https://www.cnblogs.com/origin-zy/p/17395701.html#:~:text=%E5%9C%A8MySQL%E4%B8%AD%EF%BC%8C%E4%B8%A4%E9%98%B6%E6%AE%B5%E9%94%81%E5%8D%8F%E8%AE%AE%E7%9A%84%E5%90%AB%E4%B9%89%E6%98%AF%EF%BC%9A%E5%BD%93%E4%B8%80%E4%B8%AA%E4%BA%8B%E5%8A%A1%E8%8E%B7%E5%8F%96%E5%88%B0%E4%BA%86%E6%9F%90%E4%B8%80%E4%B8%AA%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AF%B9%E8%B1%A1%E7%9A%84%E9%94%81%E4%B9%8B%E5%90%8E%EF%BC%8C%E5%B9%B6%E4%B8%8D%E6%98%AF%E5%BD%93%E5%89%8D%E4%BA%8B%E5%8A%A1%E4%B8%8D%E9%9C%80%E8%A6%81%E6%93%8D%E4%BD%9C%E5%AE%83%E4%BA%86%E4%B9%8B%E5%90%8E%EF%BC%8C%E8%BF%99%E4%B8%AA%E8%AF%B4%E5%B0%B1%E4%BC%9A%E9%A9%AC%E4%B8%8A%E9%87%8A%E6%94%BE%E6%8E%89%EF%BC%8C%E8%BF%99%E4%B8%AA%E9%94%81%E4%BC%9A%E4%B8%80%E7%9B%B4%E8%A2%AB%E8%BF%99%E4%B8%AA%E4%BA%8B%E5%8A%A1%E6%8C%81%E6%9C%89%EF%BC%8C%E7%9B%B4%E5%88%B0%E8%BF%99%E4%B8%AA%E4%BA%8B%E5%8A%A1%E8%A2%AB%E6%8F%90%E4%BA%A4%E6%88%96%E5%9B%9E%E6%BB%9A%E5%90%8E%EF%BC%8C%E8%BF%99%E4%B8%AA%E9%94%81%E6%89%8D%E4%BC%9A%E8%A2%AB%E9%87%8A%E6%94%BE%E6%8E%89%E3%80%82">https://www.cnblogs.com/origin-zy/p/17395701.html#:~:text=在MySQL中，两阶段锁协议的含义是：当一个事务获取到了某一个数据库对象的锁之后，并不是当前事务不需要操作它了之后，这个说就会马上释放掉，这个锁会一直被这个事务持有，直到这个事务被提交或回滚后，这个锁才会被释放掉。</a> 所以，在当前事务还没有结束的时候，任何其他事务尝试获取这个锁的时候，都会被阻塞。,知道当前事务提交或回滚后，前提事务才可以获取到这把锁。 这就是MySQL中2PL两阶段锁协议的含义。 它在事务并发的时候，为数据的一致性提供有力的保障。)</p>
-<p>两阶段锁协议的含义是：<strong>当一个事务获取到了某一个数据库对象的锁之后，并不是当前事务不需要操作它了之后，这个说就会马上释放掉，这个锁会一直被这个事务持有，直到这个事务被提交或回滚后，这个锁才会被释放掉。</strong>所以，在当前事务还没有结束的时候，任何其他事务尝试获取这个锁的时候，都会被阻塞。知道当前事务提交或回滚后，前提事务才可以获取到这把锁。</p>
-</li>
-<li><p><a href="https://blog.csdn.net/xmtblog/article/details/104980789">8 张图，给你完整的剖析 MySQL 两阶段加锁（2PL）协议-CSDN博客</a></p>
-</li>
-</ul>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">两阶段加锁（2PL，Two-Phase Locking）协议是数据库管理系统中用于实现事务隔离的一种协议。它分为两个阶段：</span><br><span class="line"></span><br><span class="line">1. 扩展阶段（Growing Phase）</span><br><span class="line">在这个阶段，事务可以申请锁（包括读锁和写锁），并且可以不断地增加所持有的锁。</span><br><span class="line">事务在扩展阶段内，可以获得新的锁，但不能释放任何已持有的锁。</span><br><span class="line">这个阶段持续到事务第一次释放锁为止。</span><br><span class="line">2. 收缩阶段（Shrinking Phase）</span><br><span class="line">一旦事务释放了第一个锁，就进入收缩阶段。</span><br><span class="line">在这个阶段，事务不能再申请新的锁，只能释放已持有的锁。</span><br><span class="line">事务可以在此阶段释放任何锁，但不能再获取新的锁。</span><br><span class="line"></span><br><span class="line">扩展阶段允许事务收集必要的锁，而收缩阶段则确保锁的释放顺序，从而避免死锁和其他并发问题。两阶段加锁协议是确保数据库事务满足串行化的关键机制之一。</span><br></pre></td></tr></table></figure>
-
-<p>其中，<strong>我以两阶段协议为起点，和你一起讨论了在开发的时候如何安排正确的事务语句</strong>。这里的原则&#x2F;我给你的建议是：<strong>如果你的事务中需要锁多个行，要把最可能造成锁冲突、最可能影响并发度的锁的申请时机尽量往后放。</strong></p>
-<p>但是，调整语句顺序<strong>并不能完全避免死锁</strong>。所以我们引入了死锁和死锁检测的概念，以及提供了<strong>三个方案</strong>，来减少死锁对数据库的影响。<strong>减少死锁的主要方向，就是控制访问相同资源的并发事务量。</strong></p>
-<p>如果你要删除一个表里面的前10000行数据，有以下三种方法可以做到：</p>
-<ul>
-<li>第一种，直接执行delete from T limit 10000;</li>
-<li>第二种，在一个连接中循环执行20次 delete from T limit 500;</li>
-<li>第三种，在20个连接中同时执行delete from T limit 500。</li>
-</ul>
-<p>你会选择哪一种方法呢？为什么呢？</p>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期我给你留的问题是：当备库用–single-transaction做逻辑备份的时候，如果从主库的binlog传来一个DDL语句会怎么样？</p>
-<p>假设这个DDL是针对表t1的， 这里我把备份过程中几个关键的语句列出来：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Q1:SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;</span><br><span class="line">Q2:START TRANSACTION  WITH CONSISTENT SNAPSHOT；</span><br><span class="line">/* other tables */</span><br><span class="line">Q3:SAVEPOINT sp;</span><br><span class="line">/* 时刻 1 */</span><br><span class="line">Q4:show create table `t1`;</span><br><span class="line">/* 时刻 2 */</span><br><span class="line">Q5:SELECT * FROM `t1`;</span><br><span class="line">/* 时刻 3 */</span><br><span class="line">Q6:ROLLBACK TO SAVEPOINT sp;</span><br><span class="line">/* 时刻 4 */</span><br><span class="line">/* other tables */</span><br></pre></td></tr></table></figure>
-
-<p>在<strong>备份开始</strong>的时候，为了<strong>确保</strong>RR（可重复读）隔离级别，再设置一次RR隔离级别(Q1);</p>
-<p><strong>启动事务</strong>，这里用 WITH CONSISTENT SNAPSHOT<strong>确保这个语句执行完就可以得到一个一致性视图（Q2)；</strong></p>
-<p><strong>设置一个保存点</strong>，这个很重要（Q3）；</p>
-<p>这里介绍一下<strong>保存点（SAVEPOINT）</strong>的概念:</p>
-<ul>
-<li><strong>保存点的定义</strong>: 保存点是事务中的一个标记，你可以在事务的某个时刻设置一个保存点，<strong>之后可以选择回滚到这个点，而不是回滚整个事务。</strong></li>
-</ul>
-<p>详细的可以看看这篇文章:</p>
-<ul>
-<li><p><a href="https://blog.csdn.net/hammring/article/details/106958696">事务之保存点（savepoint）-CSDN博客</a></p>
-<p>下面将重点提取出来:</p>
-<p>如果开启一个事务，已经写了很多语句，突然发现执行完上一语句时发现语句写错了。</p>
-<p>你只好使用rollback语句让数据库恢复到事务开启之前的状态。以前写完的语句也需要重新执行。</p>
-<p>所以mysql数据库的作者<strong>提出了保存点（savepoint）的概念</strong>。<strong>开启事务后在执行语句后面打几个点，我们调用rollback语句就会回滚到指定的点。而不是回到事务执行之前的样子。</strong></p>
-</li>
-</ul>
-<p>这里还介绍一下show create table是什么意思,具体可以看看这篇文章:</p>
-<ul>
-<li><a href="https://deepinout.com/mysql/mysql-questions/201_tk_1706620105.html">mysql show create table命令的详解|极客笔记 (deepinout.com)</a></li>
-</ul>
-<p>show create 是为了<strong>拿到表结构</strong>(Q4)，然后正式导数据 （Q5），<strong>回滚到SAVEPOINT sp，在这里的作用是释放 t1的MDL锁 （Q6。当然这部分属于“超纲”，上文正文里面都没提到。）</strong></p>
-<p>DDL从主库传过来的时间按照<strong>效果不同</strong>，我打了四个时刻。题目<strong>设定为小表</strong>，我们假定到达后，如果开始执行，则很快能够执行完成。</p>
-<p>参考答案如下：</p>
-<ol>
-<li>如果在Q4语句(Q4:show create table <code>t1</code>;)执行<strong>之前</strong>（时刻 1前）到达，现象：<strong>没有影响，备份拿到的是DDL后的表结构</strong>。（在开始备份之前就同步好了，没有任何问题,这个时候binlog已经同步好了）</li>
-<li>如果在“时刻 2”(Q5:SELECT * FROM <code>t1</code>;)到达，<strong>则表结构被改过</strong>，Q5执行的时候，报 <strong>Table definition has changed, please retry transaction</strong>，现象：mysqldump终止；（正式导数据的时候发现表结构定义被修改，中止备份操作）</li>
-<li>如果在“时刻2”和“时刻3”(Q6:ROLLBACK TO SAVEPOINT sp;)之间到达，mysqldump占着t1的MDL读锁，<strong>binlog被阻塞</strong>，<strong>现象：主从延迟，直到Q6执行完成。</strong>（导出数据完成,但是还没有提交,此时binlog会被阻塞）</li>
-<li>从“时刻4”(&#x2F;* other tables *&#x2F;)开始，<strong>mysqldump释放了MDL读锁，现象：没有影响，备份拿到的是DDL前的表结构。</strong>（已经备份完了，这时候的修改不会影响到之前的备份）</li>
-</ol>
-<p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/07-hang-suo-gong-guo-zen-mo-jian-shao-hang-suo-dui-xing-neng-de-ying-xiang">07 行锁功过：怎么减少行锁对性能的影响？ | MySql实战45讲 (gitbook.io)</a></p>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>全局锁和表锁 ：给表加个字段怎么有这么多阻碍？</title>
     <url>/2024/09/10/MySQL06/</url>
     <content><![CDATA[<p> 今天我要跟你聊聊MySQL的锁。<strong>数据库锁设计的初衷是处理并发问题。</strong>作为多用户共享的资源，当出现并发访问的时候，<strong>数据库需要合理地控制资源的访问规则</strong>。而锁就是用来实现这些访问规则的重要数据结构。</p>
@@ -1754,6 +1646,114 @@
 <li>简单说：<strong>MRR 通过把「随机磁盘读」，转化为「<a href="https://zhida.zhihu.com/search?q=%E9%A1%BA%E5%BA%8F%E7%A3%81%E7%9B%98&zhida_source=entity&is_preview=1">顺序磁盘</a>读」，从而提高了索引查询的性能。</strong></li>
 </ul>
 <p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/06-quan-ju-suo-he-biao-suo-gei-biao-jia-ge-zi-duan-zen-mo-you-zhe-mo-duo-zu-ai">06 全局锁和表锁 ：给表加个字段怎么有这么多阻碍？ | MySql实战45讲 (gitbook.io)</a></p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>行锁功过：怎么减少行锁对性能的影响？</title>
+    <url>/2024/09/10/MySQL07/</url>
+    <content><![CDATA[<p>在上一篇文章中，<strong>介绍了MySQL的全局锁和表级锁，今天我们就来讲讲MySQL的行锁。</strong></p>
+<p><strong>MySQL的行锁是在引擎层由各个引擎自己实现的。但并不是所有的引擎都支持行锁，比如MyISAM引擎就不支持行锁。</strong>不支持行锁<strong>意味着并发控制只能使用表锁</strong>，对于这种引擎的表，<strong>同一张表上任何时刻只能有一个更新在执行，这就会影响到业务并发度。InnoDB是支持行锁的，这也是MyISAM被InnoDB替代的重要原因之一。</strong></p>
+<p>我们今天就主要来聊聊InnoDB的行锁，以及如何通过减少锁冲突来提升业务并发度。</p>
+<p>顾名思义，<strong>行锁就是针对数据表中行记录的锁。这很好理解，比如事务A更新了一行，而这时候事务B也要更新同一行，则必须等事务A的操作完成后才能进行更新。</strong></p>
+<p>当然，数据库中<strong>还有一些没那么一目了然的概念和设计，这些概念如果理解和使用不当，容易导致程序出现非预期行为，比如两阶段锁。</strong></p>
+<h3 id="从两阶段锁说起"><a href="#从两阶段锁说起" class="headerlink" title="从两阶段锁说起"></a>从两阶段锁说起</h3><p>我先给你举个例子。在下面的操作序列中，事务B的update语句执行时会是什么现象呢？假设字段id是表t的主键。</p>
+<p><img src="/2024/09/10/MySQL07/image-20240910130922763.png" alt="image-20240910130922763"></p>
+<p>这个问题的结论取决于事务A在执行完两条update语句后，持有哪些锁，以及在什么时候释放。<strong>你可以验证一下：实际上事务B的update语句会被阻塞，直到事务A执行commit之后，事务B才能继续执行。（这个我在最初学习MySQL的时候就试验过了）</strong></p>
+<p>知道了这个答案，你一定知道了事务A持有的两个记录的行锁，<strong>都是在commit的时候才释放的</strong>。</p>
+<p>也就是说，<strong>在InnoDB事务中，行锁是在需要的时候才加上的，但并不是不需要了就立刻释放，而是要等到事务结束时才释放。这个就是两阶段锁协议。</strong></p>
+<p>知道了这个设定，对我们使用事务有什么帮助呢？那就是，<strong>如果你的事务中需要锁多个行，要把最可能造成锁冲突、最可能影响并发度的锁尽量往后放。</strong>我给你举个例子。</p>
+<p>假设你负责实现一个电影票在线交易业务，顾客A要在影院B购买电影票。我们简化一点，这个业务需要涉及到以下操作：</p>
+<ol>
+<li>从顾客A账户余额中扣除电影票价；</li>
+<li>给影院B的账户余额增加这张电影票价；</li>
+<li>记录一条交易日志。</li>
+</ol>
+<p><strong>也就是说，要完成这个交易，我们需要update两条记录，并insert一条记录。当然，为了保证交易的原子性，我们要把这三个操作放在一个事务中。（我们在Spring程序中直接一个@Transactional注解就行了）</strong>那么，你会怎样安排这三个语句在事务中的顺序呢？</p>
+<p>试想如果同时有另外一个顾客C要在影院B买票，那么这两个事务冲突的部分就是语句2了。因为它们要更新同一个影院账户的余额，需要修改同一行数据。</p>
+<p>根据两阶段锁协议，不论你怎样安排语句顺序，所有的操作需要的行锁都是在事务提交的时候才释放的。<strong>所以，如果你把语句2安排在最后，比如按照3、1、2这样的顺序，那么影院账户余额这一行的锁时间就最少。这就最大程度地减少了事务之间的锁等待，提升了并发度。</strong></p>
+<p><strong>好了，现在由于你的正确设计，影院余额这一行的行锁在一个事务中不会停留很长时间。</strong>但是，这并没有完全解决你的困扰。</p>
+<p>如果这个影院做活动，可以低价预售一年内所有的电影票，而且这个活动只做一天。于是在活动时间开始的时候，你的MySQL就挂了。<strong>你登上服务器一看，CPU消耗接近100%，但整个数据库每秒就执行不到100个事务。</strong>这是什么原因呢？</p>
+<p>这里，我就要说到<strong>死锁和死锁检测了</strong>。</p>
+<h3 id="死锁和死锁检测"><a href="#死锁和死锁检测" class="headerlink" title="死锁和死锁检测"></a>死锁和死锁检测</h3><p><strong>当并发系统中不同线程出现循环资源依赖，涉及的线程都在等待别的线程释放资源时，就会导致这几个线程都进入无限等待的状态，称为死锁。</strong>这里我用数据库中的行锁举个例子。</p>
+<p><img src="/2024/09/10/MySQL07/image-20240910131442146.png" alt="image-20240910131442146"></p>
+<p><strong>这时候，事务A在等待事务B释放id&#x3D;2的行锁，而事务B在等待事务A释放id&#x3D;1的行锁。 事务A和事务B在互相等待对方的资源释放，就是进入了死锁状态。</strong>当出现死锁以后，有两种策略：</p>
+<ul>
+<li><strong>一种策略是，直接进入等待，直到超时。这个超时时间可以通过参数innodb_lock_wait_timeout来设置。</strong></li>
+<li>另一种策略是，<strong>发起死锁检测，发现死锁后，主动回滚死锁链条中的某一个事务，让其他事务得以继续执行。将参数innodb_deadlock_detect设置为on，表示开启这个逻辑。</strong></li>
+</ul>
+<p>在InnoDB中，innodb_lock_wait_timeout的<strong>默认值是50s</strong>，意味着如果采用第一个策略，当出现死锁以后，<strong>第一个被锁住的线程要过50s才会超时退出，然后其他线程才有可能继续执行。对于在线服务来说，这个等待时间往往是无法接受的。</strong></p>
+<p>但是，我们又不可能直接把这个时间设置成一个很小的值，比如1s。这样当出现死锁的时候，确实很快就可以解开，但如果不是死锁，而是简单的锁等待呢？所以，超时时间设置太短的话，会出现很多误伤。</p>
+<p>所以，<strong>正常情况下我们还是要采用第二种策略</strong>，即：<strong>主动死锁检测，而且innodb_deadlock_detect的默认值本身就是on</strong>。主动死锁检测在发生死锁的时候，<strong>是能够快速发现并进行处理的</strong>，但是它也是有额外负担的。</p>
+<p>你可以想象一下这个过程：<strong>每当一个事务被锁的时候，就要看看它所依赖的线程有没有被别人锁住，如此循环，最后判断是否出现了循环等待，也就是死锁</strong>。</p>
+<p>那如果是我们上面说到的所有事务都要更新同一行的场景呢？</p>
+<p>每个新来的被堵住的线程，都要判断会不会由于自己的加入导致了死锁，<strong>这是一个时间复杂度是O(n^2)的操作（1 + 2 + 3 + …… + n）</strong>。假设有1000个并发线程要同时更新同一行，那么死锁检测操作就是100万这个量级的。<strong>虽然最终检测的结果是没有死锁，但是这期间要消耗大量的CPU资源。因此，你就会看到CPU利用率很高，但是每秒却执行不了几个事务。</strong></p>
+<p>根据上面的分析，我们来讨论一下，怎么解决由这种<strong>热点行更新</strong>导致的性能问题呢？<strong>问题的症结在于，死锁检测要耗费大量的CPU资源。</strong></p>
+<p><strong>一种头痛医头的方法，就是如果你能确保这个业务一定不会出现死锁，可以临时把死锁检测关掉。</strong>但是这种操作本身带有一定的风险，因为业务设计的时候一般不会把死锁当做一个严重错误，毕竟出现死锁了，就回滚，然后通过业务重试一般就没问题了，这是业务无损的。<strong>而关掉死锁检测意味着可能会出现大量的超时，这是业务有损的。</strong></p>
+<p><strong>另一个思路是控制并发度。</strong>根据上面的分析，你会发现如果并发能够控制住，<strong>比如同一行同时最多只有10个线程在更新，那么死锁检测的成本很低</strong>，就不会出现这个问题。一个直接的想法就是，<strong>在客户端做并发控制</strong>。但是，你会很快发现这个方法不太可行，因为客户端很多。我见过一个应用，有600个客户端，<strong>这样即使每个客户端控制到只有5个并发线程，汇总到数据库服务端以后，峰值并发数也可能要达到3000。</strong></p>
+<p>因此，<strong>这个并发控制要做在数据库服务端。如果你有中间件，可以考虑在中间件实现；如果你的团队有能修改MySQL源码的人，也可以做在MySQL里面</strong>。基本思路就是，<strong>对于相同行的更新，在进入引擎之前排队。这样在InnoDB内部就不会有大量的死锁检测工作了。</strong></p>
+<p>可能你会问，<strong>如果团队里暂时没有数据库方面的专家，不能实现这样的方案，能不能从设计上优化这个问题呢？</strong></p>
+<p><strong>你可以考虑通过将一行改成逻辑上的多行来减少锁冲突。</strong>还是以影院账户为例，可以考虑放在多条记录上，<strong>比如10个记录，影院的账户总额等于这10个记录的值的总和。这样每次要给影院账户加金额的时候，随机选其中一条记录来加。这样每次冲突概率变成原来的1&#x2F;10，可以减少锁等待个数，也就减少了死锁检测的CPU消耗。（原来有时候这样设计不是屎山啊，这是为了避免并发死锁）</strong></p>
+<p>这个方案看上去是无损的，但其实这类方案需要根据业务逻辑做<strong>详细设计</strong>。<strong>如果账户余额可能会减少，比如退票逻辑，那么这时候就需要考虑当一部分行记录变成0的时候，代码要有特殊处理。</strong></p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天介绍了<strong>MySQL的行锁，涉及了两阶段锁协议、死锁和死锁检测这两大部分内容。</strong></p>
+<p>这里<strong>两阶段加锁（2PL(Two-phase locking)）协议</strong>可以看看这几篇文章：</p>
+<ul>
+<li><p>[关于MySQL 两阶段加锁（2PL(Two-phase locking)）协议 - _Origin - 博客园 (cnblogs.com)](<a href="https://www.cnblogs.com/origin-zy/p/17395701.html#:~:text=%E5%9C%A8MySQL%E4%B8%AD%EF%BC%8C%E4%B8%A4%E9%98%B6%E6%AE%B5%E9%94%81%E5%8D%8F%E8%AE%AE%E7%9A%84%E5%90%AB%E4%B9%89%E6%98%AF%EF%BC%9A%E5%BD%93%E4%B8%80%E4%B8%AA%E4%BA%8B%E5%8A%A1%E8%8E%B7%E5%8F%96%E5%88%B0%E4%BA%86%E6%9F%90%E4%B8%80%E4%B8%AA%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AF%B9%E8%B1%A1%E7%9A%84%E9%94%81%E4%B9%8B%E5%90%8E%EF%BC%8C%E5%B9%B6%E4%B8%8D%E6%98%AF%E5%BD%93%E5%89%8D%E4%BA%8B%E5%8A%A1%E4%B8%8D%E9%9C%80%E8%A6%81%E6%93%8D%E4%BD%9C%E5%AE%83%E4%BA%86%E4%B9%8B%E5%90%8E%EF%BC%8C%E8%BF%99%E4%B8%AA%E8%AF%B4%E5%B0%B1%E4%BC%9A%E9%A9%AC%E4%B8%8A%E9%87%8A%E6%94%BE%E6%8E%89%EF%BC%8C%E8%BF%99%E4%B8%AA%E9%94%81%E4%BC%9A%E4%B8%80%E7%9B%B4%E8%A2%AB%E8%BF%99%E4%B8%AA%E4%BA%8B%E5%8A%A1%E6%8C%81%E6%9C%89%EF%BC%8C%E7%9B%B4%E5%88%B0%E8%BF%99%E4%B8%AA%E4%BA%8B%E5%8A%A1%E8%A2%AB%E6%8F%90%E4%BA%A4%E6%88%96%E5%9B%9E%E6%BB%9A%E5%90%8E%EF%BC%8C%E8%BF%99%E4%B8%AA%E9%94%81%E6%89%8D%E4%BC%9A%E8%A2%AB%E9%87%8A%E6%94%BE%E6%8E%89%E3%80%82">https://www.cnblogs.com/origin-zy/p/17395701.html#:~:text=在MySQL中，两阶段锁协议的含义是：当一个事务获取到了某一个数据库对象的锁之后，并不是当前事务不需要操作它了之后，这个说就会马上释放掉，这个锁会一直被这个事务持有，直到这个事务被提交或回滚后，这个锁才会被释放掉。</a> 所以，在当前事务还没有结束的时候，任何其他事务尝试获取这个锁的时候，都会被阻塞。,知道当前事务提交或回滚后，前提事务才可以获取到这把锁。 这就是MySQL中2PL两阶段锁协议的含义。 它在事务并发的时候，为数据的一致性提供有力的保障。)</p>
+<p>两阶段锁协议的含义是：<strong>当一个事务获取到了某一个数据库对象的锁之后，并不是当前事务不需要操作它了之后，这个说就会马上释放掉，这个锁会一直被这个事务持有，直到这个事务被提交或回滚后，这个锁才会被释放掉。</strong>所以，在当前事务还没有结束的时候，任何其他事务尝试获取这个锁的时候，都会被阻塞。知道当前事务提交或回滚后，前提事务才可以获取到这把锁。</p>
+</li>
+<li><p><a href="https://blog.csdn.net/xmtblog/article/details/104980789">8 张图，给你完整的剖析 MySQL 两阶段加锁（2PL）协议-CSDN博客</a></p>
+</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">两阶段加锁（2PL，Two-Phase Locking）协议是数据库管理系统中用于实现事务隔离的一种协议。它分为两个阶段：</span><br><span class="line"></span><br><span class="line">1. 扩展阶段（Growing Phase）</span><br><span class="line">在这个阶段，事务可以申请锁（包括读锁和写锁），并且可以不断地增加所持有的锁。</span><br><span class="line">事务在扩展阶段内，可以获得新的锁，但不能释放任何已持有的锁。</span><br><span class="line">这个阶段持续到事务第一次释放锁为止。</span><br><span class="line">2. 收缩阶段（Shrinking Phase）</span><br><span class="line">一旦事务释放了第一个锁，就进入收缩阶段。</span><br><span class="line">在这个阶段，事务不能再申请新的锁，只能释放已持有的锁。</span><br><span class="line">事务可以在此阶段释放任何锁，但不能再获取新的锁。</span><br><span class="line"></span><br><span class="line">扩展阶段允许事务收集必要的锁，而收缩阶段则确保锁的释放顺序，从而避免死锁和其他并发问题。两阶段加锁协议是确保数据库事务满足串行化的关键机制之一。</span><br></pre></td></tr></table></figure>
+
+<p>其中，<strong>我以两阶段协议为起点，和你一起讨论了在开发的时候如何安排正确的事务语句</strong>。这里的原则&#x2F;我给你的建议是：<strong>如果你的事务中需要锁多个行，要把最可能造成锁冲突、最可能影响并发度的锁的申请时机尽量往后放。</strong></p>
+<p>但是，调整语句顺序<strong>并不能完全避免死锁</strong>。所以我们引入了死锁和死锁检测的概念，以及提供了<strong>三个方案</strong>，来减少死锁对数据库的影响。<strong>减少死锁的主要方向，就是控制访问相同资源的并发事务量。</strong></p>
+<p>如果你要删除一个表里面的前10000行数据，有以下三种方法可以做到：</p>
+<ul>
+<li>第一种，直接执行delete from T limit 10000;</li>
+<li>第二种，在一个连接中循环执行20次 delete from T limit 500;</li>
+<li>第三种，在20个连接中同时执行delete from T limit 500。</li>
+</ul>
+<p>你会选择哪一种方法呢？为什么呢？</p>
+<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期我给你留的问题是：当备库用–single-transaction做逻辑备份的时候，如果从主库的binlog传来一个DDL语句会怎么样？</p>
+<p>假设这个DDL是针对表t1的， 这里我把备份过程中几个关键的语句列出来：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Q1:SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;</span><br><span class="line">Q2:START TRANSACTION  WITH CONSISTENT SNAPSHOT；</span><br><span class="line">/* other tables */</span><br><span class="line">Q3:SAVEPOINT sp;</span><br><span class="line">/* 时刻 1 */</span><br><span class="line">Q4:show create table `t1`;</span><br><span class="line">/* 时刻 2 */</span><br><span class="line">Q5:SELECT * FROM `t1`;</span><br><span class="line">/* 时刻 3 */</span><br><span class="line">Q6:ROLLBACK TO SAVEPOINT sp;</span><br><span class="line">/* 时刻 4 */</span><br><span class="line">/* other tables */</span><br></pre></td></tr></table></figure>
+
+<p>在<strong>备份开始</strong>的时候，为了<strong>确保</strong>RR（可重复读）隔离级别，再设置一次RR隔离级别(Q1);</p>
+<p><strong>启动事务</strong>，这里用 WITH CONSISTENT SNAPSHOT<strong>确保这个语句执行完就可以得到一个一致性视图（Q2)；</strong></p>
+<p><strong>设置一个保存点</strong>，这个很重要（Q3）；</p>
+<p>这里介绍一下<strong>保存点（SAVEPOINT）</strong>的概念:</p>
+<ul>
+<li><strong>保存点的定义</strong>: 保存点是事务中的一个标记，你可以在事务的某个时刻设置一个保存点，<strong>之后可以选择回滚到这个点，而不是回滚整个事务。</strong></li>
+</ul>
+<p>详细的可以看看这篇文章:</p>
+<ul>
+<li><p><a href="https://blog.csdn.net/hammring/article/details/106958696">事务之保存点（savepoint）-CSDN博客</a></p>
+<p>下面将重点提取出来:</p>
+<p>如果开启一个事务，已经写了很多语句，突然发现执行完上一语句时发现语句写错了。</p>
+<p>你只好使用rollback语句让数据库恢复到事务开启之前的状态。以前写完的语句也需要重新执行。</p>
+<p>所以mysql数据库的作者<strong>提出了保存点（savepoint）的概念</strong>。<strong>开启事务后在执行语句后面打几个点，我们调用rollback语句就会回滚到指定的点。而不是回到事务执行之前的样子。</strong></p>
+</li>
+</ul>
+<p>这里还介绍一下show create table是什么意思,具体可以看看这篇文章:</p>
+<ul>
+<li><a href="https://deepinout.com/mysql/mysql-questions/201_tk_1706620105.html">mysql show create table命令的详解|极客笔记 (deepinout.com)</a></li>
+</ul>
+<p>show create 是为了<strong>拿到表结构</strong>(Q4)，然后正式导数据 （Q5），<strong>回滚到SAVEPOINT sp，在这里的作用是释放 t1的MDL锁 （Q6。当然这部分属于“超纲”，上文正文里面都没提到。）</strong></p>
+<p>DDL从主库传过来的时间按照<strong>效果不同</strong>，我打了四个时刻。题目<strong>设定为小表</strong>，我们假定到达后，如果开始执行，则很快能够执行完成。</p>
+<p>参考答案如下：</p>
+<ol>
+<li>如果在Q4语句(Q4:show create table <code>t1</code>;)执行<strong>之前</strong>（时刻 1前）到达，现象：<strong>没有影响，备份拿到的是DDL后的表结构</strong>。（在开始备份之前就同步好了，没有任何问题,这个时候binlog已经同步好了）</li>
+<li>如果在“时刻 2”(Q5:SELECT * FROM <code>t1</code>;)到达，<strong>则表结构被改过</strong>，Q5执行的时候，报 <strong>Table definition has changed, please retry transaction</strong>，现象：mysqldump终止；（正式导数据的时候发现表结构定义被修改，中止备份操作）</li>
+<li>如果在“时刻2”和“时刻3”(Q6:ROLLBACK TO SAVEPOINT sp;)之间到达，mysqldump占着t1的MDL读锁，<strong>binlog被阻塞</strong>，<strong>现象：主从延迟，直到Q6执行完成。</strong>（导出数据完成,但是还没有提交,此时binlog会被阻塞）</li>
+<li>从“时刻4”(&#x2F;* other tables *&#x2F;)开始，<strong>mysqldump释放了MDL读锁，现象：没有影响，备份拿到的是DDL前的表结构。</strong>（已经备份完了，这时候的修改不会影响到之前的备份）</li>
+</ol>
+<p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/07-hang-suo-gong-guo-zen-mo-jian-shao-hang-suo-dui-xing-neng-de-ying-xiang">07 行锁功过：怎么减少行锁对性能的影响？ | MySql实战45讲 (gitbook.io)</a></p>
 ]]></content>
       <categories>
         <category>MySQL</category>
@@ -2152,6 +2152,116 @@
       </tags>
   </entry>
   <entry>
+    <title>怎么给字符串字段加索引？</title>
+    <url>/2024/09/11/MySQL11/</url>
+    <content><![CDATA[<p>现在，几乎所有的系统都支持邮箱登录，<strong>如何在邮箱这样的字段上建立合理的索引</strong>，是我们今天要讨论的问题。</p>
+<p>假设，你现在<strong>维护一个支持邮箱登录的系统</strong>，用户表是这么定义的：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; create table SUser(</span><br><span class="line">ID bigint unsigned primary key,</span><br><span class="line">email varchar(64), </span><br><span class="line">... </span><br><span class="line">)engine=innodb; </span><br></pre></td></tr></table></figure>
+
+<p><strong>由于要使用邮箱登录，所以业务代码中一定会出现类似于这样的语句：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select f1, f2 from SUser where email=&#x27;xxx&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p>从第4和第5篇讲解索引的文章中，<strong>我们可以知道，如果email这个字段上没有索引，那么这个语句就只能做全表扫描</strong>。</p>
+<p>同时，<strong>MySQL是支持前缀索引的</strong>，也就是说，<strong>你可以定义字符串的一部分作为索引。默认地，如果你创建索引的语句不指定前缀长度，那么索引就会包含整个字符串。</strong></p>
+<p>比如，这两个在email字段上创建索引的语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; alter table SUser add index index1(email);</span><br><span class="line">或</span><br><span class="line">mysql&gt; alter table SUser add index index2(email(6));</span><br></pre></td></tr></table></figure>
+
+<p>第一个语句创建的index1索引里面，包含了<strong>每个记录的整个字符串</strong>；而第二个语句创建的index2索引里面，<strong>对于每个记录都是只取前6个字节</strong>。</p>
+<p>那么，这两种不同的定义在数据结构和存储上有什么区别呢？如图2和3所示，就是这两个索引的示意图。</p>
+<p><img src="/2024/09/11/MySQL11/image-20240911103026039.png" alt="image-20240911103026039"></p>
+<p><img src="/2024/09/11/MySQL11/image-20240911103031756.png" alt="image-20240911103031756"></p>
+<p>从图中你可以看到，<strong>由于email(6)这个索引结构中每个邮箱字段都只取前6个字节（即：zhangs），所以占用的空间会更小，这就是使用前缀索引的优势。</strong></p>
+<p>但，这同时带来的损失是，<strong>可能会增加额外的记录扫描次数。</strong></p>
+<p>接下来，我们再看看下面这个语句，在这两个索引定义下分别是怎么执行的。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">select id,name,email from SUser where email=&#x27;zhangssxyz@xxx.com&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p><strong>如果使用的是index1</strong>（即email整个字符串的索引结构），执行顺序是这样的：</p>
+<p>1.<br>   从index1<strong>索引树</strong>找到满足索引值是’<a href="mailto:&#122;&#x68;&#97;&#x6e;&#103;&#x73;&#x73;&#120;&#121;&#x7a;&#x40;&#x78;&#x78;&#120;&#x2e;&#x63;&#111;&#109;">&#122;&#x68;&#97;&#x6e;&#103;&#x73;&#x73;&#120;&#121;&#x7a;&#x40;&#x78;&#x78;&#120;&#x2e;&#x63;&#111;&#109;</a>’的这条记录，取得ID2的值；<br>2. <strong>到主键上查到主键值是ID2的行，判断email的值是正确的，将这行记录加入结果集；</strong><br>3. <strong>取index1索引树上刚刚查到的位置的下一条记录，发现已经不满足email&#x3D;‘<a href="mailto:&#x7a;&#104;&#97;&#110;&#x67;&#115;&#x73;&#120;&#x79;&#x7a;&#x40;&#x78;&#x78;&#120;&#x2e;&#x63;&#x6f;&#109;">&#x7a;&#104;&#97;&#110;&#x67;&#115;&#x73;&#120;&#x79;&#x7a;&#x40;&#x78;&#x78;&#120;&#x2e;&#x63;&#x6f;&#109;</a>’的条件了，循环结束。</strong></p>
+<p>这个过程中，<strong>只需要回主键索引取一次数据，所以系统认为只扫描了一行。</strong></p>
+<p><strong>如果使用的是index2</strong>（即email(6)索引结构），执行顺序是这样的：</p>
+<p>1.<br>   从index2索引树找到满足索引值是’zhangs’的记录，找到的第一个是ID1；<br>2. 到主键上查到主键值是ID1的行，判断出email的值不是’<a href="mailto:&#x7a;&#x68;&#x61;&#x6e;&#x67;&#115;&#115;&#120;&#121;&#122;&#64;&#x78;&#120;&#x78;&#46;&#99;&#111;&#x6d;">&#x7a;&#x68;&#x61;&#x6e;&#x67;&#115;&#115;&#120;&#121;&#122;&#64;&#x78;&#120;&#x78;&#46;&#99;&#111;&#x6d;</a>’，这行记录丢弃；<br>3. 取index2上刚刚查到的位置的下一条记录，发现仍然是’zhangs’，取出ID2，再到ID索引上取整行然后判断，这次值对了，将这行记录加入结果集；<br>4. 重复上一步，直到在idxe2上取到的值不是’zhangs’时，循环结束。</p>
+<p><strong>在这个过程中，要回主键索引取4次数据，也就是扫描了4行。</strong></p>
+<p>通过这个对比，你很容易就可以发现，<strong>使用前缀索引后，可能会导致查询语句读数据的次数变多</strong>。</p>
+<p>但是，对于这个查询语句来说，<strong>如果你定义的index2不是email(6)而是email(7），也就是说取email字段的前7个字节来构建索引的话，即满足前缀’zhangss’的记录只有一个，也能够直接查到ID2，只扫描一行就结束了</strong>。</p>
+<p>也就是说<strong>使用前缀索引，定义好长度，就可以做到既节省空间，又不用额外增加太多的查询成本。</strong></p>
+<p>于是，你就有个问题：当要给字符串创建前缀索引时，<strong>有什么方法能够确定我应该使用多长的前缀呢</strong>？</p>
+<p>实际上，<strong>我们在建立索引时关注的是区分度，区分度越高越好。因为区分度越高，意味着重复的键值越少。因此，我们可以通过统计索引上有多少个不同的值来判断要使用多长的前缀。</strong></p>
+<p>首先，你可以使用下面这个语句，算出这个列上有多少个不同的值：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select count(distinct email) as L from SUser;</span><br></pre></td></tr></table></figure>
+
+<p>然后，依次选取不同长度的前缀来看这个值，比如我们要看一下4~7个字节的前缀索引，可以用这个语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select </span><br><span class="line">  count(distinct left(email,4)）as L4,</span><br><span class="line">  count(distinct left(email,5)）as L5,</span><br><span class="line">  count(distinct left(email,6)）as L6,</span><br><span class="line">  count(distinct left(email,7)）as L7,</span><br><span class="line">from SUser;</span><br></pre></td></tr></table></figure>
+
+<p>当然，<strong>使用前缀索引很可能会损失区分度，所以你需要预先设定一个可以接受的损失比例，比如5%<strong>。然后，在返回的L4~L7中，找出</strong>不小于</strong> L * 95%的值，<strong>假设这里L6、L7都满足，你就可以选择前缀长度为6</strong>。</p>
+<h3 id="前缀索引对覆盖索引的影响"><a href="#前缀索引对覆盖索引的影响" class="headerlink" title="前缀索引对覆盖索引的影响"></a>前缀索引对覆盖索引的影响</h3><p>前面我们说了使用<strong>前缀索引可能会增加扫描行数，这会影响到性能。其实，前缀索引的影响不止如此，我们再看一下另外一个场景。</strong></p>
+<p>你先来看看这个SQL语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">select id,email from SUser where email=&#x27;zhangssxyz@xxx.com&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p>与前面例子中的SQL语句</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">select id,name,email from SUser where email=&#x27;zhangssxyz@xxx.com&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p>相比，这个语句只要求返回id和email字段。</p>
+<p>所以，<strong>如果使用index1（即email整个字符串的索引结构）的话，可以利用覆盖索引，从index1查到结果后直接就返回了，不需要回到ID索引再去查一次。而如果使用index2（即email(6)索引结构）的话，就不得不回到ID索引再去判断email字段的值。</strong></p>
+<p>即使你将index2的定义修改为<strong>email(18)的前缀索引</strong>，这时候虽然index2<strong>已经包含了所有的信息</strong>，但InnoDB<strong>还是要回到id索引再查一下</strong>，<strong>因为系统并不确定前缀索引的定义是否截断了完整信息。</strong></p>
+<p>也就是说，<strong>使用前缀索引就用不上覆盖索引对查询性能的优化了，这也是你在选择是否使用前缀索引时需要考虑的一个因素。</strong></p>
+<h3 id="其他方式"><a href="#其他方式" class="headerlink" title="其他方式"></a>其他方式</h3><p>对于类似于邮箱这样的字段来说，<strong>使用前缀索引的效果可能还不错。但是，遇到前缀的区分度不够好的情况时，我们要怎么办呢？</strong></p>
+<p>比如，我们国家的身份证号，一共18位，<strong>其中前6位是地址码，所以同一个县的人的身份证号前6位一般会是相同的</strong>。</p>
+<p>假设你维护的数据库是一个市的公民信息系统，这时候如果对身份证号做长度为6的前缀索引的话，<strong>这个索引的区分度就非常低了。</strong></p>
+<p>按照我们前面说的方法，<strong>可能你需要创建长度为12以上的前缀索引，才能够满足区分度要求。</strong></p>
+<p>但是，索引选取的越长，<strong>占用的磁盘空间就越大，相同的数据页能放下的索引值就越少，搜索的效率也就会越低。</strong></p>
+<p>那么，如果我们能够确定业务需求里面只有按照身份证进行等值查询的需求，还有没有别的处理方法呢？这种方法，既可以占用更小的空间，也能达到相同的查询效率。</p>
+<p>答案是，有的。</p>
+<p><strong>第一种方式是使用倒序存储。****如果你存储身份证号的时候把它倒过来存，每次查询的时候，你可以这么写：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select field_list from t where id_card = reverse(&#x27;input_id_card_string&#x27;);</span><br></pre></td></tr></table></figure>
+
+<p><strong>由于身份证号的最后6位没有地址码这样的重复逻辑，所以最后这6位很可能就提供了足够的区分度。当然了，实践中你不要忘记使用count(distinct)方法去做个验证。</strong></p>
+<p><strong>第二种方式是使用hash字段。</strong>你可以在表上再创建一个整数字段，来保存身份证的校验码，<strong>同时在这个字段上创建索引。</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; alter table t add id_card_crc int unsigned, add index(id_card_crc);</span><br></pre></td></tr></table></figure>
+
+<p>然后每次插入新记录的时候，<strong>都同时用crc32()这个函数得到校验码填到这个新字段。由于校验码可能存在冲突，也就是说两个不同的身份证号通过crc32()函数得到的结果可能是相同的，所以你的查询语句where部分要判断id_card的值是否精确相同。</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select field_list from t where id_card_crc=crc32(&#x27;input_id_card_string&#x27;) and id_card=&#x27;input_id_card_string&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>这样，<strong>索引的长度变成了4个字节</strong>，比原来小了很多。</p>
+<p>接下来，我们再一起看看<strong>使用倒序存储和使用hash字段这两种方法的异同点。</strong></p>
+<p>首先，它们的相同点是，<strong>都不支持范围查询</strong>。倒序存储的字段上创建的索引<strong>是按照倒序字符串的方式排序的，已经没有办法利用索引方式查出身份证号码在[ID_X, ID_Y]的所有市民了</strong>。同样地，hash字段的方式<strong>也只能支持等值查询</strong>。</p>
+<p>它们的区别，主要体现在以下三个方面：</p>
+<ol>
+<li>从占用的额外空间来看，<strong>倒序存储方式在主键索引上，不会消耗额外的存储空间，而hash字段方法需要增加一个字段</strong>。当然，倒序存储方式使用4个字节的前缀长度应该是不够的，<strong>如果再长一点，这个消耗跟额外这个hash字段也差不多抵消了</strong>。</li>
+<li>在CPU消耗方面，倒序方式每次写和读的时候，都需要额外调用一次reverse函数，而hash字段的方式需要额外调用一次crc32()函数。如果只从这两个函数的计算复杂度来看的话，<strong>reverse函数额外消耗的CPU资源会更小些</strong>。</li>
+<li>从查询效率上看，<strong>使用hash字段方式的查询性能相对更稳定一些。因为crc32算出来的值虽然有冲突的概率，但是概率非常小，可以认为每次查询的平均扫描行数接近1</strong>。而倒序存储方式毕竟还是用的前缀索引的方式，<strong>也就是说还是会增加扫描行数</strong>。</li>
+</ol>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>在今天这篇文章中，我跟你聊了聊<strong>字符串字段创建索引</strong>的场景。我们来回顾一下，你可以使用的方式有：</p>
+<ul>
+<li><strong>直接创建完整索引</strong>，这样可能比较占用空间；</li>
+<li><strong>创建前缀索引</strong>，节省空间，<strong>但会增加查询扫描次数，并且不能使用覆盖索引</strong>；</li>
+<li><strong>倒序存储</strong>，<strong>再创建前缀索引</strong>，用于绕过字符串本身前缀的区分度不够的问题；</li>
+<li><strong>创建hash字段索引</strong>，查询性能稳定，有额外的存储和计算消耗，<strong>跟第三种方式一样，都不支持范围扫描</strong>。</li>
+</ul>
+<p>在实际应用中，你要根据业务字段的特点选择使用哪种方式。</p>
+<p>如果你在维护一个学校的学生信息数据库，学生登录名的统一格式是”学号@gmail.com”, 而学号的规则是：十五位的数字，其中前三位是所在城市编号、第四到第六位是学校编号、第七位到第十位是入学年份、最后五位是顺序编号。</p>
+<p>系统登录的时候都需要学生输入登录名和密码，验证正确后才能继续使用系统。就只考虑登录验证这个行为的话，你会怎么设计这个登录名的索引呢？</p>
+<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上篇文章中的第一个例子，大家要检查一下隔离级别是不是RR（Repeatable Read，可重复读），创建的表t是不是InnoDB引擎。</p>
+<p>在上一篇文章最后，我给你留的问题是，为什么经过这个操作序列，explain的结果就不对了？这里，我来为你分析一下原因。</p>
+<p>delete 语句删掉了所有的数据，然后再通过call idata()插入了10万行数据，看上去是覆盖了原来的10万行。</p>
+<p>但是，session A<strong>开启了事务并没有提交，所以之前插入的10万行数据是不能删除的</strong>。这样，<strong>之前的数据每一行数据都有两个版本，旧版本是delete之前的数据，新版本是标记为deleted的数据。</strong></p>
+<p>这样，索引a上的数据其实就有两份。</p>
+<p>然后你会说，不对啊，主键上的数据也不能删，那没有使用force index的语句，使用explain命令看到的扫描行数为什么还是100000左右？（潜台词，如果这个也翻倍，也许优化器还会认为选字段a作为索引更合适）</p>
+<p><strong>是的，不过这个是主键，主键是直接按照表的行数来估计的。而表的行数，优化器直接用的是show table status的值。</strong></p>
+<p>这个值的计算方法，我会在后面有文章为你详细讲解。</p>
+<p><img src="/2024/09/11/MySQL11/image-20240911103410211.png" alt="image-20240911103410211"></p>
+<blockquote>
+<p>大家的机器如果<strong>IO能力比较差</strong>的话，做这个验证的时候，可以把<strong>innodb_flush_log_at_trx_commit 和 sync_binlog 都设置成0。</strong></p>
+</blockquote>
+<p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/11-zen-mo-gei-zi-fu-chuan-zi-duan-jia-suo-yin">11 怎么给字符串字段加索引？ | MySql实战45讲 (gitbook.io)</a></p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>MySQL为什么有时候会选错索引？</title>
     <url>/2024/09/10/MySQL10/</url>
     <content><![CDATA[<p>前面我们介绍过索引，<strong>你已经知道了在MySQL中一张表其实是可以支持多个索引的</strong>。但是，<strong>你写SQL语句的时候，并没有主动指定使用哪个索引。也就是说，使用哪个索引是由MySQL来确定的。</strong></p>
@@ -2305,116 +2415,6 @@
       </tags>
   </entry>
   <entry>
-    <title>怎么给字符串字段加索引？</title>
-    <url>/2024/09/11/MySQL11/</url>
-    <content><![CDATA[<p>现在，几乎所有的系统都支持邮箱登录，<strong>如何在邮箱这样的字段上建立合理的索引</strong>，是我们今天要讨论的问题。</p>
-<p>假设，你现在<strong>维护一个支持邮箱登录的系统</strong>，用户表是这么定义的：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; create table SUser(</span><br><span class="line">ID bigint unsigned primary key,</span><br><span class="line">email varchar(64), </span><br><span class="line">... </span><br><span class="line">)engine=innodb; </span><br></pre></td></tr></table></figure>
-
-<p><strong>由于要使用邮箱登录，所以业务代码中一定会出现类似于这样的语句：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select f1, f2 from SUser where email=&#x27;xxx&#x27;;</span><br></pre></td></tr></table></figure>
-
-<p>从第4和第5篇讲解索引的文章中，<strong>我们可以知道，如果email这个字段上没有索引，那么这个语句就只能做全表扫描</strong>。</p>
-<p>同时，<strong>MySQL是支持前缀索引的</strong>，也就是说，<strong>你可以定义字符串的一部分作为索引。默认地，如果你创建索引的语句不指定前缀长度，那么索引就会包含整个字符串。</strong></p>
-<p>比如，这两个在email字段上创建索引的语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; alter table SUser add index index1(email);</span><br><span class="line">或</span><br><span class="line">mysql&gt; alter table SUser add index index2(email(6));</span><br></pre></td></tr></table></figure>
-
-<p>第一个语句创建的index1索引里面，包含了<strong>每个记录的整个字符串</strong>；而第二个语句创建的index2索引里面，<strong>对于每个记录都是只取前6个字节</strong>。</p>
-<p>那么，这两种不同的定义在数据结构和存储上有什么区别呢？如图2和3所示，就是这两个索引的示意图。</p>
-<p><img src="/2024/09/11/MySQL11/image-20240911103026039.png" alt="image-20240911103026039"></p>
-<p><img src="/2024/09/11/MySQL11/image-20240911103031756.png" alt="image-20240911103031756"></p>
-<p>从图中你可以看到，<strong>由于email(6)这个索引结构中每个邮箱字段都只取前6个字节（即：zhangs），所以占用的空间会更小，这就是使用前缀索引的优势。</strong></p>
-<p>但，这同时带来的损失是，<strong>可能会增加额外的记录扫描次数。</strong></p>
-<p>接下来，我们再看看下面这个语句，在这两个索引定义下分别是怎么执行的。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">select id,name,email from SUser where email=&#x27;zhangssxyz@xxx.com&#x27;;</span><br></pre></td></tr></table></figure>
-
-<p><strong>如果使用的是index1</strong>（即email整个字符串的索引结构），执行顺序是这样的：</p>
-<p>1.<br>   从index1<strong>索引树</strong>找到满足索引值是’<a href="mailto:&#122;&#104;&#x61;&#110;&#x67;&#115;&#115;&#120;&#x79;&#x7a;&#64;&#x78;&#120;&#120;&#46;&#99;&#x6f;&#x6d;">&#122;&#104;&#x61;&#110;&#x67;&#115;&#115;&#120;&#x79;&#x7a;&#64;&#x78;&#120;&#120;&#46;&#99;&#x6f;&#x6d;</a>’的这条记录，取得ID2的值；<br>2. <strong>到主键上查到主键值是ID2的行，判断email的值是正确的，将这行记录加入结果集；</strong><br>3. <strong>取index1索引树上刚刚查到的位置的下一条记录，发现已经不满足email&#x3D;‘<a href="mailto:&#x7a;&#104;&#97;&#110;&#x67;&#115;&#115;&#120;&#x79;&#x7a;&#x40;&#x78;&#120;&#x78;&#x2e;&#x63;&#x6f;&#x6d;">&#x7a;&#104;&#97;&#110;&#x67;&#115;&#115;&#120;&#x79;&#x7a;&#x40;&#x78;&#120;&#x78;&#x2e;&#x63;&#x6f;&#x6d;</a>’的条件了，循环结束。</strong></p>
-<p>这个过程中，<strong>只需要回主键索引取一次数据，所以系统认为只扫描了一行。</strong></p>
-<p><strong>如果使用的是index2</strong>（即email(6)索引结构），执行顺序是这样的：</p>
-<p>1.<br>   从index2索引树找到满足索引值是’zhangs’的记录，找到的第一个是ID1；<br>2. 到主键上查到主键值是ID1的行，判断出email的值不是’<a href="mailto:&#122;&#x68;&#x61;&#110;&#103;&#115;&#x73;&#120;&#x79;&#122;&#64;&#x78;&#120;&#120;&#46;&#x63;&#111;&#x6d;">&#122;&#x68;&#x61;&#110;&#103;&#115;&#x73;&#120;&#x79;&#122;&#64;&#x78;&#120;&#120;&#46;&#x63;&#111;&#x6d;</a>’，这行记录丢弃；<br>3. 取index2上刚刚查到的位置的下一条记录，发现仍然是’zhangs’，取出ID2，再到ID索引上取整行然后判断，这次值对了，将这行记录加入结果集；<br>4. 重复上一步，直到在idxe2上取到的值不是’zhangs’时，循环结束。</p>
-<p><strong>在这个过程中，要回主键索引取4次数据，也就是扫描了4行。</strong></p>
-<p>通过这个对比，你很容易就可以发现，<strong>使用前缀索引后，可能会导致查询语句读数据的次数变多</strong>。</p>
-<p>但是，对于这个查询语句来说，<strong>如果你定义的index2不是email(6)而是email(7），也就是说取email字段的前7个字节来构建索引的话，即满足前缀’zhangss’的记录只有一个，也能够直接查到ID2，只扫描一行就结束了</strong>。</p>
-<p>也就是说<strong>使用前缀索引，定义好长度，就可以做到既节省空间，又不用额外增加太多的查询成本。</strong></p>
-<p>于是，你就有个问题：当要给字符串创建前缀索引时，<strong>有什么方法能够确定我应该使用多长的前缀呢</strong>？</p>
-<p>实际上，<strong>我们在建立索引时关注的是区分度，区分度越高越好。因为区分度越高，意味着重复的键值越少。因此，我们可以通过统计索引上有多少个不同的值来判断要使用多长的前缀。</strong></p>
-<p>首先，你可以使用下面这个语句，算出这个列上有多少个不同的值：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select count(distinct email) as L from SUser;</span><br></pre></td></tr></table></figure>
-
-<p>然后，依次选取不同长度的前缀来看这个值，比如我们要看一下4~7个字节的前缀索引，可以用这个语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select </span><br><span class="line">  count(distinct left(email,4)）as L4,</span><br><span class="line">  count(distinct left(email,5)）as L5,</span><br><span class="line">  count(distinct left(email,6)）as L6,</span><br><span class="line">  count(distinct left(email,7)）as L7,</span><br><span class="line">from SUser;</span><br></pre></td></tr></table></figure>
-
-<p>当然，<strong>使用前缀索引很可能会损失区分度，所以你需要预先设定一个可以接受的损失比例，比如5%<strong>。然后，在返回的L4~L7中，找出</strong>不小于</strong> L * 95%的值，<strong>假设这里L6、L7都满足，你就可以选择前缀长度为6</strong>。</p>
-<h3 id="前缀索引对覆盖索引的影响"><a href="#前缀索引对覆盖索引的影响" class="headerlink" title="前缀索引对覆盖索引的影响"></a>前缀索引对覆盖索引的影响</h3><p>前面我们说了使用<strong>前缀索引可能会增加扫描行数，这会影响到性能。其实，前缀索引的影响不止如此，我们再看一下另外一个场景。</strong></p>
-<p>你先来看看这个SQL语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">select id,email from SUser where email=&#x27;zhangssxyz@xxx.com&#x27;;</span><br></pre></td></tr></table></figure>
-
-<p>与前面例子中的SQL语句</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">select id,name,email from SUser where email=&#x27;zhangssxyz@xxx.com&#x27;;</span><br></pre></td></tr></table></figure>
-
-<p>相比，这个语句只要求返回id和email字段。</p>
-<p>所以，<strong>如果使用index1（即email整个字符串的索引结构）的话，可以利用覆盖索引，从index1查到结果后直接就返回了，不需要回到ID索引再去查一次。而如果使用index2（即email(6)索引结构）的话，就不得不回到ID索引再去判断email字段的值。</strong></p>
-<p>即使你将index2的定义修改为<strong>email(18)的前缀索引</strong>，这时候虽然index2<strong>已经包含了所有的信息</strong>，但InnoDB<strong>还是要回到id索引再查一下</strong>，<strong>因为系统并不确定前缀索引的定义是否截断了完整信息。</strong></p>
-<p>也就是说，<strong>使用前缀索引就用不上覆盖索引对查询性能的优化了，这也是你在选择是否使用前缀索引时需要考虑的一个因素。</strong></p>
-<h3 id="其他方式"><a href="#其他方式" class="headerlink" title="其他方式"></a>其他方式</h3><p>对于类似于邮箱这样的字段来说，<strong>使用前缀索引的效果可能还不错。但是，遇到前缀的区分度不够好的情况时，我们要怎么办呢？</strong></p>
-<p>比如，我们国家的身份证号，一共18位，<strong>其中前6位是地址码，所以同一个县的人的身份证号前6位一般会是相同的</strong>。</p>
-<p>假设你维护的数据库是一个市的公民信息系统，这时候如果对身份证号做长度为6的前缀索引的话，<strong>这个索引的区分度就非常低了。</strong></p>
-<p>按照我们前面说的方法，<strong>可能你需要创建长度为12以上的前缀索引，才能够满足区分度要求。</strong></p>
-<p>但是，索引选取的越长，<strong>占用的磁盘空间就越大，相同的数据页能放下的索引值就越少，搜索的效率也就会越低。</strong></p>
-<p>那么，如果我们能够确定业务需求里面只有按照身份证进行等值查询的需求，还有没有别的处理方法呢？这种方法，既可以占用更小的空间，也能达到相同的查询效率。</p>
-<p>答案是，有的。</p>
-<p><strong>第一种方式是使用倒序存储。****如果你存储身份证号的时候把它倒过来存，每次查询的时候，你可以这么写：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select field_list from t where id_card = reverse(&#x27;input_id_card_string&#x27;);</span><br></pre></td></tr></table></figure>
-
-<p><strong>由于身份证号的最后6位没有地址码这样的重复逻辑，所以最后这6位很可能就提供了足够的区分度。当然了，实践中你不要忘记使用count(distinct)方法去做个验证。</strong></p>
-<p><strong>第二种方式是使用hash字段。</strong>你可以在表上再创建一个整数字段，来保存身份证的校验码，<strong>同时在这个字段上创建索引。</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; alter table t add id_card_crc int unsigned, add index(id_card_crc);</span><br></pre></td></tr></table></figure>
-
-<p>然后每次插入新记录的时候，<strong>都同时用crc32()这个函数得到校验码填到这个新字段。由于校验码可能存在冲突，也就是说两个不同的身份证号通过crc32()函数得到的结果可能是相同的，所以你的查询语句where部分要判断id_card的值是否精确相同。</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select field_list from t where id_card_crc=crc32(&#x27;input_id_card_string&#x27;) and id_card=&#x27;input_id_card_string&#x27;</span><br></pre></td></tr></table></figure>
-
-<p>这样，<strong>索引的长度变成了4个字节</strong>，比原来小了很多。</p>
-<p>接下来，我们再一起看看<strong>使用倒序存储和使用hash字段这两种方法的异同点。</strong></p>
-<p>首先，它们的相同点是，<strong>都不支持范围查询</strong>。倒序存储的字段上创建的索引<strong>是按照倒序字符串的方式排序的，已经没有办法利用索引方式查出身份证号码在[ID_X, ID_Y]的所有市民了</strong>。同样地，hash字段的方式<strong>也只能支持等值查询</strong>。</p>
-<p>它们的区别，主要体现在以下三个方面：</p>
-<ol>
-<li>从占用的额外空间来看，<strong>倒序存储方式在主键索引上，不会消耗额外的存储空间，而hash字段方法需要增加一个字段</strong>。当然，倒序存储方式使用4个字节的前缀长度应该是不够的，<strong>如果再长一点，这个消耗跟额外这个hash字段也差不多抵消了</strong>。</li>
-<li>在CPU消耗方面，倒序方式每次写和读的时候，都需要额外调用一次reverse函数，而hash字段的方式需要额外调用一次crc32()函数。如果只从这两个函数的计算复杂度来看的话，<strong>reverse函数额外消耗的CPU资源会更小些</strong>。</li>
-<li>从查询效率上看，<strong>使用hash字段方式的查询性能相对更稳定一些。因为crc32算出来的值虽然有冲突的概率，但是概率非常小，可以认为每次查询的平均扫描行数接近1</strong>。而倒序存储方式毕竟还是用的前缀索引的方式，<strong>也就是说还是会增加扫描行数</strong>。</li>
-</ol>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>在今天这篇文章中，我跟你聊了聊<strong>字符串字段创建索引</strong>的场景。我们来回顾一下，你可以使用的方式有：</p>
-<ul>
-<li><strong>直接创建完整索引</strong>，这样可能比较占用空间；</li>
-<li><strong>创建前缀索引</strong>，节省空间，<strong>但会增加查询扫描次数，并且不能使用覆盖索引</strong>；</li>
-<li><strong>倒序存储</strong>，<strong>再创建前缀索引</strong>，用于绕过字符串本身前缀的区分度不够的问题；</li>
-<li><strong>创建hash字段索引</strong>，查询性能稳定，有额外的存储和计算消耗，<strong>跟第三种方式一样，都不支持范围扫描</strong>。</li>
-</ul>
-<p>在实际应用中，你要根据业务字段的特点选择使用哪种方式。</p>
-<p>如果你在维护一个学校的学生信息数据库，学生登录名的统一格式是”学号@gmail.com”, 而学号的规则是：十五位的数字，其中前三位是所在城市编号、第四到第六位是学校编号、第七位到第十位是入学年份、最后五位是顺序编号。</p>
-<p>系统登录的时候都需要学生输入登录名和密码，验证正确后才能继续使用系统。就只考虑登录验证这个行为的话，你会怎么设计这个登录名的索引呢？</p>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上篇文章中的第一个例子，大家要检查一下隔离级别是不是RR（Repeatable Read，可重复读），创建的表t是不是InnoDB引擎。</p>
-<p>在上一篇文章最后，我给你留的问题是，为什么经过这个操作序列，explain的结果就不对了？这里，我来为你分析一下原因。</p>
-<p>delete 语句删掉了所有的数据，然后再通过call idata()插入了10万行数据，看上去是覆盖了原来的10万行。</p>
-<p>但是，session A<strong>开启了事务并没有提交，所以之前插入的10万行数据是不能删除的</strong>。这样，<strong>之前的数据每一行数据都有两个版本，旧版本是delete之前的数据，新版本是标记为deleted的数据。</strong></p>
-<p>这样，索引a上的数据其实就有两份。</p>
-<p>然后你会说，不对啊，主键上的数据也不能删，那没有使用force index的语句，使用explain命令看到的扫描行数为什么还是100000左右？（潜台词，如果这个也翻倍，也许优化器还会认为选字段a作为索引更合适）</p>
-<p><strong>是的，不过这个是主键，主键是直接按照表的行数来估计的。而表的行数，优化器直接用的是show table status的值。</strong></p>
-<p>这个值的计算方法，我会在后面有文章为你详细讲解。</p>
-<p><img src="/2024/09/11/MySQL11/image-20240911103410211.png" alt="image-20240911103410211"></p>
-<blockquote>
-<p>大家的机器如果<strong>IO能力比较差</strong>的话，做这个验证的时候，可以把<strong>innodb_flush_log_at_trx_commit 和 sync_binlog 都设置成0。</strong></p>
-</blockquote>
-<p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/11-zen-mo-gei-zi-fu-chuan-zi-duan-jia-suo-yin">11 怎么给字符串字段加索引？ | MySql实战45讲 (gitbook.io)</a></p>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>为什么表数据删掉一半，表文件大小不变？</title>
     <url>/2024/09/11/MySQL13/</url>
     <content><![CDATA[<p>经常会有同学来问我，<strong>我的数据库占用空间太大，我把一个最大的表删掉了一半的数据，怎么表文件的大小还是没变？</strong></p>
@@ -2531,109 +2531,6 @@
 <p> 有几个同学提到了<strong>内存淘汰脏页，对应的redo log的操作</strong>，这个我们会在后面的文章中展开，大家可以先看一下 </p>
 </blockquote>
 <p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/13-wei-shi-mo-biao-shu-ju-shan-diao-yi-ban-biao-wen-jian-da-xiao-bu-bian#xiao-jie">13 为什么表数据删掉一半，表文件大小不变？ | MySql实战45讲 (gitbook.io)</a></p>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>为什么我的MySQL会“抖”一下？</title>
-    <url>/2024/09/11/MySQL12/</url>
-    <content><![CDATA[<p>平时的工作中，不知道你有没有遇到过这样的场景，<strong>一条SQL语句，正常执行的时候特别快，但是有时也不知道怎么回事，它就会变得特别慢，并且这样的场景很难复现，它不只随机，而且持续时间还很短。</strong></p>
-<p>看上去，这就像是数据库“抖”了一下。今天，我们就一起来看一看这是什么原因。</p>
-<h3 id="你的SQL语句为什么变“慢”了"><a href="#你的SQL语句为什么变“慢”了" class="headerlink" title="你的SQL语句为什么变“慢”了"></a>你的SQL语句为什么变“慢”了</h3><p>在前面第2篇文章<a href="https://time.geekbang.org/column/article/68633">《日志系统：一条SQL更新语句是如何执行的？》</a>中，我为你介绍了WAL机制。现在你知道了，<strong>InnoDB在处理更新语句的时候，只做了写日志这一个磁盘操作。这个日志叫作redo log（重做日志），也就是《孔乙己》里咸亨酒店掌柜用来记账的粉板，在更新内存写完redo log后，就返回给客户端，本次更新成功。</strong></p>
-<p>做下类比的话，<strong>掌柜记账的账本是数据文件，记账用的粉板是日志文件（redo log），掌柜的记忆就是内存</strong>。</p>
-<p>掌柜总要找时间把账本更新一下，<strong>这对应的就是把内存里的数据写入磁盘的过程，术语就是flush</strong>。在这个flush操作执行之前，孔乙己的赊账总额，其实跟掌柜手中账本里面的记录是不一致的。因为孔乙己今天的赊账金额还只在粉板上，而账本里的记录是老的，还没把今天的赊账算进去。</p>
-<p><strong>当内存数据页跟磁盘数据页内容不一致的时候，我们称这个内存页为“脏页”。内存数据写入到磁盘后，内存和磁盘上的数据页的内容就一致了，称为“干净页”</strong>。</p>
-<p>不论是脏页还是干净页，都在内存中。在这个例子里，内存对应的就是掌柜的记忆。</p>
-<p>接下来，我们用一个示意图来展示一下“孔乙己赊账”的整个操作过程。假设原来孔乙己欠账10文，这次又要赊9文。</p>
-<p><img src="/2024/09/11/MySQL12/image-20240911105754102.png" alt="image-20240911105754102"></p>
-<p>回到文章开头的问题，<strong>你不难想象，平时执行很快的更新操作，其实就是在写内存和日志，而MySQL偶尔“抖”一下的那个瞬间，可能就是在刷脏页（flush）</strong>。</p>
-<p>那么，什么情况会引发数据库的flush过程呢？</p>
-<p>我们还是继续用咸亨酒店掌柜的这个例子，想一想：掌柜在什么情况下会把粉板上的赊账记录改到账本上？</p>
-<ul>
-<li>第一种场景是，<strong>粉板满了，记不下了。这时候如果再有人来赊账，掌柜就只得放下手里的活儿，将粉板上的记录擦掉一些，留出空位以便继续记账。</strong>当然在擦掉之前，他必须先将正确的账目记录到账本中才行。 这个场景，<strong>对应的就是InnoDB的redo log写满了。这时候系统会停止所有更新操作（STW），把checkpoint往前推进，redo log留出空间可以继续写</strong>。我在第二讲画了一个redo log的示意图，这里我改成环形，便于大家理解。</li>
-</ul>
-<p><img src="/2024/09/11/MySQL12/image-20240911105804571.png" alt="image-20240911105804571"></p>
-<p>checkpoint可不是随便往前修改一下位置就可以的。比如图2中，<strong>把checkpoint位置从CP推进到CP’</strong>，就需要将两个点之间的日志（浅绿色部分），<strong>对应的所有脏页都flush到磁盘上。之后，图中从write pos到CP’之间就是可以再写入的redo log的区域。</strong></p>
-<ul>
-<li>第二种场景是，这一天生意太好，要记住的事情太多，掌柜发现自己快记不住了，<strong>赶紧找出账本把孔乙己这笔账先加进去。 这种场景，对应的就是系统内存不足</strong>。当需要新的内存页，而内存不够用的时候，<strong>就要淘汰一些数据页，空出内存给别的数据页使用。如果淘汰的是“脏页”，就要先将脏页写到磁盘。</strong> 你一定会说，<strong>这时候难道不能直接把内存淘汰掉，下次需要请求的时候，从磁盘读入数据页，然后拿redo log出来应用不就行了？这里其实是从性能考虑的。如果刷脏页一定会写盘</strong>，就保证了每个数据页有两种状态：<ul>
-<li><strong>一种是内存里存在，内存里就肯定是正确的结果，直接返回；</strong></li>
-<li><strong>另一种是内存里没有数据，就可以肯定数据文件上是正确的结果，读入内存后返回。 这样的效率最高。</strong></li>
-</ul>
-</li>
-<li><strong>第三种场景是，生意不忙的时候，或者打烊之后。这时候柜台没事，掌柜闲着也是闲着，不如更新账本。</strong> 这种场景，<strong>对应的就是MySQL认为系统“空闲”的时候</strong>。当然，MySQL“这家酒店”的生意好起来可是会很快就能把粉板记满的，所以“掌柜”要合理地安排时间，<strong>即使是“生意好”的时候，也要见缝插针地找时间，只要有机会就刷一点“脏页”</strong>。</li>
-<li><strong>第四种场景是，年底了咸亨酒店要关门几天，需要把账结清一下。</strong>这时候掌柜要把所有账都记到账本上，这样过完年重新开张的时候，就能就着账本明确账目情况了。 <strong>这种场景，对应的就是MySQL正常关闭的情况。这时候，MySQL会把内存的脏页都flush到磁盘上，这样下次MySQL启动的时候，就可以直接从磁盘上读数据，启动速度会很快</strong>。</li>
-</ul>
-<p>接下来，<strong>你可以分析一下上面四种场景对性能的影响。</strong></p>
-<p>其中，<strong>第三种情况是属于MySQL空闲时的操作，这时系统没什么压力，而第四种场景是数据库本来就要关闭了。这两种情况下，你不会太关注“性能”问题</strong>。所以这里，我们主要来分析一下前两种场景下的性能问题。</p>
-<p>第一种是“redo log写满了，要flush脏页”，这种情况是InnoDB要尽量避免的。<strong>因为出现这种情况的时候，整个系统就不能再接受更新了，所有的更新都必须堵住。如果你从监控上看，这时候更新数会跌为0。</strong></p>
-<p>第二种是“内存不够用了，要先将脏页写到磁盘”，这种情况其实是常态。<strong>InnoDB用缓冲池（buffer pool）管理内存，缓冲池中的内存页有三种状态：</strong></p>
-<ul>
-<li><strong>第一种是，还没有使用的；</strong></li>
-<li><strong>第二种是，使用了并且是干净页；</strong></li>
-<li><strong>第三种是，使用了并且是脏页。</strong></li>
-</ul>
-<p>InnoDB的策略是<strong>尽量使用内存，因此对于一个长时间运行的库来说，未被使用的页面很少</strong>。</p>
-<p>而当要读入的数据页没有在内存的时候，就必须到缓冲池中申请一个数据页。<strong>这时候只能把最久不使用的数据页从内存中淘汰掉：如果要淘汰的是一个干净页，就直接释放出来复用；但如果是脏页呢，就必须将脏页先刷到磁盘，变成干净页后才能复用。</strong></p>
-<p>所以，<strong>刷脏页虽然是常态</strong>，但是出现以下这两种情况，都是会明显影响性能的：</p>
-<ol>
-<li><strong>一个查询要获取的新的数据页较多，会淘汰太多脏页，导致查询的响应时间明显变长；</strong></li>
-<li><strong>日志写满，更新全部堵住，写性能跌为0，这种情况对敏感业务来说，是不能接受的。</strong></li>
-</ol>
-<p>所以，InnoDB需要有控制脏页比例的机制，来尽量避免上面的这两种情况。</p>
-<h3 id="InnoDB刷脏页的控制策略"><a href="#InnoDB刷脏页的控制策略" class="headerlink" title="InnoDB刷脏页的控制策略"></a>InnoDB刷脏页的控制策略</h3><p>接下来，我就来和你说说InnoDB脏页的控制策略，以及和这些策略相关的参数。</p>
-<p><strong>首先，你要正确地告诉InnoDB所在主机的IO能力，这样InnoDB才能知道需要全力刷脏页的时候，可以刷多快。</strong></p>
-<p>这就要用到<strong>innodb_io_capacity这个参数了，它会告诉InnoDB你的磁盘能力</strong>。<strong>这个值我建议你设置成磁盘的IOPS。磁盘的IOPS可以通过fio这个工具来测试，下面的语句是我用来测试磁盘随机读写的命令：</strong></p>
-<p>关于IOPS可以看看这篇文章：</p>
-<ul>
-<li><p><a href="https://zhuanlan.zhihu.com/p/668976764">一文读懂：IOPS、延迟和吞吐量等存储性能指标 - 知乎 (zhihu.com)</a></p>
-<p><strong>我们举个简单的栗子</strong>，就像我们上班坐地铁一样，<strong>地铁上一个和下一个人可以看作存储系统的I&#x2F;O，IOPS就相当于（地铁上的人+地铁下的人）&#x2F;停留时间（秒）。</strong></p>
-</li>
-</ul>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">fio -filename=$filename -direct=1 -iodepth 1 -thread -rw=randrw -ioengine=psync -bs=16k -size=500M -numjobs=10 -runtime=10 -group_reporting -name=mytest </span><br></pre></td></tr></table></figure>
-
-<p>其实，<strong>因为没能正确地设置innodb_io_capacity参数，而导致的性能问题也比比皆是</strong>。之前，就曾有其他公司的开发负责人找我看一个库的性能问题，说<strong>MySQL的写入速度很慢，TPS很低，但是数据库主机的IO压力并不大。经过一番排查，发现罪魁祸首就是这个参数的设置出了问题</strong>。</p>
-<p>他的主机磁盘用的是SSD，<strong>但是innodb_io_capacity的值设置的是300。于是，InnoDB认为这个系统的能力就这么差，所以刷脏页刷得特别慢，甚至比脏页生成的速度还慢，这样就造成了脏页累积，影响了查询和更新性能</strong>。</p>
-<p><strong>虽然我们现在已经定义了“全力刷脏页”的行为，但平时总不能一直是全力刷吧？毕竟磁盘能力不能只用来刷脏页，还需要服务用户请求。所以接下来，我们就一起看看InnoDB怎么控制引擎按照“全力”的百分比来刷脏页。</strong></p>
-<p>根据我前面提到的知识点，试想一下，<strong>如果你来设计策略控制刷脏页的速度，会参考哪些因素呢？</strong></p>
-<p>这个问题可以这么想，如果刷太慢，会出现什么情况？<strong>首先是内存脏页太多，其次是redo log写满。</strong></p>
-<p>所以，InnoDB的刷盘速度就是要参考这两个因素：<strong>一个是脏页比例，一个是redo log写盘速度。</strong></p>
-<p>InnoDB会根据这两个因素先单独算出两个数字。</p>
-<p>参数innodb_max_dirty_pages_pct是脏页比例上限，默认值是75%。InnoDB会根据当前的脏页比例（假设为M），算出一个范围在0到100之间的数字，计算这个数字的伪代码类似这样：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">F1(M)</span><br><span class="line">&#123;</span><br><span class="line">  if M&gt;=innodb_max_dirty_pages_pct then</span><br><span class="line">      return 100;</span><br><span class="line">  return 100*M/innodb_max_dirty_pages_pct;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>InnoDB每次写入的日志都有一个序号，<strong>当前写入的序号跟checkpoint对应的序号之间的差值，我们假设为N</strong>。InnoDB会根据这个N算出一个<strong>范围在0到100之间的数字</strong>，这个计算公式可以记为F2(N)。F2(N)算法比较复杂，你只要知道N越大，算出来的值越大就好了。</p>
-<p>然后，<strong>根据上述算得的F1(M)和F2(N)两个值，取其中较大的值记为R，之后引擎就可以按照innodb_io_capacity定义的能力乘以R%来控制刷脏页的速度。</strong></p>
-<p>上述的计算流程比较抽象，不容易理解，所以我画了一个简单的流程图。图中的F1、F2就是上面我们通过脏页比例和redo log写入速度算出来的两个值。</p>
-<p><img src="/2024/09/11/MySQL12/image-20240911105833495.png" alt="image-20240911105833495"></p>
-<p>现在你知道了，<strong>InnoDB会在后台刷脏页，而刷脏页的过程是要将内存页写入磁盘。所以，无论是你的查询语句在需要内存的时候可能要求淘汰一个脏页，还是由于刷脏页的逻辑会占用IO资源并可能影响到了你的更新语句</strong>，都可能是造成你从业务端感知到MySQL“抖”了一下的原因。</p>
-<p>要尽量避免这种情况，你就要<strong>合理地设置innodb_io_capacity</strong>的值，并且**平时要多关注脏页比例，不要让它经常接近75%**。</p>
-<p>其中，脏页比例是通过Innodb_buffer_pool_pages_dirty&#x2F;Innodb_buffer_pool_pages_total得到的，具体的命令参考下面的代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select VARIABLE_VALUE into @a from global_status where VARIABLE_NAME = &#x27;Innodb_buffer_pool_pages_dirty&#x27;;</span><br><span class="line">select VARIABLE_VALUE into @b from global_status where VARIABLE_NAME = &#x27;Innodb_buffer_pool_pages_total&#x27;;</span><br><span class="line">select @a/@b;</span><br></pre></td></tr></table></figure>
-
-<p>接下来，我们再看一个有趣的策略。</p>
-<p><strong>一旦一个查询请求需要在执行过程中先flush掉一个脏页时，这个查询就可能要比平时慢了</strong>。而MySQL中的一个机制，可能让你的查询会更慢：<strong>在准备刷一个脏页的时候，如果这个数据页旁边的数据页刚好是脏页，就会把这个“邻居”也带着一起刷掉；而且这个把“邻居”拖下水的逻辑还可以继续蔓延，也就是对于每个邻居数据页，如果跟它相邻的数据页也还是脏页的话，也会被放到一起刷</strong>。</p>
-<p>在InnoDB中，innodb_flush_neighbors 参数就是用来控制这个行为的，<strong>值为1的时候会有上述的“连坐”机制，值为0时表示不找邻居，自己刷自己的</strong>。</p>
-<p>找“邻居”这个优化在机械硬盘时代是很有意义的，<strong>可以减少很多随机IO。机械硬盘的随机IOPS一般只有几百，相同的逻辑操作减少随机IO就意味着系统性能的大幅度提升</strong>。</p>
-<p>而如果使用的是SSD这类IOPS比较高的设备的话，<strong>我就建议你把innodb_flush_neighbors的值设置成0。因为这时候IOPS往往不是瓶颈，而“只刷自己”，就能更快地执行完必要的刷脏页操作，减少SQL语句响应时间。</strong></p>
-<p><strong>在MySQL 8.0中，innodb_flush_neighbors参数的默认值已经是0了。</strong></p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天这篇文章，我延续第2篇中介绍的WAL的概念，<strong>和你解释了这个机制后续需要的刷脏页操作和执行时机</strong>。利用WAL技术，<strong>数据库将随机写转换成了顺序写，大大提升了数据库的性能</strong>。</p>
-<p>但是，<strong>由此也带来了内存脏页的问题。脏页会被后台线程自动flush，也会由于数据页淘汰而触发flush，而刷脏页的过程由于会占用资源，可能会让你的更新和查询语句的响应时间长一些</strong>。在文章里，我也给你介绍了控制刷脏页的方法和对应的监控方式。</p>
-<p>一个内存配置为128GB、innodb_io_capacity设置为20000的大规格实例，正常会建议你将redo log设置成4个1GB的文件。</p>
-<p>但如果你在配置的时候不慎将redo log设置成了1个100M的文件，会发生什么情况呢？又为什么会出现这样的情况呢？</p>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期我留给你的问题是，给一个学号字段创建索引，有哪些方法。</p>
-<p>由于这个学号的规则，<strong>无论是正向还是反向的前缀索引，重复度都比较高。因为维护的只是一个学校的，因此前面6位（其中，前三位是所在城市编号、第四到第六位是学校编号）其实是固定</strong>的，邮箱后缀都是@gamil.com，<strong>因此可以只存入学年份加顺序编号，它们的长度是9位</strong>。</p>
-<p>而其实在此基础上，<strong>可以用数字类型来存这9位数字。比如201100001，这样只需要占4个字节。其实这个就是一种hash</strong>，只是它用了最简单的转换规则：<strong>字符串转数字的规则，而刚好我们设定的这个背景，可以保证这个转换后结果的唯一性</strong>。</p>
-<p>一个学校的总人数这种数据量，50年才100万学生，这个表肯定是小表。<strong>为了业务简单，直接存原来的字符串。这个答复里面包含了“优化成本和收益”的思想，我觉得值得at出来</strong>。</p>
-<p>如果碰到表数据量特别大的场景，通过这种方式的收益是很不错的。</p>
-<blockquote>
-<p>用整型存<strong>“四位年份+五位编号”</strong>的方法； <strong>由于整个学号的值超过了int上限，用8个字节的bigint来存的方法。</strong></p>
-</blockquote>
-<p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/12-wei-shi-mo-wo-de-mysql-hui-dou-yi-xia">12 为什么我的MySQL会“抖”一下？ | MySql实战45讲 (gitbook.io)</a></p>
 ]]></content>
       <categories>
         <category>MySQL</category>
@@ -3558,6 +3455,246 @@
 <p>需要说明一下，需要在启动配置里面增加<strong>performance_schema&#x3D;on，才能用上这个功能，performance_schema库里的表才有数据。</strong></p>
 </blockquote>
 <p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/20-huan-du-shi-shi-mo-huan-du-you-shi-mo-wen-ti">20 幻读是什么，幻读有什么问题？ | MySql实战45讲 (gitbook.io)</a></p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>为什么我只改一行的语句，锁这么多？</title>
+    <url>/2024/09/12/MySQL21/</url>
+    <content><![CDATA[<p>在上一篇文章中，我和你介绍了间隙锁和next-key lock的概念，但是并没有说明加锁规则。间隙锁的概念理解起来确实有点儿难，尤其在配合上行锁以后，很容易在判断是否会出现锁等待的问题上犯错。</p>
+<p>所以今天，我们就先从这个加锁规则开始吧。</p>
+<p>首先说明一下，这些加锁规则我没在别的地方看到过有类似的总结，以前我自己判断的时候都是想着代码里面的实现来脑补的。这次为了总结成不看代码的同学也能理解的规则，是我又重新刷了代码临时总结出来的。所以，<strong>这个规则有以下两条前提说明：</strong></p>
+<ol>
+<li>MySQL后面的版本可能会改变加锁策略，所以这个规则只限于截止到现在的最新版本，<strong>即5.x系列&lt;&#x3D;5.7.24，8.0系列 &lt;&#x3D;8.0.13。</strong></li>
+<li>如果大家在验证中有发现bad case的话，请提出来，我会再补充进这篇文章，使得一起学习本专栏的所有同学都能受益。</li>
+</ol>
+<p><strong>因为间隙锁在可重复读隔离级别下才有效，所以本篇文章接下来的描述，若没有特殊说明，默认是可重复读隔离级别。</strong></p>
+<p><strong>我总结的加锁规则里面，包含了两个“原则”、两个“优化”和一个“bug”。</strong></p>
+<ol>
+<li>原则1：<strong>加锁的基本单位是next-key lock。希望你还记得，next-key lock是前开后闭区间。</strong></li>
+<li>原则2：<strong>查找过程中访问到的对象才会加锁。</strong></li>
+<li>优化1：<strong>索引上的等值查询，给唯一索引加锁的时候，next-key lock退化为行锁。</strong></li>
+<li>优化2：<strong>索引上的等值查询，向右遍历时且最后一个值不满足等值条件的时候，next-key lock退化为间隙锁。</strong></li>
+<li>一个bug：<strong>唯一索引上的范围查询会访问到不满足条件的第一个值为止。</strong></li>
+</ol>
+<p>我还是以上篇文章的表t为例，和你解释一下这些规则。表t的建表语句和初始化语句如下。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CREATE TABLE `t` (</span><br><span class="line">  `id` int(11) NOT NULL,</span><br><span class="line">  `c` int(11) DEFAULT NULL,</span><br><span class="line">  `d` int(11) DEFAULT NULL,</span><br><span class="line">  PRIMARY KEY (`id`),</span><br><span class="line">  KEY `c` (`c`)</span><br><span class="line">) ENGINE=InnoDB;</span><br><span class="line"></span><br><span class="line">insert into t values(0,0,0),(5,5,5),</span><br><span class="line">(10,10,10),(15,15,15),(20,20,20),(25,25,25);</span><br></pre></td></tr></table></figure>
+
+<p>接下来的例子基本都是配合着图片说明的，所以我建议你可以对照着文稿看，有些例子可能会“毁三观”，也建议你读完文章后亲手实践一下。</p>
+<h3 id="案例一：等值查询间隙锁"><a href="#案例一：等值查询间隙锁" class="headerlink" title="案例一：等值查询间隙锁"></a>案例一：等值查询间隙锁</h3><p>第一个例子是关于等值条件操作间隙：</p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105649285.png" alt="image-20240912105649285"></p>
+<p>由于表t中没有id&#x3D;7的记录，所以用我们上面提到的加锁规则判断一下的话：</p>
+<ol>
+<li>根据原则1，<strong>加锁单位是next-key lock，session A加锁范围就是(5,10]；</strong></li>
+<li>同时根据优化2，这是一个等值查询(id&#x3D;7)，而id&#x3D;10不满足查询条件，<strong>next-key lock退化成间隙锁，因此最终加锁的范围是(5,10)。</strong></li>
+</ol>
+<p>所以，<strong>session B要往这个间隙里面插入id&#x3D;8的记录会被锁住，但是session C修改id&#x3D;10这行是可以的。</strong></p>
+<h3 id="案例二：非唯一索引等值锁"><a href="#案例二：非唯一索引等值锁" class="headerlink" title="案例二：非唯一索引等值锁"></a>案例二：非唯一索引等值锁</h3><p>第二个例子是关于<strong>覆盖索引</strong>上的锁：</p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105706095.png" alt="image-20240912105706095"></p>
+<p>看到这个例子，你是不是有一种“该锁的不锁，不该锁的乱锁”的感觉？我们来分析一下吧。</p>
+<p>这里session A要给索引c上c&#x3D;5的这一行加上读锁。</p>
+<ol>
+<li>根据原则1，加锁单位是next-key lock，因此会给(0,5]加上next-key lock。</li>
+<li><strong>要注意c是普通索引，因此仅访问c&#x3D;5这一条记录是不能马上停下来的，需要向右遍历，查到c&#x3D;10才放弃。根据原则2，访问到的都要加锁，因此要给(5,10]加next-key lock。</strong></li>
+<li>但是同时这个符合优化2：<strong>等值判断，向右遍历，最后一个值不满足c&#x3D;5这个等值条件，因此退化成间隙锁(5,10)。</strong></li>
+<li>根据原则2 ，<strong>只有访问到的对象才会加锁</strong>，这个查询使用覆盖索引，<strong>并不需要访问主键索引，所以主键索引上没有加任何锁</strong>，这就是为什么session B的update语句可以执行完成。</li>
+</ol>
+<p>但session C要插入一个(7,7,7)的记录，就会被session A的间隙锁(5,10)锁住。</p>
+<p>需要注意，在这个例子中，lock in share mode<strong>只锁覆盖索引，但是如果是for update就不一样了。 执行 for update时，系统会认为你接下来要更新数据，因此会顺便给主键索引上满足条件的行加上行锁。</strong></p>
+<p>这个例子说明，<strong>锁是加在索引上的（这个说的实在是太好了，我看到前面就有这样的感觉了）</strong>；同时，<strong>它给我们的指导是，如果你要用lock in share mode来给行加读锁避免数据被更新的话，就必须得绕过覆盖索引的优化，在查询字段中加入索引中不存在的字段。</strong>比如，将session A的查询语句改成select d from t where c&#x3D;5 lock in share mode。你可以自己验证一下效果。</p>
+<h3 id="案例三：主键索引范围锁"><a href="#案例三：主键索引范围锁" class="headerlink" title="案例三：主键索引范围锁"></a>案例三：主键索引范围锁</h3><p>第三个例子是关于范围查询的。</p>
+<p>举例之前，你可以先思考一下这个问题：对于我们这个表t，下面这两条查询语句，加锁范围相同吗？</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select * from t where id=10 for update;</span><br><span class="line">mysql&gt; select * from t where id&gt;=10 and id&lt;11 for update;</span><br></pre></td></tr></table></figure>
+
+<p>你可能会想，id定义为int类型，这两个语句就是等价的吧？其实，它们并不完全等价。</p>
+<p>在逻辑上，这两条查语句肯定是等价的，但是它们的加锁规则不太一样。现在，我们就让session A执行第二个查询语句，来看看加锁效果。</p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105728204.png" alt="image-20240912105728204"></p>
+<p>现在我们就用前面提到的加锁规则，来分析一下session A 会加什么锁呢？</p>
+<ol>
+<li><strong>开始执行的时候，要找到第一个id&#x3D;10的行，因此本该是next-key lock(5,10]。 根据优化1， 主键id上的等值条件，退化成行锁，只加了id&#x3D;10这一行的行锁。</strong></li>
+<li><strong>范围查找就往后继续找，找到id&#x3D;15这一行停下来，因此需要加next-key lock(10,15]。</strong></li>
+</ol>
+<p>所以，session A这时候锁的范围就是<strong>主键索引上</strong>，**行锁id&#x3D;10和next-key lock(10,15]**。这样，session B和session C的结果你就能理解了。</p>
+<p>这里你需要注意一点，<strong>首次session A定位查找id&#x3D;10的行的时候，是当做等值查询来判断的，而向右扫描到id&#x3D;15的时候，用的是范围查询判断。</strong></p>
+<h3 id="案例四：非唯一索引范围锁"><a href="#案例四：非唯一索引范围锁" class="headerlink" title="案例四：非唯一索引范围锁"></a>案例四：非唯一索引范围锁</h3><p>接下来，我们再看两个<strong>范围查询加锁</strong>的例子，你可以对照着案例三来看。</p>
+<p>需要注意的是，与案例三不同的是，案例四中查询语句的where部分用的是字段c。</p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105742861.png" alt="image-20240912105742861"></p>
+<p>这次session A用字段c来判断，加锁规则跟案例三唯一的不同是：<strong>在第一次用c&#x3D;10定位记录的时候，索引c上加了(5,10]这个next-key lock后，由于索引c是非唯一索引，没有优化规则，也就是说不会蜕变为行锁，因此最终sesion A加的锁是，索引c上的(5,10] 和(10,15] 这两个next-key lock。</strong></p>
+<p>所以从结果上来看，sesson B要插入（8,8,8)的这个insert语句时就被堵住了。</p>
+<p>这里需要扫描到c&#x3D;15才停止扫描，<strong>是合理的，因为InnoDB要扫到c&#x3D;15，才知道不需要继续往后找了。</strong></p>
+<h3 id="案例五：唯一索引范围锁bug"><a href="#案例五：唯一索引范围锁bug" class="headerlink" title="案例五：唯一索引范围锁bug"></a>案例五：唯一索引范围锁bug</h3><p>前面的四个案例，我们已经用到了加锁规则中的两个原则和两个优化，接下来再看一个关于加锁规则中bug的案例。</p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105756086.png" alt="image-20240912105756086"></p>
+<p>session A是一个范围查询，<strong>按照原则1的话，应该是索引id上只加(10,15]这个next-key lock，并且因为id是唯一键，所以循环判断到id&#x3D;15这一行就应该停止了。</strong></p>
+<p>但是实现上，<strong>InnoDB会往前扫描到第一个不满足条件的行为止，也就是id&#x3D;20。而且由于这是个范围扫描，因此索引id上的(15,20]这个next-key lock也会被锁上。</strong></p>
+<p>所以你看到了，<strong>session B要更新id&#x3D;20这一行，是会被锁住的。同样地，session C要插入id&#x3D;16的一行，也会被锁住。</strong></p>
+<p>照理说，这里锁住id&#x3D;20这一行的行为，其实是没有必要的。因为扫描到id&#x3D;15，<strong>就可以确定不用往后再找了。但实现上还是这么做了，因此我认为这是个bug。</strong></p>
+<p>我也曾找社区的专家讨论过，<strong>官方bug系统上也有提到，但是并未被verified。所以，认为这是bug这个事儿，也只能算我的一家之言，如果你有其他见解的话，也欢迎你提出来。</strong></p>
+<h3 id="案例六：非唯一索引上存在”等值”的例子"><a href="#案例六：非唯一索引上存在”等值”的例子" class="headerlink" title="案例六：非唯一索引上存在”等值”的例子"></a>案例六：非唯一索引上存在”等值”的例子</h3><p>接下来的例子，是为了更好地说明“间隙”这个概念。这里，我给表t插入一条新记录。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; insert into t values(30,10,30);</span><br></pre></td></tr></table></figure>
+
+<p>新插入的这一行c&#x3D;10，也就是说现在表里有两个c&#x3D;10的行。那么，这时候索引c上的间隙是什么状态了呢？<strong>你要知道，由于非唯一索引上包含主键的值，所以是不可能存在“相同”的两行的。</strong></p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105814401.png" alt="image-20240912105814401"></p>
+<p>可以看到，<strong>虽然有两个c&#x3D;10，但是它们的主键值id是不同的（分别是10和30），因此这两个c&#x3D;10的记录之间，也是有间隙的。</strong></p>
+<p>图中我画出了索引c上的主键id。为了跟间隙锁的开区间形式进行区别，我用(c&#x3D;10,id&#x3D;30)这样的形式，来表示索引上的一行。</p>
+<p>现在，我们来看一下案例六。</p>
+<p>这次我们用delete语句来验证。注意，<strong>delete语句加锁的逻辑，其实跟select … for update 是类似的，也就是我在文章开始总结的两个“原则”、两个“优化”和一个“bug”。</strong></p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105823924.png" alt="image-20240912105823924"></p>
+<p>这时，session A在遍历的时候，先访问第一个c&#x3D;10的记录。同样地，根据原则1，这里加的是(c&#x3D;5,id&#x3D;5)到(c&#x3D;10,id&#x3D;10)这个next-key lock。</p>
+<p>然后，session A向右查找，直到碰到(c&#x3D;15,id&#x3D;15)这一行，循环才结束。根据优化2，<strong>这是一个等值查询，向右查找到了不满足条件的行，所以会退化成(c&#x3D;10,id&#x3D;10) 到 (c&#x3D;15,id&#x3D;15)的间隙锁。</strong></p>
+<p>也就是说，这个delete语句在索引c上的加锁范围，就是下图中蓝色区域覆盖的部分。</p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105834105.png" alt="image-20240912105834105"></p>
+<p>这个蓝色区域左右两边都是虚线，<strong>表示开区间，即(c&#x3D;5,id&#x3D;5)和(c&#x3D;15,id&#x3D;15)这两行上都没有锁。</strong></p>
+<h3 id="案例七：limit-语句加锁"><a href="#案例七：limit-语句加锁" class="headerlink" title="案例七：limit 语句加锁"></a>案例七：limit 语句加锁</h3><p>例子6也有一个对照案例，场景如下所示：</p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105844034.png" alt="image-20240912105844034"></p>
+<p>这个例子里，session A的delete语句加了 limit 2。<strong>你知道表t里c&#x3D;10的记录其实只有两条，因此加不加limit 2，删除的效果都是一样的，但是加锁的效果却不同。</strong>可以看到，session B的insert语句执行通过了，跟案例六的结果不同。</p>
+<p>这是因为，案例七里的delete语句明确加了limit 2的限制，因此在遍历到(c&#x3D;10, id&#x3D;30)这一行之后，<strong>满足条件的语句已经有两条，循环就结束了。</strong></p>
+<p><strong>因此，索引c上的加锁范围就变成了从（c&#x3D;5,id&#x3D;5)到（c&#x3D;10,id&#x3D;30)这个前开后闭区间，如下图所示：</strong></p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105855636.png" alt="image-20240912105855636"></p>
+<p><strong>可以看到，(c&#x3D;10,id&#x3D;30）之后的这个间隙并没有在加锁范围里，因此insert语句插入c&#x3D;12是可以执行成功的。</strong></p>
+<p>这个例子对我们实践的指导意义就是，<strong>在删除数据的时候尽量加limit</strong>。<strong>这样不仅可以控制删除数据的条数，让操作更安全，还可以减小加锁的范围（这个可以啊，以前完全没有了解过）</strong>。</p>
+<h3 id="案例八：一个死锁的例子"><a href="#案例八：一个死锁的例子" class="headerlink" title="案例八：一个死锁的例子"></a>案例八：一个死锁的例子</h3><p>前面的例子中，我们在分析的时候，是按照next-key lock的逻辑来分析的，因为这样分析比较方便。最后我们再看一个案例，目的是说明：<strong>next-key lock实际上是间隙锁和行锁加起来的结果</strong>。</p>
+<p>你一定会疑惑，这个概念不是一开始就说了吗？不要着急，我们先来看下面这个例子：</p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105909914.png" alt="image-20240912105909914"></p>
+<p>现在，我们按时间顺序来分析一下为什么是这样的结果。</p>
+<ol>
+<li><strong>session A 启动事务后执行查询语句加lock in share mode，在索引c上加了next-key lock(5,10] 和间隙锁(10,15)；</strong></li>
+<li>session B 的update语句也要在索引c上<strong>加next-key lock(5,10] ，进入锁等待；</strong></li>
+<li>然后session A要再插入(8,8,8)这一行，<strong>被session B的间隙锁锁住。由于出现了死锁，InnoDB让session B回滚。</strong></li>
+</ol>
+<p>你可能会问，session B的next-key lock不是还没申请成功吗？</p>
+<p>其实是这样的，<strong>session B的“加next-key lock(5,10] ”操作，实际上分成了两步，先是加(5,10)的间隙锁，加锁成功；然后加c&#x3D;10的行锁，这时候才被锁住的。</strong></p>
+<p>也就是说，<strong>我们在分析加锁规则的时候可以用next-key lock来分析。但是要知道，具体执行的时候，是要分成间隙锁和行锁两段来执行的</strong>。</p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>这里我再次说明一下，<strong>我们上面的所有案例都是在可重复读隔离级别(repeatable-read)下验证的</strong>。同时，可重复读隔离级别<strong>遵守两阶段锁协议</strong>，<strong>所有加锁的资源，都是在事务提交或者回滚的时候才释放的</strong>。</p>
+<p>在最后的案例中，<strong>你可以清楚地知道next-key lock实际上是由间隙锁加行锁实现的。如果切换到读提交隔离级别(read-committed)的话，就好理解了，过程中去掉间隙锁的部分，也就是只剩下行锁的部分</strong>。</p>
+<p>其实<strong>读提交隔离级别在外键场景下还是有间隙锁，相对比较复杂</strong>，我们今天先不展开。</p>
+<p>另外，<strong>在读提交隔离级别下还有一个优化，即：语句执行过程中加上的行锁，在语句执行完成后，就要把“不满足条件的行”上的行锁直接释放了，不需要等到事务提交。</strong></p>
+<p>也就是说，读提交隔离级别下，<strong>锁的范围更小，锁的时间更短，这也是不少业务都默认使用读提交隔离级别的原因</strong>。</p>
+<p>不过，我希望你学过今天的课程以后，可以对next-key lock的概念有更清晰的认识，并且会用加锁规则去判断语句的加锁范围。</p>
+<p>在业务<strong>需要使用可重复读隔离级别的时候，能够更细致地设计操作数据库的语句，解决幻读问题的同时，最大限度地提升系统并行处理事务的能力。</strong></p>
+<p>经过这篇文章的介绍，你再看一下上一篇文章最后的思考题，再来尝试分析一次。</p>
+<p>我把题目重新描述和简化一下：还是我们在文章开头初始化的表t，里面有6条记录，图12的语句序列中，为什么session B的insert操作，会被锁住呢？</p>
+<p><img src="/2024/09/12/MySQL21/image-20240912105928814.png" alt="image-20240912105928814"></p>
+<p>另外，如果你有兴趣多做一些实验的话，可以设计好语句序列，在执行之前先自己分析一下，然后实际地验证结果是否跟你的分析一致。</p>
+<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期的问题，我在本期继续作为了课后思考题，所以会在下篇文章再一起公布“答案”。</p>
+<p>这里，我展开回答一下评论区几位同学的问题。</p>
+<ul>
+<li>以前一直认为间隙锁只在二级索引上有。<strong>现在你知道了，有间隙的地方就可能有间隙锁。</strong></li>
+<li>如果是varchar类型，加锁规则是什么样的。 回答：实际上在判断间隙的时候，<strong>varchar和int是一样的，排好序以后，相邻两个值之间就有间隙</strong>。</li>
+<li>上一篇文章自己验证的结果跟案例一不同，就是在session A执行完这两个语句：</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">begin;</span><br><span class="line">select * from t where d=5 for update; /*Q1*/</span><br></pre></td></tr></table></figure>
+
+<p>以后，session B 的update 和session C的insert 都会被堵住。这是不是跟文章的结论矛盾？</p>
+<p>其实不是的，这个例子用的是反证假设，就是假设不堵住，会出现问题；然后，<strong>推导出session A需要锁整个表所有的行和所有间隙。</strong></p>
+<p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/21-wei-shi-mo-wo-zhi-gai-yi-hang-de-yu-ju-suo-zhe-mo-duo#an-li-er-fei-wei-yi-suo-yin-deng-zhi-suo">21 为什么我只改一行的语句，锁这么多？ | MySql实战45讲 (gitbook.io)</a></p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>为什么我的MySQL会“抖”一下？</title>
+    <url>/2024/09/11/MySQL12/</url>
+    <content><![CDATA[<p>平时的工作中，不知道你有没有遇到过这样的场景，<strong>一条SQL语句，正常执行的时候特别快，但是有时也不知道怎么回事，它就会变得特别慢，并且这样的场景很难复现，它不只随机，而且持续时间还很短。</strong></p>
+<p>看上去，这就像是数据库“抖”了一下。今天，我们就一起来看一看这是什么原因。</p>
+<h3 id="你的SQL语句为什么变“慢”了"><a href="#你的SQL语句为什么变“慢”了" class="headerlink" title="你的SQL语句为什么变“慢”了"></a>你的SQL语句为什么变“慢”了</h3><p>在前面第2篇文章<a href="https://time.geekbang.org/column/article/68633">《日志系统：一条SQL更新语句是如何执行的？》</a>中，我为你介绍了WAL机制。现在你知道了，<strong>InnoDB在处理更新语句的时候，只做了写日志这一个磁盘操作。这个日志叫作redo log（重做日志），也就是《孔乙己》里咸亨酒店掌柜用来记账的粉板，在更新内存写完redo log后，就返回给客户端，本次更新成功。</strong></p>
+<p>做下类比的话，<strong>掌柜记账的账本是数据文件，记账用的粉板是日志文件（redo log），掌柜的记忆就是内存</strong>。</p>
+<p>掌柜总要找时间把账本更新一下，<strong>这对应的就是把内存里的数据写入磁盘的过程，术语就是flush</strong>。在这个flush操作执行之前，孔乙己的赊账总额，其实跟掌柜手中账本里面的记录是不一致的。因为孔乙己今天的赊账金额还只在粉板上，而账本里的记录是老的，还没把今天的赊账算进去。</p>
+<p><strong>当内存数据页跟磁盘数据页内容不一致的时候，我们称这个内存页为“脏页”。内存数据写入到磁盘后，内存和磁盘上的数据页的内容就一致了，称为“干净页”</strong>。</p>
+<p>不论是脏页还是干净页，都在内存中。在这个例子里，内存对应的就是掌柜的记忆。</p>
+<p>接下来，我们用一个示意图来展示一下“孔乙己赊账”的整个操作过程。假设原来孔乙己欠账10文，这次又要赊9文。</p>
+<p><img src="/2024/09/11/MySQL12/image-20240911105754102.png" alt="image-20240911105754102"></p>
+<p>回到文章开头的问题，<strong>你不难想象，平时执行很快的更新操作，其实就是在写内存和日志，而MySQL偶尔“抖”一下的那个瞬间，可能就是在刷脏页（flush）</strong>。</p>
+<p>那么，什么情况会引发数据库的flush过程呢？</p>
+<p>我们还是继续用咸亨酒店掌柜的这个例子，想一想：掌柜在什么情况下会把粉板上的赊账记录改到账本上？</p>
+<ul>
+<li>第一种场景是，<strong>粉板满了，记不下了。这时候如果再有人来赊账，掌柜就只得放下手里的活儿，将粉板上的记录擦掉一些，留出空位以便继续记账。</strong>当然在擦掉之前，他必须先将正确的账目记录到账本中才行。 这个场景，<strong>对应的就是InnoDB的redo log写满了。这时候系统会停止所有更新操作（STW），把checkpoint往前推进，redo log留出空间可以继续写</strong>。我在第二讲画了一个redo log的示意图，这里我改成环形，便于大家理解。</li>
+</ul>
+<p><img src="/2024/09/11/MySQL12/image-20240911105804571.png" alt="image-20240911105804571"></p>
+<p>checkpoint可不是随便往前修改一下位置就可以的。比如图2中，<strong>把checkpoint位置从CP推进到CP’</strong>，就需要将两个点之间的日志（浅绿色部分），<strong>对应的所有脏页都flush到磁盘上。之后，图中从write pos到CP’之间就是可以再写入的redo log的区域。</strong></p>
+<ul>
+<li>第二种场景是，这一天生意太好，要记住的事情太多，掌柜发现自己快记不住了，<strong>赶紧找出账本把孔乙己这笔账先加进去。 这种场景，对应的就是系统内存不足</strong>。当需要新的内存页，而内存不够用的时候，<strong>就要淘汰一些数据页，空出内存给别的数据页使用。如果淘汰的是“脏页”，就要先将脏页写到磁盘。</strong> 你一定会说，<strong>这时候难道不能直接把内存淘汰掉，下次需要请求的时候，从磁盘读入数据页，然后拿redo log出来应用不就行了？这里其实是从性能考虑的。如果刷脏页一定会写盘</strong>，就保证了每个数据页有两种状态：<ul>
+<li><strong>一种是内存里存在，内存里就肯定是正确的结果，直接返回；</strong></li>
+<li><strong>另一种是内存里没有数据，就可以肯定数据文件上是正确的结果，读入内存后返回。 这样的效率最高。</strong></li>
+</ul>
+</li>
+<li><strong>第三种场景是，生意不忙的时候，或者打烊之后。这时候柜台没事，掌柜闲着也是闲着，不如更新账本。</strong> 这种场景，<strong>对应的就是MySQL认为系统“空闲”的时候</strong>。当然，MySQL“这家酒店”的生意好起来可是会很快就能把粉板记满的，所以“掌柜”要合理地安排时间，<strong>即使是“生意好”的时候，也要见缝插针地找时间，只要有机会就刷一点“脏页”</strong>。</li>
+<li><strong>第四种场景是，年底了咸亨酒店要关门几天，需要把账结清一下。</strong>这时候掌柜要把所有账都记到账本上，这样过完年重新开张的时候，就能就着账本明确账目情况了。 <strong>这种场景，对应的就是MySQL正常关闭的情况。这时候，MySQL会把内存的脏页都flush到磁盘上，这样下次MySQL启动的时候，就可以直接从磁盘上读数据，启动速度会很快</strong>。</li>
+</ul>
+<p>接下来，<strong>你可以分析一下上面四种场景对性能的影响。</strong></p>
+<p>其中，<strong>第三种情况是属于MySQL空闲时的操作，这时系统没什么压力，而第四种场景是数据库本来就要关闭了。这两种情况下，你不会太关注“性能”问题</strong>。所以这里，我们主要来分析一下前两种场景下的性能问题。</p>
+<p>第一种是“redo log写满了，要flush脏页”，这种情况是InnoDB要尽量避免的。<strong>因为出现这种情况的时候，整个系统就不能再接受更新了，所有的更新都必须堵住。如果你从监控上看，这时候更新数会跌为0。</strong></p>
+<p>第二种是“内存不够用了，要先将脏页写到磁盘”，这种情况其实是常态。<strong>InnoDB用缓冲池（buffer pool）管理内存，缓冲池中的内存页有三种状态：</strong></p>
+<ul>
+<li><strong>第一种是，还没有使用的；</strong></li>
+<li><strong>第二种是，使用了并且是干净页；</strong></li>
+<li><strong>第三种是，使用了并且是脏页。</strong></li>
+</ul>
+<p>InnoDB的策略是<strong>尽量使用内存，因此对于一个长时间运行的库来说，未被使用的页面很少</strong>。</p>
+<p>而当要读入的数据页没有在内存的时候，就必须到缓冲池中申请一个数据页。<strong>这时候只能把最久不使用的数据页从内存中淘汰掉：如果要淘汰的是一个干净页，就直接释放出来复用；但如果是脏页呢，就必须将脏页先刷到磁盘，变成干净页后才能复用。</strong></p>
+<p>所以，<strong>刷脏页虽然是常态</strong>，但是出现以下这两种情况，都是会明显影响性能的：</p>
+<ol>
+<li><strong>一个查询要获取的新的数据页较多，会淘汰太多脏页，导致查询的响应时间明显变长；</strong></li>
+<li><strong>日志写满，更新全部堵住，写性能跌为0，这种情况对敏感业务来说，是不能接受的。</strong></li>
+</ol>
+<p>所以，InnoDB需要有控制脏页比例的机制，来尽量避免上面的这两种情况。</p>
+<h3 id="InnoDB刷脏页的控制策略"><a href="#InnoDB刷脏页的控制策略" class="headerlink" title="InnoDB刷脏页的控制策略"></a>InnoDB刷脏页的控制策略</h3><p>接下来，我就来和你说说InnoDB脏页的控制策略，以及和这些策略相关的参数。</p>
+<p><strong>首先，你要正确地告诉InnoDB所在主机的IO能力，这样InnoDB才能知道需要全力刷脏页的时候，可以刷多快。</strong></p>
+<p>这就要用到<strong>innodb_io_capacity这个参数了，它会告诉InnoDB你的磁盘能力</strong>。<strong>这个值我建议你设置成磁盘的IOPS。磁盘的IOPS可以通过fio这个工具来测试，下面的语句是我用来测试磁盘随机读写的命令：</strong></p>
+<p>关于IOPS可以看看这篇文章：</p>
+<ul>
+<li><p><a href="https://zhuanlan.zhihu.com/p/668976764">一文读懂：IOPS、延迟和吞吐量等存储性能指标 - 知乎 (zhihu.com)</a></p>
+<p><strong>我们举个简单的栗子</strong>，就像我们上班坐地铁一样，<strong>地铁上一个和下一个人可以看作存储系统的I&#x2F;O，IOPS就相当于（地铁上的人+地铁下的人）&#x2F;停留时间（秒）。</strong></p>
+</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">fio -filename=$filename -direct=1 -iodepth 1 -thread -rw=randrw -ioengine=psync -bs=16k -size=500M -numjobs=10 -runtime=10 -group_reporting -name=mytest </span><br></pre></td></tr></table></figure>
+
+<p>其实，<strong>因为没能正确地设置innodb_io_capacity参数，而导致的性能问题也比比皆是</strong>。之前，就曾有其他公司的开发负责人找我看一个库的性能问题，说<strong>MySQL的写入速度很慢，TPS很低，但是数据库主机的IO压力并不大。经过一番排查，发现罪魁祸首就是这个参数的设置出了问题</strong>。</p>
+<p>他的主机磁盘用的是SSD，<strong>但是innodb_io_capacity的值设置的是300。于是，InnoDB认为这个系统的能力就这么差，所以刷脏页刷得特别慢，甚至比脏页生成的速度还慢，这样就造成了脏页累积，影响了查询和更新性能</strong>。</p>
+<p><strong>虽然我们现在已经定义了“全力刷脏页”的行为，但平时总不能一直是全力刷吧？毕竟磁盘能力不能只用来刷脏页，还需要服务用户请求。所以接下来，我们就一起看看InnoDB怎么控制引擎按照“全力”的百分比来刷脏页。</strong></p>
+<p>根据我前面提到的知识点，试想一下，<strong>如果你来设计策略控制刷脏页的速度，会参考哪些因素呢？</strong></p>
+<p>这个问题可以这么想，如果刷太慢，会出现什么情况？<strong>首先是内存脏页太多，其次是redo log写满。</strong></p>
+<p>所以，InnoDB的刷盘速度就是要参考这两个因素：<strong>一个是脏页比例，一个是redo log写盘速度。</strong></p>
+<p>InnoDB会根据这两个因素先单独算出两个数字。</p>
+<p>参数innodb_max_dirty_pages_pct是脏页比例上限，默认值是75%。InnoDB会根据当前的脏页比例（假设为M），算出一个范围在0到100之间的数字，计算这个数字的伪代码类似这样：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">F1(M)</span><br><span class="line">&#123;</span><br><span class="line">  if M&gt;=innodb_max_dirty_pages_pct then</span><br><span class="line">      return 100;</span><br><span class="line">  return 100*M/innodb_max_dirty_pages_pct;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>InnoDB每次写入的日志都有一个序号，<strong>当前写入的序号跟checkpoint对应的序号之间的差值，我们假设为N</strong>。InnoDB会根据这个N算出一个<strong>范围在0到100之间的数字</strong>，这个计算公式可以记为F2(N)。F2(N)算法比较复杂，你只要知道N越大，算出来的值越大就好了。</p>
+<p>然后，<strong>根据上述算得的F1(M)和F2(N)两个值，取其中较大的值记为R，之后引擎就可以按照innodb_io_capacity定义的能力乘以R%来控制刷脏页的速度。</strong></p>
+<p>上述的计算流程比较抽象，不容易理解，所以我画了一个简单的流程图。图中的F1、F2就是上面我们通过脏页比例和redo log写入速度算出来的两个值。</p>
+<p><img src="/2024/09/11/MySQL12/image-20240911105833495.png" alt="image-20240911105833495"></p>
+<p>现在你知道了，<strong>InnoDB会在后台刷脏页，而刷脏页的过程是要将内存页写入磁盘。所以，无论是你的查询语句在需要内存的时候可能要求淘汰一个脏页，还是由于刷脏页的逻辑会占用IO资源并可能影响到了你的更新语句</strong>，都可能是造成你从业务端感知到MySQL“抖”了一下的原因。</p>
+<p>要尽量避免这种情况，你就要<strong>合理地设置innodb_io_capacity</strong>的值，并且**平时要多关注脏页比例，不要让它经常接近75%**。</p>
+<p>其中，脏页比例是通过Innodb_buffer_pool_pages_dirty&#x2F;Innodb_buffer_pool_pages_total得到的，具体的命令参考下面的代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql&gt; select VARIABLE_VALUE into @a from global_status where VARIABLE_NAME = &#x27;Innodb_buffer_pool_pages_dirty&#x27;;</span><br><span class="line">select VARIABLE_VALUE into @b from global_status where VARIABLE_NAME = &#x27;Innodb_buffer_pool_pages_total&#x27;;</span><br><span class="line">select @a/@b;</span><br></pre></td></tr></table></figure>
+
+<p>接下来，我们再看一个有趣的策略。</p>
+<p><strong>一旦一个查询请求需要在执行过程中先flush掉一个脏页时，这个查询就可能要比平时慢了</strong>。而MySQL中的一个机制，可能让你的查询会更慢：<strong>在准备刷一个脏页的时候，如果这个数据页旁边的数据页刚好是脏页，就会把这个“邻居”也带着一起刷掉；而且这个把“邻居”拖下水的逻辑还可以继续蔓延，也就是对于每个邻居数据页，如果跟它相邻的数据页也还是脏页的话，也会被放到一起刷</strong>。</p>
+<p>在InnoDB中，innodb_flush_neighbors 参数就是用来控制这个行为的，<strong>值为1的时候会有上述的“连坐”机制，值为0时表示不找邻居，自己刷自己的</strong>。</p>
+<p>找“邻居”这个优化在机械硬盘时代是很有意义的，<strong>可以减少很多随机IO。机械硬盘的随机IOPS一般只有几百，相同的逻辑操作减少随机IO就意味着系统性能的大幅度提升</strong>。</p>
+<p>而如果使用的是SSD这类IOPS比较高的设备的话，<strong>我就建议你把innodb_flush_neighbors的值设置成0。因为这时候IOPS往往不是瓶颈，而“只刷自己”，就能更快地执行完必要的刷脏页操作，减少SQL语句响应时间。</strong></p>
+<p><strong>在MySQL 8.0中，innodb_flush_neighbors参数的默认值已经是0了。</strong></p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天这篇文章，我延续第2篇中介绍的WAL的概念，<strong>和你解释了这个机制后续需要的刷脏页操作和执行时机</strong>。利用WAL技术，<strong>数据库将随机写转换成了顺序写，大大提升了数据库的性能</strong>。</p>
+<p>但是，<strong>由此也带来了内存脏页的问题。脏页会被后台线程自动flush，也会由于数据页淘汰而触发flush，而刷脏页的过程由于会占用资源，可能会让你的更新和查询语句的响应时间长一些</strong>。在文章里，我也给你介绍了控制刷脏页的方法和对应的监控方式。</p>
+<p>一个内存配置为128GB、innodb_io_capacity设置为20000的大规格实例，正常会建议你将redo log设置成4个1GB的文件。</p>
+<p>但如果你在配置的时候不慎将redo log设置成了1个100M的文件，会发生什么情况呢？又为什么会出现这样的情况呢？</p>
+<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期我留给你的问题是，给一个学号字段创建索引，有哪些方法。</p>
+<p>由于这个学号的规则，<strong>无论是正向还是反向的前缀索引，重复度都比较高。因为维护的只是一个学校的，因此前面6位（其中，前三位是所在城市编号、第四到第六位是学校编号）其实是固定</strong>的，邮箱后缀都是@gamil.com，<strong>因此可以只存入学年份加顺序编号，它们的长度是9位</strong>。</p>
+<p>而其实在此基础上，<strong>可以用数字类型来存这9位数字。比如201100001，这样只需要占4个字节。其实这个就是一种hash</strong>，只是它用了最简单的转换规则：<strong>字符串转数字的规则，而刚好我们设定的这个背景，可以保证这个转换后结果的唯一性</strong>。</p>
+<p>一个学校的总人数这种数据量，50年才100万学生，这个表肯定是小表。<strong>为了业务简单，直接存原来的字符串。这个答复里面包含了“优化成本和收益”的思想，我觉得值得at出来</strong>。</p>
+<p>如果碰到表数据量特别大的场景，通过这种方式的收益是很不错的。</p>
+<blockquote>
+<p>用整型存<strong>“四位年份+五位编号”</strong>的方法； <strong>由于整个学号的值超过了int上限，用8个字节的bigint来存的方法。</strong></p>
+</blockquote>
+<p>参考文章：<a href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/12-wei-shi-mo-wo-de-mysql-hui-dou-yi-xia">12 为什么我的MySQL会“抖”一下？ | MySql实战45讲 (gitbook.io)</a></p>
 ]]></content>
       <categories>
         <category>MySQL</category>
