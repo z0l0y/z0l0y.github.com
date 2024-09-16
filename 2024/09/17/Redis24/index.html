@@ -4,9 +4,9 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="切片集群：数据增多了，是该加内存还是加实例？, zoloy">
-    <meta name="description" content="我曾遇到过这么一个需求：要用 Redis 保存 5000 万个键值对，每个键值对大约是 512B，为了能快速部署并对外提供服务，我们采用云主机来运行 Redis 实例，那么，该如何选择云主机的内存容量呢？
-*我粗略地计算了一下，这些键值对所">
+    <meta name="keywords" content="替换策略：缓存满了怎么办？, zoloy">
+    <meta name="description" content="Redis 缓存使用内存来保存数据，避免业务应用从后端数据库中读取数据，可以提升应用的响应速度。那么，如果我们把所有要访问的数据都放入缓存，是不是一个很好的设计选择呢？其实，这样做的性价比反而不高。
+举个例子吧。MySQL 中有 1TB 的">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -18,7 +18,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>切片集群：数据增多了，是该加内存还是加实例？ | zoloy&#39;s blog</title>
+    <title>替换策略：缓存满了怎么办？ | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -291,12 +291,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/18.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/11.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">切片集群：数据增多了，是该加内存还是加实例？</h1>
+                    <h1 class="description center-align post-title">替换策略：缓存满了怎么办？</h1>
                 </div>
             </div>
         </div>
@@ -345,28 +345,28 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-16
+                    2024-09-17
                 </div>
                 
 
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
-                    2024-09-16
+                    2024-09-17
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    5.9k
+                    6.2k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    20 分
+                    21 分
                 </div>
                 
 
@@ -389,107 +389,115 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <p>我曾遇到过这么一个需求：<strong>要用 Redis 保存 5000 万个键值对，每个键值对大约是 512B，为了能快速部署并对外提供服务，我们采用云主机来运行 Redis 实例，那么，该如何选择云主机的内存容量呢？</strong></p>
-<p>*<em>我粗略地计算了一下，这些键值对所占的内存空间大约是 25GB（5000 万 <em>512B）。所以，当时，我想到的第一个方案就是：选择一台 32GB 内存的云主机来部署 Redis。因为 32GB 的内存能保存所有数据，而且还留有 7GB，可以保证系统的正常运行。同时，我还采用 RDB 对数据做持久化，以确保 Redis 实例故障后，还能从 RDB 恢复数据。</em></em></p>
-<p>但是，在使用的过程中，我发现，Redis 的响应有时会非常慢。<strong>后来，我们使用 INFO 命令查看 Redis 的 latest_fork_usec 指标值（表示最近一次 fork 的耗时），结果显示这个指标值特别高，快到秒级别了。</strong></p>
-<p>这跟 Redis 的持久化机制有关系。<strong>在使用 RDB 进行持久化时，Redis 会 fork 子进程来完成，fork 操作的用时和 Redis 的数据量是正相关的，而 fork 在执行时会阻塞主线程。数据量越大，fork 操作造成的主线程阻塞的时间越长。所以，在使用 RDB 对 25GB 的数据进行持久化时，数据量较大，后台运行的子进程在 fork 创建时阻塞了主线程，于是就导致 Redis 响应变慢了。</strong></p>
-<p>看来，第一个方案显然是不可行的，我们必须要寻找其他的方案。<strong>这个时候，我们注意到了 Redis 的切片集群。虽然组建切片集群比较麻烦，但是它可以保存大量数据，而且对 Redis 主线程的阻塞影响较小。</strong></p>
-<p><strong>切片集群，也叫分片集群，就是指启动多个 Redis 实例组成一个集群，然后按照一定的规则，把收到的数据划分成多份，每一份用一个实例来保存。</strong>回到我们刚刚的场景中，<strong>如果把 25GB 的数据平均分成 5 份（当然，也可以不做均分），使用 5 个实例来保存，每个实例只需要保存 5GB 数据。如下图所示：</strong></p>
-<p><img src="/2024/09/16/Redis09/793251ca784yyf6ac37fe46389094b26.jpg" alt="img"></p>
-<p>切片集群架构图</p>
-<p><strong>那么，在切片集群中，实例在为 5GB 数据生成 RDB 时，数据量就小了很多，fork 子进程一般不会给主线程带来较长时间的阻塞。采用多个实例保存数据切片后，我们既能保存 25GB 数据，又避免了 fork 子进程阻塞主线程而导致的响应突然变慢。</strong></p>
-<p>在实际应用 Redis 时，随着用户或业务规模的扩展，<strong>保存大量数据的情况通常是无法避免的。而切片集群，就是一个非常好的解决方案。这节课，我们就来学习一下。</strong></p>
-<h2 id="如何保存更多数据？"><a href="#如何保存更多数据？" class="headerlink" title="如何保存更多数据？"></a>如何保存更多数据？</h2><p>在刚刚的案例里，<strong>为了保存大量数据，我们使用了大内存云主机和切片集群两种方法。实际上，这两种方法分别对应着 Redis 应对数据量增多的两种方案：纵向扩展（scale up）和横向扩展（scale out）。</strong></p>
+                <p><strong>Redis 缓存使用内存来保存数据，避免业务应用从后端数据库中读取数据，可以提升应用的响应速度。那么，如果我们把所有要访问的数据都放入缓存，是不是一个很好的设计选择呢？其实，这样做的性价比反而不高。</strong></p>
+<p>举个例子吧。MySQL 中有 1TB 的数据，如果我们使用 Redis 把这 1TB 的数据都缓存起来，虽然应用都能在内存中访问数据了，<strong>但是，这样配置并不合理，因为性价比很低</strong>。一方面，1TB 内存的价格大约是 3.5 万元，<strong>而 1TB 磁盘的价格大约是 1000 元。另一方面，数据访问都是有局部性的，也就是我们通常所说的“八二原理”，80% 的请求实际只访问了 20% 的数据。所以，用 1TB 的内存做缓存，并没有必要。</strong></p>
+<p>为了保证较高的性价比，<strong>缓存的空间容量必然要小于后端数据库的数据总量。不过，内存大小毕竟有限，随着要缓存的数据量越来越大，有限的缓存空间不可避免地会被写满。此时，该怎么办呢？</strong></p>
+<p>解决这个问题就涉及到缓存系统的一个重要机制，即<strong>缓存数据的淘汰机制</strong>。简单来说，数据淘汰机制包括两步：</p>
 <ul>
-<li><strong>纵向扩展</strong>：<strong>升级单个 Redis 实例的资源配置，包括增加内存容量、增加磁盘容量、使用更高配置的 CPU</strong>。就像下图中，原来的实例内存是 8GB，硬盘是 50GB，纵向扩展后，内存增加到 24GB，磁盘增加到 150GB。</li>
-<li><strong>横向扩展</strong>：<strong>横向增加当前 Redis 实例的个数，就像下图中，原来使用 1 个 8GB 内存、50GB 磁盘的实例，现在使用三个相同配置的实例。</strong></li>
+<li>第一，根据一定的策略，<strong>筛选出对应用访问来说“不重要”的数据；</strong></li>
+<li>第二，<strong>将这些数据从缓存中删除，为新来的数据腾出空间；</strong></li>
 </ul>
-<p><img src="/2024/09/16/Redis09/7a512fec7eba789c6d098b834929701a.jpg" alt="img"></p>
-<p>纵向扩展和横向扩展对比图</p>
-<p>那么，这两种方式的优缺点分别是什么呢？</p>
-<p>首先，纵向扩展的好处是，<strong>实施起来简单、直接</strong>。不过，这个方案也面临两个潜在的问题。</p>
-<p>第一个问题是，<strong>当使用 RDB 对数据进行持久化时，如果数据量增加，需要的内存也会增加，主线程 fork 子进程时就可能会阻塞（比如刚刚的例子中的情况）</strong>。不过，<strong>如果你不要求持久化保存 Redis 数据，那么，纵向扩展会是一个不错的选择。</strong></p>
-<p>不过，这时，你还要面对第二个问题：<strong>纵向扩展会受到硬件和成本的限制</strong>。这很容易理解，<strong>毕竟，把内存从 32GB 扩展到 64GB 还算容易，但是，要想扩充到 1TB，就会面临硬件容量和成本上的限制了</strong>。</p>
-<p>与纵向扩展相比，横向扩展是一个扩展性更好的方案。这是因为，要想保存更多的数据，采用这种方案的话，<strong>只用增加 Redis 的实例个数就行了</strong>，不用担心单个实例的硬件和成本限制。<strong>在面向百万、千万级别的用户规模时，横向扩展的 Redis 切片集群会是一个非常好的选择</strong>。</p>
-<p>不过，在只使用单个实例的时候，<strong>数据存在哪儿，客户端访问哪儿，都是非常明确的，但是，切片集群不可避免地涉及到多个实例的分布式管理问题。要想把切片集群用起来，我们就需要解决两大问题：</strong></p>
-<ul>
-<li>数据切片后，<strong>在多个实例之间如何分布？</strong></li>
-<li><strong>客户端怎么确定想要访问的数据在哪个实例上？</strong></li>
-</ul>
-<p>接下来，我们就一个个地解决。</p>
-<h2 id="数据切片和实例的对应分布关系"><a href="#数据切片和实例的对应分布关系" class="headerlink" title="数据切片和实例的对应分布关系"></a>数据切片和实例的对应分布关系</h2><p>在切片集群中，<strong>数据需要分布在不同实例上，那么，数据和实例之间如何对应呢？这就和接下来我要讲的 Redis Cluster 方案有关了。不过，我们要先弄明白切片集群和 Redis Cluster 的联系与区别。</strong></p>
-<p>实际上，<strong>切片集群是一种保存大量数据的通用机制，这个机制可以有不同的实现方案。在 Redis 3.0 之前，官方并没有针对切片集群提供具体的方案。从 3.0 开始，官方提供了一个名为 Redis Cluster 的方案，用于实现切片集群。Redis Cluster 方案中就规定了数据和实例的对应规则。</strong></p>
-<p>具体来说，<strong>Redis Cluster 方案采用哈希槽（Hash Slot，接下来我会直接称之为 Slot），来处理数据和实例之间的映射关系</strong>。在 Redis Cluster 方案中，<strong>一个切片集群共有 16384 个哈希槽，这些哈希槽类似于数据分区，每个键值对都会根据它的 key，被映射到一个哈希槽中。</strong></p>
-<p>具体的映射过程分为两大步：<strong>首先根据键值对的 key，按照CRC16 算法计算一个 16 bit 的值；然后，再用这个 16bit 值对 16384 取模，得到 0~16383 范围内的模数，每个模数代表一个相应编号的哈希槽。关于 CRC16 算法，不是这节课的重点，你简单看下链接中的资料就可以了。</strong></p>
-<p>那么，这些哈希槽又是如何被映射到具体的 Redis 实例上的呢？</p>
-<p>我们在部署 Redis Cluster 方案时，<strong>可以使用 cluster create 命令创建集群，此时，Redis 会自动把这些槽平均分布在集群实例上。例如，如果集群中有 N 个实例，那么，每个实例上的槽个数为 16384&#x2F;N 个。</strong></p>
-<p>当然， <strong>我们也可以使用 cluster meet 命令手动建立实例间的连接，形成集群，再使用 cluster addslots 命令，指定每个实例上的哈希槽个数。</strong></p>
-<p>举个例子，<strong>假设集群中不同 Redis 实例的内存大小配置不一，如果把哈希槽均分在各个实例上，在保存相同数量的键值对时，和内存大的实例相比，内存小的实例就会有更大的容量压力。遇到这种情况时，你可以根据不同实例的资源配置情况，使用 cluster addslots 命令手动分配哈希槽。</strong></p>
-<p>为了便于你理解，我画一张示意图来解释一下，数据、哈希槽、实例这三者的映射分布情况。</p>
-<p><img src="/2024/09/16/Redis09/7d070c8b19730b308bfaabbe82c2f1ab.jpg" alt="img"></p>
-<p>示意图中的切片集群一共有 3 个实例，<strong>同时假设有 5 个哈希槽，我们首先可以通过下面的命令手动分配哈希槽：实例 1 保存哈希槽 0 和 1，实例 2 保存哈希槽 2 和 3，实例 3 保存哈希槽 4。</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">redis-cli -h 172.16.19.3 –p 6379 cluster addslots 0,1</span><br><span class="line"></span><br><span class="line">redis-cli -h 172.16.19.4 –p 6379 cluster addslots 2,3</span><br><span class="line"></span><br><span class="line">redis-cli -h 172.16.19.5 –p 6379 cluster addslots 4</span><br></pre></td></tr></table></figure>
+<p>这节课上，我就来和你聊聊缓存满了之后的数据淘汰机制。<strong>通常，我们也把它叫作缓存替换机制，同时还会讲到一系列选择淘汰数据的具体策略。了解了数据淘汰机制和相应策略，我们才可以选择合理的 Redis 配置，提高缓存命中率，提升应用的访问性能。</strong></p>
+<p>不过，在学习淘汰策略之前，我们首先要知道设置缓存容量的依据和方法。毕竟，在实际使用缓存时，我们需要决定用多大的空间来缓存数据。</p>
+<h2 id="设置多大的缓存容量合适？"><a href="#设置多大的缓存容量合适？" class="headerlink" title="设置多大的缓存容量合适？"></a>设置多大的缓存容量合适？</h2><p><strong>缓存容量设置得是否合理，会直接影响到使用缓存的性价比。我们通常希望以最小的代价去获得最大的收益，所以，把昂贵的内存资源用在关键地方就非常重要了。</strong></p>
+<p>就像我刚才说的，<strong>实际应用中的数据访问是具有局部性的</strong>。下面有一张图，图里有红、蓝两条线，显示了不同比例数据贡献的访问量情况。<strong>蓝线代表了“八二原理”表示的数据局部性，而红线则表示在当前应用负载下，数据局部性的变化</strong>。</p>
+<p>我们先看看蓝线。<strong>它表示的就是“八二原理”，有 20% 的数据贡献了 80% 的访问了，而剩余的数据虽然体量很大，但只贡献了 20% 的访问量。这 80% 的数据在访问量上就形成了一条长长的尾巴，我们也称为“长尾效应”。</strong></p>
+<p><img src="/2024/09/17/Redis24/986ed247a4353524f387f0bbf76586e4.jpg" alt="img"></p>
+<p>所以，<strong>如果按照“八二原理”来设置缓存空间容量，也就是把缓存空间容量设置为总数据量的 20% 的话，就有可能拦截到 80% 的访问。</strong></p>
+<p>为什么说是“有可能”呢？</p>
+<p>这是因为，<strong>“八二原理”是对大量实际应用的数据访问情况做了统计后，得出的一个统计学意义上的数据量和访问量的比例。具体到某一个应用来说，数据访问的规律会和具体的业务场景有关。对于最常被访问的 20% 的数据来说，它们贡献的访问量，既有可能超过 80%，也有可能不到 80%。</strong></p>
+<p>我们再通过一个电商商品的场景，来说明下“有可能”这件事儿。<strong>一方面，在商品促销时，热门商品的信息可能只占到总商品数据信息量的 5%，而这些商品信息承载的可能是超过 90% 的访问请求。这时，我们只要缓存这 5% 的数据，就能获得很好的性能收益。另一方面，如果业务应用要对所有商品信息进行查询统计，这时候，即使按照“八二原理”缓存了 20% 的商品数据，也不能获得很好的访问性能，因为 80% 的数据仍然需要从后端数据库中获取。</strong></p>
+<p>接下来，我们再看看数据访问局部性示意图中的红线。<strong>近年来，有些研究人员专门对互联网应用（例如视频播放网站）中，用户请求访问内容的分布情况做过分析，得到了这张图中的红线。</strong></p>
+<p>在这条红线上，<strong>80% 的数据贡献的访问量，超过了传统的长尾效应中 80% 数据能贡献的访问量。原因在于，用户的个性化需求越来越多，在一个业务应用中，不同用户访问的内容可能差别很大，所以，用户请求的数据和它们贡献的访问量比例，不再具备长尾效应中的“八二原理”分布特征了。也就是说，20% 的数据可能贡献不了 80% 的访问，而剩余的 80% 数据反而贡献了更多的访问量，我们称之为重尾效应。</strong></p>
+<p>正是因为 20% 的数据不一定能贡献 80% 的访问量，我们不能简单地按照“总数据量的 20%”来设置缓存最大空间容量。<strong>在实践过程中，我看到过的缓存容量占总数据量的比例，从 5% 到 40% 的都有。这个容量规划不能一概而论，是需要结合应用数据实际访问特征和成本开销来综合考虑的。</strong></p>
+<p>这其实也是我一直在和你分享的经验，<strong>系统的设计选择是一个权衡的过程：大容量缓存是能带来性能加速的收益，但是成本也会更高，而小容量缓存不一定就起不到加速访问的效果。</strong>一般来说，<strong>我会建议把缓存容量设置为总数据量的 15% 到 30%，兼顾访问性能和内存空间开销</strong>。</p>
+<p>对于 Redis 来说，一旦确定了缓存最大容量，比如 4GB，你就可以使用下面这个命令来设定缓存的大小了：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CONFIG SET maxmemory 4gb</span><br></pre></td></tr></table></figure>
 
-<p>在集群运行的过程中，<strong>key1 和 key2 计算完 CRC16 值后，对哈希槽总个数 5 取模，再根据各自的模数结果，就可以被映射到对应的实例 1 和实例 3 上了。</strong></p>
-<p>另外，我再给你一个小提醒，<strong>在手动分配哈希槽时，需要把 16384 个槽都分配完，否则 Redis 集群无法正常工作</strong>。</p>
-<p><strong>好了，通过哈希槽，切片集群就实现了数据到哈希槽、哈希槽再到实例的分配</strong>。但是，即使实例有了哈希槽的映射信息，客户端又是怎么知道要访问的数据在哪个实例上呢？接下来，我就来和你聊聊。</p>
-<h2 id="客户端如何定位数据？"><a href="#客户端如何定位数据？" class="headerlink" title="客户端如何定位数据？"></a>客户端如何定位数据？</h2><p>在定位键值对数据时，<strong>它所处的哈希槽是可以通过计算得到的，这个计算可以在客户端发送请求时来执行。但是，要进一步定位到实例，还需要知道哈希槽分布在哪个实例上。</strong></p>
-<p>一般来说，<strong>客户端和集群实例建立连接后，实例就会把哈希槽的分配信息发给客户端。但是，在集群刚刚创建的时候，每个实例只知道自己被分配了哪些哈希槽，是不知道其他实例拥有的哈希槽信息的。</strong></p>
-<p>那么，客户端为什么可以在访问任何一个实例时，都能获得所有的哈希槽信息呢？这是因为，<strong>Redis 实例会把自己的哈希槽信息发给和它相连接的其它实例，来完成哈希槽分配信息的扩散。当实例之间相互连接后，每个实例就有所有哈希槽的映射关系了。</strong></p>
-<p><strong>客户端收到哈希槽信息后，会把哈希槽信息缓存在本地</strong>。<strong>当客户端请求键值对时，会先计算键所对应的哈希槽，然后就可以给相应的实例发送请求了。</strong></p>
-<p>但是，在集群中，实例和哈希槽的对应关系并不是一成不变的，最常见的变化有两个：</p>
+<p>不过，<strong>缓存被写满是不可避免的</strong>。即使你精挑细选，<strong>确定了缓存容量，还是要面对缓存写满时的替换操作</strong>。<strong>缓存替换需要解决两个问题：决定淘汰哪些数据，如何处理那些被淘汰的数据。</strong></p>
+<p>接下来，我们就来学习下，Redis 中的数据淘汰策略。</p>
+<h2 id="Redis-缓存有哪些淘汰策略？"><a href="#Redis-缓存有哪些淘汰策略？" class="headerlink" title="Redis 缓存有哪些淘汰策略？"></a>Redis 缓存有哪些淘汰策略？</h2><p>Redis 4.0 之前一共实现了 6 种内存淘汰策略，在 4.0 之后，又增加了 2 种策略。我们可以按照是否会进行数据淘汰把它们分成两类：</p>
 <ul>
-<li>在集群中，<strong>实例有新增或删除，Redis 需要重新分配哈希槽</strong>；</li>
-<li>为了负载均衡，<strong>Redis 需要把哈希槽在所有实例上重新分布一遍。</strong></li>
+<li><strong>不进行数据淘汰的策略，只有 noeviction 这一种。</strong></li>
+<li><strong>会进行淘汰的 7 种其他策略。</strong></li>
 </ul>
-<p><strong>此时，实例之间还可以通过相互传递消息，获得最新的哈希槽分配信息，但是，客户端是无法主动感知这些变化的</strong>。这就会导致，<strong>它缓存的分配信息和最新的分配信息就不一致了</strong>，那该怎么办呢？</p>
-<p>Redis Cluster 方案提供了一种<strong>重定向机制，</strong>所谓的“重定向”，就是指，<strong>客户端给一个实例发送数据读写操作时，这个实例上并没有相应的数据，客户端要再给一个新实例发送操作命令。</strong></p>
-<p>那客户端又是怎么知道重定向时的新实例的访问地址呢？<strong>当客户端把一个键值对的操作请求发给一个实例时，如果这个实例上并没有这个键值对映射的哈希槽，那么，这个实例就会给客户端返回下面的 MOVED 命令响应结果，这个结果中就包含了新实例的访问地址。</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">GET hello:key</span><br><span class="line"></span><br><span class="line">(error) MOVED 13320 172.16.19.5:6379</span><br></pre></td></tr></table></figure>
+<p>会进行淘汰的 7 种策略，我们可以再进一步根据淘汰候选数据集的范围把它们分成两类：</p>
+<ul>
+<li><strong>在设置了过期时间的数据中进行淘汰</strong>，包括 volatile-random、volatile-ttl、volatile-lru、volatile-lfu（Redis  4.0 后新增）四种。</li>
+<li><strong>在所有数据范围内进行淘汰</strong>，包括 allkeys-lru、allkeys-random、allkeys-lfu（Redis 4.0 后新增）三种。</li>
+</ul>
+<p>我把这 8 种策略的分类，画到了一张图里：</p>
+<p><img src="/2024/09/17/Redis24/04bdd13b760016ec3b30f4b02e133df6.jpg" alt="img"></p>
+<p>下面我就来具体解释下各个策略。</p>
+<p>默认情况下，<strong>Redis 在使用的内存空间超过 maxmemory 值时，并不会淘汰数据</strong>，也就是设定的 <strong>noeviction 策略</strong>。对应到 Redis 缓存，<strong>也就是指，一旦缓存被写满了，再有写请求来时，Redis 不再提供服务，而是直接返回错误。Redis 用作缓存时，实际的数据集通常都是大于缓存容量的，总会有新的数据要写入缓存，这个策略本身不淘汰数据，也就不会腾出新的缓存空间，我们不把它用在 Redis 缓存中。</strong></p>
+<p>我们再分析下 volatile-random、volatile-ttl、volatile-lru 和 volatile-lfu 这四种淘汰策略。它们筛选的候选数据范围，被限制在已经设置了过期时间的键值对上。<strong>也正因为此，即使缓存没有写满，这些数据如果过期了，也会被删除。</strong></p>
+<p>例如，<strong>我们使用 EXPIRE 命令对一批键值对设置了过期时间后，无论是这些键值对的过期时间是快到了，还是 Redis 的内存使用量达到了 maxmemory 阈值，Redis 都会进一步按照 volatile-ttl、volatile-random、volatile-lru、volatile-lfu 这四种策略的具体筛选规则进行淘汰。</strong></p>
+<p>volatile-ttl 在筛选时，<strong>会针对设置了过期时间的键值对，根据过期时间的先后进行删除，越早过期的越先被删除</strong>。</p>
+<p>volatile-random 就像它的名称一样，<strong>在设置了过期时间的键值对中，进行随机删除。</strong></p>
+<ul>
+<li><strong>volatile-lru 会使用 LRU 算法筛选设置了过期时间的键值对。</strong></li>
+<li><strong>volatile-lfu 会使用 LFU 算法选择设置了过期时间的键值对。</strong></li>
+</ul>
+<p>可以看到，volatile-ttl 和 volatile-random 筛选规则比较简单，而 volatile-lru 因为涉及了 LRU 算法，所以我会在分析 allkeys-lru 策略时再详细解释。volatile-lfu 使用了 LFU 算法，我会在第 27 讲中具体解释，现在你只需要知道，它是在 LRU 算法的基础上，同时考虑了数据的访问时效性和数据的访问次数，可以看作是对淘汰策略的优化。</p>
+<p>相对于 volatile-ttl、volatile-random、volatile-lru、volatile-lfu 这四种策略淘汰的是设置了过期时间的数据，<strong>allkeys-lru、allkeys-random、allkeys-lfu 这三种淘汰策略的备选淘汰数据范围，就扩大到了所有键值对，无论这些键值对是否设置了过期时间</strong>。它们筛选数据进行淘汰的规则是：</p>
+<ul>
+<li><strong>allkeys-random 策略，从所有键值对中随机选择并删除数据；</strong></li>
+<li><strong>allkeys-lru 策略，使用 LRU 算法在所有数据中进行筛选。</strong></li>
+<li><strong>allkeys-lfu 策略，使用 LFU 算法在所有数据中进行筛选。</strong></li>
+</ul>
+<p><strong>这也就是说，如果一个键值对被删除策略选中了，即使它的过期时间还没到，也需要被删除。当然，如果它的过期时间到了但未被策略选中，同样也会被删除。</strong></p>
+<p>接下来，我们就看看 volatile-lru 和 allkeys-lru 策略都用到的 LRU 算法吧。LRU 算法工作机制并不复杂，我们一起学习下。</p>
+<p><strong>LRU 算法的全称是 Least Recently Used，从名字上就可以看出，这是按照最近最少使用的原则来筛选数据，最不常用的数据会被筛选出来，而最近频繁使用的数据会留在缓存中。</strong></p>
+<p>那具体是怎么筛选的呢？<strong>LRU 会把所有的数据组织成一个链表，链表的头和尾分别表示 MRU 端和 LRU 端，分别代表最近最常使用的数据和最近最不常用的数据。我们看一个例子。</strong></p>
+<p><img src="/2024/09/17/Redis24/0201f85c84203300ae4085c60e955yy5.jpg" alt="img"></p>
+<p><strong>我们现在有数据 6、3、9、20、5。如果数据 20 和 3 被先后访问，它们都会从现有的链表位置移到 MRU 端，而链表中在它们之前的数据则相应地往后移一位。因为，LRU 算法选择删除数据时，都是从 LRU 端开始，所以把刚刚被访问的数据移到 MRU 端，就可以让它们尽可能地留在缓存中。</strong></p>
+<p>如果有一个新数据 15 要被写入缓存，但此时已经没有缓存空间了，也就是链表没有空余位置了，那么，LRU 算法做两件事：</p>
+<ul>
+<li><strong>数据 15 是刚被访问的，所以它会被放到 MRU 端；</strong></li>
+<li><strong>算法把 LRU 端的数据 5 从缓存中删除，相应的链表中就没有数据 5 的记录了。</strong></li>
+</ul>
+<p>其实，LRU 算法背后的想法非常朴素：<strong>它认为刚刚被访问的数据，肯定还会被再次访问，所以就把它放在 MRU 端；长久不访问的数据，肯定就不会再被访问了，所以就让它逐渐后移到 LRU 端，在缓存满时，就优先删除它。</strong></p>
+<p>不过，LRU 算法在实际实现时，需要用链表管理所有的缓存数据，这会<strong>带来额外的空间开销</strong>。而且，当有数据被访问时，需要在链表上把该数据移动到 MRU 端，如果有大量数据被访问，就会带来很多链表移动操作，会很耗时，进而会降低 Redis 缓存性能。</p>
+<p><strong>所以，在 Redis 中，LRU 算法被做了简化，以减轻数据淘汰对缓存性能的影响。</strong>具体来说，<strong>Redis 默认会记录每个数据的最近一次访问的时间戳（由键值对数据结构 RedisObject 中的 lru 字段记录）。然后，Redis 在决定淘汰的数据时，第一次会随机选出 N 个数据，把它们作为一个候选集合。接下来，Redis 会比较这 N 个数据的 lru 字段，把 lru 字段值最小的数据从缓存中淘汰出去。</strong></p>
+<p>Redis 提供了一个配置参数 maxmemory-samples，这个参数就是 Redis 选出的数据个数 N。例如，我们执行如下命令，可以让 Redis 选出 100 个数据作为候选数据集：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CONFIG SET maxmemory-samples 100</span><br></pre></td></tr></table></figure>
 
-<p>其中，MOVED 命令表示，<strong>客户端请求的键值对所在的哈希槽 13320，实际是在 172.16.19.5 这个实例上。通过返回的 MOVED 命令，就相当于把哈希槽所在的新实例的信息告诉给客户端了。这样一来，客户端就可以直接和 172.16.19.5 连接，并发送操作请求了。</strong></p>
-<p>我画一张图来说明一下，<strong>MOVED 重定向命令的使用方法。可以看到，由于负载均衡，Slot  2 中的数据已经从实例 2 迁移到了实例 3</strong>，但是，<strong>客户端缓存仍然记录着“Slot 2 在实例 2”的信息，所以会给实例 2 发送命令。实例 2 给客户端返回一条 MOVED 命令，把 Slot  2 的最新位置（也就是在实例 3 上），返回给客户端，客户端就会再次向实例 3 发送请求，同时还会更新本地缓存，把 Slot  2 与实例的对应关系更新过来。</strong></p>
-<p><img src="/2024/09/16/Redis09/350abedefcdbc39d6a8a8f1874eb0809.jpg" alt="img"></p>
-<p>客户端MOVED重定向命令</p>
-<p>需要注意的是，在上图中，<strong>当客户端给实例 2 发送命令时，Slot 2 中的数据已经全部迁移到了实例 3。在实际应用时，如果 Slot 2 中的数据比较多，就可能会出现一种情况：客户端向实例 2 发送请求，但此时，Slot 2 中的数据只有一部分迁移到了实例 3，还有部分数据没有迁移。在这种迁移部分完成的情况下，客户端就会收到一条 ASK 报错信息，如下所示：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">GET hello:key</span><br><span class="line"></span><br><span class="line">(error) ASK 13320 172.16.19.5:6379</span><br></pre></td></tr></table></figure>
-
-<p>这个结果中的 ASK 命令就表示，<strong>客户端请求的键值对所在的哈希槽 13320，在 172.16.19.5 这个实例上，但是这个哈希槽正在迁移。此时，客户端需要先给 172.16.19.5 这个实例发送一个 ASKING 命令。这个命令的意思是，让这个实例允许执行客户端接下来发送的命令。然后，客户端再向这个实例发送 GET 命令，以读取数据。</strong></p>
-<p>看起来好像有点复杂，我再借助图片来解释一下。</p>
-<p>在下图中，Slot 2 正在从实例 2 往实例 3 迁移，key1 和 key2 已经迁移过去，key3 和 key4 还在实例 2。<strong>客户端向实例 2 请求 key2 后，就会收到实例 2 返回的 ASK 命令。</strong></p>
-<p>ASK 命令表示两层含义：</p>
+<p>当需要再次淘汰数据时，<strong>Redis 需要挑选数据进入第一次淘汰时创建的候选集合</strong>。这儿的挑选标准是：<strong>能进入候选集合的数据的 lru 字段值必须小于候选集合中最小的 lru 值</strong>。当有新数据进入候选数据集后，<strong>如果候选数据集中的数据个数达到了 maxmemory-samples，Redis 就把候选数据集中 lru 字段值最小的数据淘汰出去。（有点小顶堆的味道了）</strong></p>
+<p><strong>这样一来，Redis 缓存不用为所有的数据维护一个大链表，也不用在每次数据访问时都移动链表项，提升了缓存的性能。</strong></p>
+<p>好了，到这里，我们就学完了除了使用 LFU 算法以外的 5 种缓存淘汰策略，我再给你三个使用建议。</p>
+<p><strong>优先使用 allkeys-lru 策略</strong>。这样，<strong>可以充分利用 LRU 这一经典缓存算法的优势，把最近最常访问的数据留在缓存中，提升应用的访问性能。如果你的业务数据中有明显的冷热数据区分，我建议你使用 allkeys-lru 策略。</strong></p>
+<p><strong>如果业务应用中的数据访问频率相差不大，没有明显的冷热数据区分，建议使用 allkeys-random 策略，随机选择淘汰的数据就行。</strong></p>
+<p><strong>如果你的业务中有置顶的需求</strong>，比如置顶新闻、置顶视频，那么，<strong>可以使用 volatile-lru 策略，同时不给这些置顶数据设置过期时间。这样一来，这些需要置顶的数据一直不会被删除，而其他数据会在过期时根据 LRU 规则进行筛选。</strong></p>
+<p><strong>一旦被淘汰的数据被选定后，Redis 怎么处理这些数据呢？这就要说到缓存替换时的具体操作了。</strong></p>
+<h2 id="如何处理被淘汰的数据？"><a href="#如何处理被淘汰的数据？" class="headerlink" title="如何处理被淘汰的数据？"></a>如何处理被淘汰的数据？</h2><p>一般来说，一旦被淘汰的数据选定后，<strong>如果这个数据是干净数据，那么我们就直接删除；如果这个数据是脏数据，我们需要把它写回数据库</strong>，如下图所示：</p>
+<p><img src="/2024/09/17/Redis24/953e48912yy9515abf9db588d447cc5e.jpg" alt="img"></p>
+<p>那怎么判断一个数据到底是干净的还是脏的呢？</p>
+<p><strong>干净数据和脏数据的区别就在于，和最初从后端数据库里读取时的值相比，有没有被修改过。干净数据一直没有被修改，所以后端数据库里的数据也是最新值。在替换时，它可以被直接删除。</strong></p>
+<p><strong>而脏数据就是曾经被修改过的，已经和后端数据库中保存的数据不一致了。此时，如果不把脏数据写回到数据库中，这个数据的最新值就丢失了，就会影响应用的正常使用。</strong></p>
+<p><strong>这么一来，缓存替换既腾出了缓存空间，用来缓存新的数据，同时，将脏数据写回数据库，也保证了最新数据不会丢失。</strong></p>
+<p>不过，对于 Redis 来说，它决定了被淘汰的数据后，会把它们删除。<strong>即使淘汰的数据是脏数据，Redis 也不会把它们写回数据库。所以，我们在使用 Redis 缓存时，如果数据被修改了，需要在数据修改时就将它写回数据库。否则，这个脏数据被淘汰时，会被 Redis 删除，而数据库里也没有最新的数据了。</strong></p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>在这节课上，我围绕着“缓存满了该怎么办”这一问题，向你介绍了缓存替换时的数据淘汰策略，以及被淘汰数据的处理方法。</p>
+<p><strong>Redis 4.0 版本以后一共提供了 8 种数据淘汰策略，从淘汰数据的候选集范围来看，我们有两种候选范围：一种是所有数据都是候选集，一种是设置了过期时间的数据是候选集。</strong>另外，无论是面向哪种候选数据集进行淘汰数据选择，我们都有三种策略，<strong>分别是随机选择，根据 LRU 算法选择，以及根据 LFU 算法选择。</strong>当然，<strong>当面向设置了过期时间的数据集选择淘汰数据时，我们还可以根据数据离过期时间的远近来决定</strong>。</p>
+<p>一般来说，缓存系统对于选定的被淘汰数据，会根据其是干净数据还是脏数据，选择直接删除还是写回数据库。<strong>但是，在 Redis 中，被淘汰数据无论干净与否都会被删除，所以，这是我们在使用 Redis 缓存时要特别注意的：当数据修改成为脏数据时，需要在数据库中也把数据修改过来。</strong></p>
+<p>选择哪种缓存策略是值得我们多加琢磨的，<strong>它在筛选数据方面是否能筛选出可能被再次访问的数据，直接决定了缓存效率的高与低</strong>。</p>
+<p>很简单的一个对比，<strong>如果我们使用随机策略，刚筛选出来的要被删除的数据可能正好又被访问了，此时应用就只能花费几毫秒从数据库中读取数据了。而如果使用 LRU 策略，被筛选出来的数据往往是经过时间验证了，如果在一段时间内一直没有访问，本身被再次访问的概率也很低了。</strong></p>
+<p>所以，我给你的建议是，<strong>先根据是否有始终会被频繁访问的数据（例如置顶消息），来选择淘汰数据的候选集，也就是决定是针对所有数据进行淘汰，还是针对设置了过期时间的数据进行淘汰。候选数据集范围选定后，建议优先使用 LRU 算法，也就是，allkeys-lru 或 volatile-lru 策略。</strong></p>
+<p>当然，<strong>设置缓存容量的大小也很重要，我的建议是：结合实际应用的数据总量、热数据的体量，以及成本预算，把缓存空间大小设置在总数据量的 15% 到 30% 这个区间就可以。</strong></p>
+<h2 id="每课一问"><a href="#每课一问" class="headerlink" title="每课一问"></a>每课一问</h2><p>按照惯例，我给你提一个小问题。<strong>这节课，我向你介绍了 Redis 缓存在应对脏数据时，需要在数据修改的同时，也把它写回数据库</strong>，针对我们上节课介绍的缓存读写模式：<strong>只读缓存，以及读写缓存中的两种写回策略</strong>，请你思考下，Redis 缓存对应哪一种或哪几种模式？</p>
+<p>Redis在用作缓存时，使用只读缓存或读写缓存的哪种模式？</p>
 <ul>
-<li><strong>第一，表明 Slot 数据还在迁移中；</strong></li>
-<li><strong>第二，ASK 命令把客户端所请求数据的最新实例地址返回给客户端，此时，客户端需要给实例 3 发送 ASKING 命令，然后再发送操作命令。</strong></li>
+<li><strong>1、只读缓存模式：每次修改直接写入后端数据库，如果Redis缓存不命中，则什么都不用操作，如果Redis缓存命中，则删除缓存中的数据，待下次读取时从后端数据库中加载最新值到缓存中。</strong></li>
+<li><strong>2、读写缓存模式+同步直写策略：由于Redis在淘汰数据时，直接在内部删除键值对，外部无法介入处理脏数据写回数据库，所以使用Redis作读写缓存时，只能采用同步直写策略，修改缓存的同时也要写入到后端数据库中，从而保证修改操作不被丢失。</strong>但这种方案在并发场景下会导致数据库和缓存的不一致，<strong>需要在特定业务场景下或者配合分布式锁使用。</strong></li>
 </ul>
-<p><img src="/2024/09/16/Redis09/e93ae7f4edf30724d58bf68yy714eeb0.jpg" alt="img"></p>
-<p>客户端ASK重定向命令</p>
-<p>和 MOVED 命令不同，<strong>ASK 命令并不会更新客户端缓存的哈希槽分配信息</strong>。所以，在上图中，<strong>如果客户端再次请求 Slot 2 中的数据，它还是会给实例 2 发送请求。这也就是说，ASK 命令的作用只是让客户端能给新实例发送一次请求，而不像 MOVED 命令那样，会更改本地缓存，让后续所有命令都发往新实例。</strong></p>
-<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>这节课，我们学习了<strong>切片集群在保存大量数据方面的优势，以及基于哈希槽的数据分布机制和客户端定位键值对的方法。</strong></p>
-<p>在应对数据量扩容时，<strong>虽然增加内存这种纵向扩展的方法简单直接，但是会造成数据库的内存过大，导致性能变慢</strong>。</p>
-<p><strong>Redis 切片集群提供了横向扩展的模式，也就是使用多个实例，并给每个实例配置一定数量的哈希槽，数据可以通过键的哈希值映射到哈希槽，再通过哈希槽分散保存到不同的实例上。这样做的好处是扩展性好，不管有多少数据，切片集群都能应对。</strong></p>
-<p>另外，<strong>集群的实例增减，或者是为了实现负载均衡而进行的数据重新分布，会导致哈希槽和实例的映射关系发生变化，客户端发送请求时，会收到命令执行报错信息。了解了 MOVED 和 ASK 命令，你就不会为这类报错而头疼了。</strong></p>
-<p>我刚刚说过，在 Redis 3.0 之前，Redis 官方并没有提供切片集群方案，<strong>但是，其实当时业界已经有了一些切片集群的方案，例如基于客户端分区的 ShardedJedis，基于代理的 Codis、Twemproxy 等</strong>。这些方案的应用早于 Redis Cluster 方案，<strong>在支撑的集群实例规模、集群稳定性、客户端友好性方面也都有着各自的优势</strong>，我会在后面的课程中，专门和你聊聊这些方案的实现机制，以及实践经验。这样一来，当你再碰到业务发展带来的数据量巨大的难题时，就可以根据这些方案的特点，选择合适的方案实现切片集群，以应对业务需求了。</p>
-<h2 id="每课一问"><a href="#每课一问" class="headerlink" title="每课一问"></a>每课一问</h2><p>按照惯例，给你提一个小问题：<strong>Redis Cluster 方案通过哈希槽的方式把键值对分配到不同的实例上，这个过程需要对键值对的 key 做 CRC 计算</strong>，然后再和哈希槽做映射，这样做有什么好处吗？<strong>如果用一个表直接把键值对和实例的对应关系记录下来（例如键值对 1 在实例 2 上，键值对 2 在实例 1 上），这样就不用计算 key 和哈希槽的对应关系了，只用查表就行了</strong>，Redis 为什么不这么做呢？</p>
-<p>Redis Cluster不采用把key直接映射到实例的方式，而采用哈希槽的方式原因：</p>
+<p><strong>当一个系统引入缓存时，需要面临最大的问题就是，如何保证缓存和后端数据库的一致性问题，最常见的3个解决方案分别是Cache Aside、Read&#x2F;Write Throught和Write Back缓存更新策略</strong>。</p>
 <ul>
-<li><strong>1、整个集群存储key的数量是无法预估的，key的数量非常多时，直接记录每个key对应的实例映射关系，这个映射表会非常庞大，这个映射表无论是存储在服务端还是客户端都占用了非常大的内存空间。</strong></li>
-<li><strong>2、Redis Cluster采用无中心化的模式（无proxy，客户端与服务端直连），客户端在某个节点访问一个key，如果这个key不在这个节点上，这个节点需要有纠正客户端路由到正确节点的能力（MOVED响应），这就需要节点之间互相交换路由表，每个节点拥有整个集群完整的路由关系。</strong>如果存储的都是key与实例的对应关系，节点之间交换信息也会变得非常庞大，消耗过多的网络资源，而且就算交换完成，相当于每个节点都需要额外存储其他节点的路由表，内存占用过大造成资源浪费。</li>
-<li><strong>3、当集群在扩容、缩容、数据均衡时，节点之间会发生数据迁移，迁移时需要修改每个key的映射关系，维护成本高。</strong></li>
-<li><strong>4、而在中间增加一层哈希槽，可以把数据和节点解耦，key通过Hash计算，只需要关心映射到了哪个哈希槽，然后再通过哈希槽和节点的映射表找到节点，相当于消耗了很少的CPU资源，不但让数据分布更均匀，还可以让这个映射表变得很小，利于客户端和服务端保存，节点之间交换信息时也变得轻量。</strong></li>
-<li><strong>5、当集群在扩容、缩容、数据均衡时，节点之间的操作例如数据迁移，都以哈希槽为基本单位进行操作，简化了节点扩容、缩容的难度</strong>，便于集群的维护和管理。</li>
+<li><strong>1、Cache Aside策略：就是文章所讲的只读缓存模式。读操作命中缓存直接返回，否则从后端数据库加载到缓存再返回。</strong>写操作直接更新数据库，然后删除缓存。<strong>这种策略的优点是一切以后端数据库为准，可以保证缓存和数据库的一致性。缺点是写操作会让缓存失效，再次读取时需要从数据库中加载。这种策略是我们在开发软件时最常用的，在使用Memcached或Redis时一般都采用这种方案。</strong></li>
+<li><strong>2、Read&#x2F;Write Throught策略：应用层读写只需要操作缓存，不需要关心后端数据库。</strong>应用层在操作缓存时，缓存层会自动从数据库中加载或写回到数据库中，这种策略的优点是，<strong>对于应用层的使用非常友好，只需要操作缓存即可，缺点是需要缓存层支持和后端数据库的联动。</strong></li>
+<li><strong>3、Write Back策略：类似于文章所讲的读写缓存模式+异步写回策略。写操作只写缓存，比较简单。</strong>而读操作如果命中缓存则直接返回，否则需要从数据库中加载到缓存中，在加载之前，如果缓存已满，则先把需要淘汰的缓存数据写回到后端数据库中，再把对应的数据放入到缓存中。<strong>这种策略的优点是，写操作飞快（只写缓存），缺点是如果数据还未来得及写入后端数据库，系统发生异常会导致缓存和数据库的不一致。</strong>这种策略经常使用在操作系统Page Cache中，或者应对大量写操作的数据库引擎中。</li>
 </ul>
-<p>另外，我想补充一下Redis集群相关的知识，以及我的理解：</p>
-<p><strong>Redis使用集群方案就是为了解决单个节点数据量大、写入量大产生的性能瓶颈的问题。多个节点组成一个集群，可以提高集群的性能和可靠性，但随之而来的就是集群的管理问题，最核心问题有2个：请求路由、数据迁移（扩容&#x2F;缩容&#x2F;数据平衡）。</strong></p>
-<p>1、请求路由：<strong>一般都是采用哈希槽的映射关系表找到指定节点，然后在这个节点上操作的方案。</strong></p>
-<p><strong>Redis Cluster在每个节点记录完整的映射关系(便于纠正客户端的错误路由请求)，同时也发给客户端让客户端缓存一份，便于客户端直接找到指定节点，客户端与服务端配合完成数据的路由，这需要业务在使用Redis Cluster时，必须升级为集群版的SDK才支持客户端和服务端的协议交互。</strong></p>
-<p>其他Redis集群化方案例如Twemproxy、Codis都是<strong>中心化模式（增加Proxy层）</strong>，<strong>客户端通过Proxy对整个集群进行操作，Proxy后面可以挂N多个Redis实例</strong>，Proxy层维护了路由的转发逻辑。<strong>操作Proxy就像是操作一个普通Redis一样，客户端也不需要更换SDK，而Redis Cluster是把这些路由逻辑做在了SDK中。当然，增加一层Proxy也会带来一定的性能损耗。</strong></p>
-<p>2、数据迁移：<strong>当集群节点不足以支撑业务需求时，就需要扩容节点，扩容就意味着节点之间的数据需要做迁移，而迁移过程中是否会影响到业务，这也是判定一个集群方案是否成熟的标准。</strong></p>
-<p><strong>Twemproxy不支持在线扩容，它只解决了请求路由的问题，扩容时需要停机做数据重新分配</strong>。<strong>而Redis Cluster和Codis都做到了在线扩容（不影响业务或对业务的影响非常小）</strong>，重点就是在数据迁移过程中，客户端对于正在迁移的key进行操作时，集群如何处理？还要保证响应正确的结果？</p>
-<p><strong>Redis Cluster和Codis都需要服务端和客户端&#x2F;Proxy层互相配合，迁移过程中，服务端针对正在迁移的key，需要让客户端或Proxy去新节点访问（重定向），这个过程就是为了保证业务在访问这些key时依旧不受影响，而且可以得到正确的结果。</strong>由于重定向的存在，所以这个期间的访问延迟会变大。<strong>等迁移完成之后，Redis Cluster每个节点会更新路由映射表，同时也会让客户端感知到，更新客户端缓存。Codis会在Proxy层更新路由表，客户端在整个过程中无感知。</strong></p>
-<p>除了访问正确的节点之外，<strong>数据迁移过程中还需要解决异常情况（迁移超时、迁移失败）、性能问题（如何让数据迁移更快、bigkey如何处理），这个过程中的细节也很多。</strong></p>
-<p>Redis Cluster的数据迁移是同步的，<strong>迁移一个key会同时阻塞源节点和目标节点，迁移过程中会有性能问题。而Codis提供了异步迁移数据的方案，迁移速度更快，对性能影响最小，当然，实现方案也比较复杂。</strong></p>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://geekdaxue.co/read/haofeiyu@redis/re93oo">基础篇 - 09 | 切片集群：数据增多了，是该加内存还是加实例？ - 《Redis 读书笔记》 - 极客文档 (geekdaxue.co)</a></p>
+<p>除了以上提到的缓存和数据库的更新策略之外，<strong>还有一个问题就是操作缓存或数据库发生异常时如何处理？例如缓存操作成功，数据库操作失败，或者反过来，还是有可能会产生不一致的情况。</strong></p>
+<p>比较简单的解决方案是，<strong>根据业务设计好更新缓存和数据库的先后顺序来降低影响，或者给缓存设置较短的有效期来降低不一致的时间。如果需要严格保证缓存和数据库的一致性，即保证两者操作的原子性，这就涉及到分布式事务问题了</strong>，常见的解决方案就是我们经常听到的<strong>两阶段提交（2PC）、三阶段提交（3PC）、TCC、消息队列等方式来保证了，方案也会比较复杂，一般用在对于一致性要求较高的业务场景中。</strong></p>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://geekdaxue.co/read/haofeiyu@redis/ez140u">缓存 - 24 | 替换策略：缓存满了怎么办？ - 《Redis 读书笔记》 - 极客文档 (geekdaxue.co)</a></p>
 
                 
             </div>
@@ -516,7 +524,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/16/Redis09/">http://example.com/2024/09/16/Redis09/</a>
+                    <a href="http://example.com/2024/09/17/Redis24/">http://example.com/2024/09/17/Redis24/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -901,17 +909,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/16/Redis11/">
+                <a href="/2024/09/17/Redis24/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/8.jpg" class="responsive-img" alt="“万金油”的String，为什么不好用了？">
+                        <img src="/medias/featureimages/11.jpg" class="responsive-img" alt="替换策略：缓存满了怎么办？">
                         
-                        <span class="card-title">“万金油”的String，为什么不好用了？</span>
+                        <span class="card-title">替换策略：缓存满了怎么办？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -921,9 +930,9 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-16
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-17
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
@@ -936,6 +945,7 @@
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
@@ -954,13 +964,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/16/Redis08/">
+                <a href="/2024/09/17/Redis23/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/12.jpg" class="responsive-img" alt="哨兵集群：哨兵挂了，主从库还能切换吗？">
+                        <img src="/medias/featureimages/8.jpg" class="responsive-img" alt="旁路缓存：Redis是如何工作的？">
                         
-                        <span class="card-title">哨兵集群：哨兵挂了，主从库还能切换吗？</span>
+                        <span class="card-title">旁路缓存：Redis是如何工作的？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -971,7 +981,7 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-16
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-17
                             </span>
                         <span class="publish-author">
                             
