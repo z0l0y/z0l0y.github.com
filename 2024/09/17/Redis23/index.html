@@ -4,10 +4,9 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="幻读是什么，幻读有什么问题？, zoloy">
-    <meta name="description" content="在上一篇文章最后，我给你留了一个关于加锁规则的问题。今天，我们就从这个问题说起吧。
-为了便于说明问题，这一篇文章，我们就先使用一个小一点儿的表。建表和初始化语句如下（为了便于本期的例子说明，我把上篇文章中用到的表结构做了点儿修改）：
-123">
+    <meta name="keywords" content="旁路缓存：Redis是如何工作的？, zoloy">
+    <meta name="description" content="我们知道，Redis 提供了高性能的数据存取功能，所以广泛应用在缓存场景中，既能有效地提升业务应用的响应速度，还可以避免把高并发大压力的请求发送到数据库层。
+但是，如果 Redis 做缓存时出现了问题，比如说缓存失效，那么，大量请求就会直接">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -19,7 +18,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>幻读是什么，幻读有什么问题？ | zoloy&#39;s blog</title>
+    <title>旁路缓存：Redis是如何工作的？ | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -292,12 +291,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/9.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/8.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">幻读是什么，幻读有什么问题？</h1>
+                    <h1 class="description center-align post-title">旁路缓存：Redis是如何工作的？</h1>
                 </div>
             </div>
         </div>
@@ -321,8 +320,8 @@
                     
                     <div class="article-tag">
                         
-                            <a href="/tags/MySQL/">
-                                <span class="chip bg-color">MySQL</span>
+                            <a href="/tags/Redis/">
+                                <span class="chip bg-color">Redis</span>
                             </a>
                         
                     </div>
@@ -333,8 +332,8 @@
                     <div class="post-cate">
                         <i class="fas fa-bookmark fa-fw icon-category"></i>
                         
-                            <a href="/categories/MySQL/" class="post-category">
-                                MySQL
+                            <a href="/categories/Redis/" class="post-category">
+                                Redis
                             </a>
                         
                     </div>
@@ -346,28 +345,28 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-12
+                    2024-09-17
                 </div>
                 
 
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
-                    2024-09-12
+                    2024-09-17
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    5k
+                    5.2k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    18 分
+                    17 分
                 </div>
                 
 
@@ -390,149 +389,100 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <p>在上一篇文章最后，我给你留了一个关于加锁规则的问题。今天，我们就从这个问题说起吧。</p>
-<p>为了便于说明问题，这一篇文章，我们就先使用一个小一点儿的表。建表和初始化语句如下（为了便于本期的例子说明，我把上篇文章中用到的表结构做了点儿修改）：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">CREATE TABLE `t` (</span><br><span class="line">  `id` int(11) NOT NULL,</span><br><span class="line">  `c` int(11) DEFAULT NULL,</span><br><span class="line">  `d` int(11) DEFAULT NULL,</span><br><span class="line">  PRIMARY KEY (`id`),</span><br><span class="line">  KEY `c` (`c`)</span><br><span class="line">) ENGINE=InnoDB;</span><br><span class="line"></span><br><span class="line">insert into t values(0,0,0),(5,5,5),</span><br><span class="line">(10,10,10),(15,15,15),(20,20,20),(25,25,25);</span><br></pre></td></tr></table></figure>
-
-<p>这个表除了主键id外，还有一个索引c，初始化语句在表中插入了6行数据。</p>
-<p>上期我留给你的问题是，下面的语句序列，是怎么加锁的，加的锁又是什么时候释放的呢？</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">begin;</span><br><span class="line">select * from t where d=5 for update;</span><br><span class="line">commit;</span><br></pre></td></tr></table></figure>
-
-<p>比较好理解的是，<strong>这个语句会命中d&#x3D;5的这一行，对应的主键id&#x3D;5，因此在select 语句执行完成后，id&#x3D;5这一行会加一个写锁，而且由于两阶段锁协议，这个写锁会在执行commit语句的时候释放。</strong></p>
-<p>由于字段d上没有索引，<strong>因此这条查询语句会做全表扫描。那么，其他被扫描到的，但是不满足条件的5行记录上，会不会被加锁呢？</strong></p>
-<p>我们知道，InnoDB的默认事务隔离级别是可重复读，所以本文接下来没有特殊说明的部分，都是设定在可重复读隔离级别下。</p>
-<h3 id="幻读是什么？"><a href="#幻读是什么？" class="headerlink" title="幻读是什么？"></a>幻读是什么？</h3><p>现在，我们就来分析一下，如果只在id&#x3D;5这一行加锁，而其他行的不加锁的话，会怎么样。</p>
-<p>下面先来看一下这个场景（注意：这是我假设的一个场景）：</p>
-<p><img src="/2024/09/12/MySQL20/image-20240912102746933.png" alt="image-20240912102746933"></p>
-<p>可以看到，session A里执行了三次查询，分别是Q1、Q2和Q3。它们的SQL语句相同，都是select * from t where d&#x3D;5 for update。这个语句的意思你应该很清楚了，查所有d&#x3D;5的行，<strong>而且使用的是当前读</strong>，并且加上写锁。现在，我们来看一下这三条SQL语句，分别会返回什么结果。</p>
-<ol>
-<li>Q1只返回id&#x3D;5这一行；</li>
-<li>在T2时刻，session B把id&#x3D;0这一行的d值改成了5，因此T3时刻Q2查出来的是id&#x3D;0和id&#x3D;5这两行；</li>
-<li>在T4时刻，session C又插入一行（1,1,5），因此T5时刻Q3查出来的是id&#x3D;0、id&#x3D;1和id&#x3D;5的这三行。</li>
-</ol>
-<p>其中，Q3读到id&#x3D;1这一行的现象，<strong>被称为“幻读”。也就是说，幻读指的是一个事务在前后两次查询同一个范围的时候，后一次查询看到了前一次查询没有看到的行</strong>。</p>
-<p>这里，我需要对“幻读”做一个说明：</p>
-<ol>
-<li>在可重复读隔离级别下，<strong>普通的查询是快照读，是不会看到别的事务插入的数据的。因此，幻读在“当前读”下才会出现。</strong></li>
-<li>上面session B的修改结果，被session A之后的select语句用“当前读”看到，<strong>不能称为幻读。幻读仅专指“新插入的行”。</strong></li>
-</ol>
-<p>如果只从第8篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/70562">《事务到底是隔离的还是不隔离的？》</a>我们学到的事务可见性规则来分析的话，上面这三条SQL语句的返回结果都没有问题。</p>
-<p><strong>因为这三个查询都是加了for update，都是当前读。而当前读的规则，就是要能读到所有已经提交的记录的最新值。</strong>并且，session B和sessionC的两条语句，执行后就会提交，所以Q2和Q3就是应该看到这两个事务的操作效果，而且也看到了，这跟事务的可见性规则并不矛盾。</p>
-<p>但是，这是不是真的没问题呢？</p>
-<p>不，这里还真就有问题。</p>
-<h3 id="幻读有什么问题？"><a href="#幻读有什么问题？" class="headerlink" title="幻读有什么问题？"></a>幻读有什么问题？</h3><p><strong>首先是语义上的。</strong>session A在T1时刻就声明了，<strong>“我要把所有d&#x3D;5的行锁住，不准别的事务进行读写操作”。而实际上，这个语义被破坏了。</strong></p>
-<p>如果现在这样看感觉还不明显的话，我再往session B和session C里面分别加一条SQL语句，你再看看会出现什么现象。</p>
-<p><img src="/2024/09/12/MySQL20/image-20240912102802316.png" alt="image-20240912102802316"></p>
-<p>session B的第二条语句update t set c&#x3D;5 where id&#x3D;0，语义是“我把id&#x3D;0、d&#x3D;5这一行的c值，改成了5”。</p>
-<p>由于在T1时刻，session A 还只是给id&#x3D;5这一行加了行锁， 并没有给id&#x3D;0这行加上锁。因此，session B在T2时刻，是可以执行这两条update语句的。<strong>这样，就破坏了 session A 里Q1语句要锁住所有d&#x3D;5的行的加锁声明。</strong></p>
-<p><strong>session C也是一样的道理，对id&#x3D;1这一行的修改，也是破坏了Q1的加锁声明。</strong></p>
-<p><strong>其次，是数据一致性的问题。</strong></p>
-<p>我们知道<strong>，锁的设计是为了保证数据的一致性。而这个一致性，不止是数据库内部数据状态在此刻的一致性，还包含了数据和日志在逻辑上的一致性。</strong></p>
-<p>为了说明这个问题，我给session A在T1时刻再加一个更新语句，即：update t set d&#x3D;100 where d&#x3D;5。</p>
-<p><img src="/2024/09/12/MySQL20/image-20240912102818585.png" alt="image-20240912102818585"></p>
-<p>update的加锁语义和select …for update 是一致的，所以这时候加上这条update语句也很合理。session A声明说“要给d&#x3D;5的语句加上锁”，就是为了要更新数据，<strong>新加的这条update语句就是把它认为加上了锁的这一行的d值修改成了100</strong>。</p>
-<p>现在，我们来分析一下图3执行完成后，数据库里会是什么结果。</p>
-<ol>
-<li>经过T1时刻，id&#x3D;5这一行变成 (5,5,100)，当然这个结果最终是在T6时刻正式提交的;</li>
-<li>经过T2时刻，id&#x3D;0这一行变成(0,5,5);</li>
-<li>经过T4时刻，表里面多了一行(1,5,5);</li>
-<li>其他行跟这个执行序列无关，保持不变。</li>
-</ol>
-<p>这样看，这些数据也没啥问题，但是我们再来看看这时候binlog里面的内容。</p>
-<ol>
-<li>T2时刻，session B事务提交，写入了两条语句；</li>
-<li>T4时刻，session C事务提交，写入了两条语句；</li>
-<li>T6时刻，session A事务提交，写入了update t set d&#x3D;100 where d&#x3D;5 这条语句。</li>
-</ol>
-<p>我统一放到一起的话，就是这样的：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">update t set d=5 where id=0; /*(0,0,5)*/</span><br><span class="line">update t set c=5 where id=0; /*(0,5,5)*/</span><br><span class="line"></span><br><span class="line">insert into t values(1,1,5); /*(1,1,5)*/</span><br><span class="line">update t set c=5 where id=1; /*(1,5,5)*/</span><br><span class="line"></span><br><span class="line">update t set d=100 where d=5;/*所有d=5的行，d改成100*/</span><br></pre></td></tr></table></figure>
-
-<p>好，你应该看出问题了。这<strong>个语句序列，不论是拿到备库去执行，还是以后用binlog来克隆一个库，这三行的结果，都变成了 (0,5,100)、(1,5,100)和(5,5,100)。</strong></p>
-<p><strong>也就是说，id&#x3D;0和id&#x3D;1这两行，发生了数据不一致。这个问题很严重，是不行的。</strong></p>
-<p>到这里，我们再回顾一下，<strong>这个数据不一致到底是怎么引入的？</strong></p>
-<p>我们分析一下可以知道，<strong>这是我们假设“select * from t where d&#x3D;5 for update这条语句只给d&#x3D;5这一行，也就是id&#x3D;5的这一行加锁”导致的。</strong></p>
-<p>所以我们认为，上面的设定不合理，要改。</p>
-<p>那怎么改呢？<strong>我们把扫描过程中碰到的行，也都加上写锁，再来看看执行效果。</strong></p>
-<p><img src="/2024/09/12/MySQL20/image-20240912102845127.png" alt="image-20240912102845127"></p>
-<p><strong>由于session A把所有的行都加了写锁，所以session B在执行第一个update语句的时候就被锁住了。需要等到T6时刻session A提交以后，session B才能继续执行。</strong></p>
-<p>这样对于id&#x3D;0这一行，在数据库里的最终结果还是 (0,5,5)。在binlog里面，执行序列是这样的：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">insert into t values(1,1,5); /*(1,1,5)*/</span><br><span class="line">update t set c=5 where id=1; /*(1,5,5)*/</span><br><span class="line"></span><br><span class="line">update t set d=100 where d=5;/*所有d=5的行，d改成100*/</span><br><span class="line"></span><br><span class="line">update t set d=5 where id=0; /*(0,0,5)*/</span><br><span class="line">update t set c=5 where id=0; /*(0,5,5)*/</span><br></pre></td></tr></table></figure>
-
-<p>可以看到，按照日志顺序执行，id&#x3D;0这一行的最终结果也是(0,5,5)。所以，id&#x3D;0这一行的问题解决了。</p>
-<p>但同时你也可以看到，id&#x3D;1这一行，在数据库里面的结果是(1,5,5)，而根据binlog的执行结果是(1,5,100)，也就是说幻读的问题还是没有解决。<strong>为什么我们已经这么“凶残”地，把所有的记录都上了锁，还是阻止不了id&#x3D;1这一行的插入和更新呢？</strong></p>
-<p><strong>原因很简单。在T3时刻，我们给所有行加锁的时候，id&#x3D;1这一行还不存在，不存在也就加不上锁。</strong></p>
-<p><strong>也就是说，即使把所有的记录都加上锁，还是阻止不了新插入的记录，</strong>这也是为什么“幻读”会被单独拿出来解决的原因。</p>
-<p>到这里，其实我们刚说明完文章的标题 ：幻读的定义和幻读有什么问题。</p>
-<p>接下来，我们再看看InnoDB怎么解决幻读的问题。</p>
-<h3 id="如何解决幻读？"><a href="#如何解决幻读？" class="headerlink" title="如何解决幻读？"></a>如何解决幻读？</h3><p><strong>现在你知道了，产生幻读的原因是，行锁只能锁住行，但是新插入记录这个动作，要更新的是记录之间的“间隙”。因此，为了解决幻读问题，InnoDB只好引入新的锁，也就是间隙锁(Gap Lock)。</strong></p>
-<p>顾名思义，间隙锁，<strong>锁的就是两个值之间的空隙</strong>。比如文章开头的表t，初始化插入了6个记录，这就产生了7个间隙。</p>
-<p><img src="/2024/09/12/MySQL20/image-20240912102909138.png" alt="image-20240912102909138"></p>
-<p>这样，当你执行 select * from t where d&#x3D;5 for update的时候，<strong>就不止是给数据库中已有的6个记录加上了行锁，还同时加了7个间隙锁。这样就确保了无法再插入新的记录</strong>。</p>
-<p>也就是说这时候，在一行行扫描的过程中，不仅将给行加上了行锁，<strong>还给行两边的空隙，也加上了间隙锁</strong>。</p>
-<p>现在你知道了，<strong>数据行是可以加上锁的实体，数据行之间的间隙，也是可以加上锁的实体。但是间隙锁跟我们之前碰到过的锁都不太一样</strong>。</p>
-<p>比如行锁，分成读锁和写锁。下图就是这两种类型行锁的冲突关系。</p>
-<p><img src="/2024/09/12/MySQL20/image-20240912102918732.png" alt="image-20240912102918732"></p>
-<p>也就是说，跟行锁有冲突关系的是“另外一个行锁”。</p>
-<p>但是间隙锁不一样，<strong>跟间隙锁存在冲突关系的，是“往这个间隙中插入一个记录”这个操作。</strong>间隙锁之间都<strong>不存在</strong>冲突关系。</p>
-<p>这句话不太好理解，我给你举个例子：</p>
-<p><img src="/2024/09/12/MySQL20/image-20240912102929394.png" alt="image-20240912102929394"></p>
-<p>这里session B并不会被堵住。<strong>因为表t里并没有c&#x3D;7这个记录，因此session A加的是间隙锁(5,10)。而session B也是在这个间隙加的间隙锁。它们有共同的目标，即：保护这个间隙，不允许插入值。但，它们之间是不冲突的。</strong></p>
-<p>间隙锁和行锁合称next-key lock，每个next-key lock是前开后闭区间。也就是说，我们的表t初始化以后，如果用select * from t for update要把整个表所有记录锁起来，就形成了7个next-key lock，分别是 (-∞,0]、(0,5]、(5,10]、(10,15]、(15,20]、(20, 25]、(25, +supremum]。</p>
-<blockquote>
-<p>备注：这篇文章中，如果没有特别说明，<strong>我们把间隙锁记为开区间，把next-key lock记为前开后闭区间。</strong></p>
-</blockquote>
-<p>你可能会问说，这个supremum从哪儿来的呢？</p>
-<p><strong>这是因为+∞是开区间。实现上，InnoDB给每个索引加了一个不存在的最大值supremum，这样才符合我们前面说的“都是前开后闭区间”。</strong></p>
-<p><strong>间隙锁和next-key lock的引入，帮我们解决了幻读的问题，但同时也带来了一些“困扰”。</strong></p>
-<p>在前面的文章中，就有同学提到了这个问题。我把他的问题转述一下，对应到我们这个例子的表来说，业务逻辑这样的：任意锁住一行，如果这一行不存在的话就插入，如果存在这一行就更新它的数据，代码如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">begin;</span><br><span class="line">select * from t where id=N for update;</span><br><span class="line"></span><br><span class="line">/*如果行不存在*/</span><br><span class="line">insert into t values(N,N,N);</span><br><span class="line">/*如果行存在*/</span><br><span class="line">update t set d=N set id=N;</span><br><span class="line"></span><br><span class="line">commit;</span><br></pre></td></tr></table></figure>
-
-<p>可能你会说，<strong>这个不是insert … on duplicate key update 就能解决吗</strong>？但其实在有多个唯一键的时候，这个方法是不能满足这位提问同学的需求的。至于为什么，我会在后面的文章中再展开说明。</p>
-<p>这里介绍一下<code>insert … on duplicate key update </code>是什么：</p>
-<p><code>insert … on duplicate key update </code> 是 MySQL 中的一种语法，<strong>用于在插入数据时处理重复键的情况</strong>。其基本含义是：</p>
+                <p>我们知道，<strong>Redis 提供了高性能的数据存取功能，所以广泛应用在缓存场景中，既能有效地提升业务应用的响应速度，还可以避免把高并发大压力的请求发送到数据库层。</strong></p>
+<p>但是，<strong>如果 Redis 做缓存时出现了问题，比如说缓存失效，那么，大量请求就会直接积压到数据库层，必然会给数据库带来巨大的压力，很可能会导致数据库宕机或是故障，那么，业务应用就没有办法存取数据、响应用户请求了。这种生产事故，肯定不是我们希望看到的。</strong></p>
+<p>正因为 Redis 用作缓存的普遍性以及它在业务应用中的重要作用，<strong>所以，我们需要系统地掌握缓存的一系列内容，包括工作原理、替换策略、异常处理和扩展机制。具体来说，我们需要解决四个关键问题：</strong></p>
 <ul>
-<li><strong>如果插入的行在表中不存在，则执行插入操作。</strong></li>
-<li><strong>如果插入的行在表中已存在（即出现了主键或唯一索引冲突），则执行更新操作。（我记得Mybatis-Plus里面有个API好像就是使用的这个SQL语句）</strong></li>
+<li>Redis 缓存具体是怎么工作的？</li>
+<li>Redis 缓存如果满了，该怎么办？</li>
+<li>为什么会有缓存一致性、缓存穿透、缓存雪崩、缓存击穿等异常，该如何应对？</li>
+<li>Redis 的内存毕竟有限，如果用快速的固态硬盘来保存数据，可以增加缓存的数据量，那么，Redis 缓存可以使用快速固态硬盘吗？</li>
 </ul>
-<p>现在，我们就只讨论这个逻辑。</p>
-<p>这个同学碰到的现象是，这个逻辑一旦有并发，就会碰到死锁。你一定也觉得奇怪，这个逻辑每次操作前用for update锁起来，已经是最严格的模式了，怎么还会有死锁呢？</p>
-<p>这里，我用两个session来模拟并发，并假设N&#x3D;9。</p>
-<p><img src="/2024/09/12/MySQL20/image-20240912102952820.png" alt="image-20240912102952820"></p>
-<p>你看到了，其实都不需要用到后面的update语句，就已经形成死锁了。我们按语句执行顺序来分析一下：</p>
-<ol>
-<li><strong>session A 执行select … for update语句，由于id&#x3D;9这一行并不存在，因此会加上间隙锁(5,10);</strong></li>
-<li><strong>session B 执行select … for update语句，同样会加上间隙锁(5,10)，间隙锁之间不会冲突，因此这个语句可以执行成功；</strong></li>
-<li><strong>session B 试图插入一行(9,9,9)，被session A的间隙锁挡住了，只好进入等待；</strong></li>
-<li><strong>session A试图插入一行(9,9,9)，被session B的间隙锁挡住了。</strong></li>
-</ol>
-<p>至此，两个session进入互相等待状态，形成死锁。<strong>当然，InnoDB的死锁检测马上就发现了这对死锁关系，让session A的insert语句报错返回了。</strong></p>
-<p>你现在知道了，<strong>间隙锁的引入，可能会导致同样的语句锁住更大的范围，这其实是影响了并发度的</strong>。其实，这还只是一个简单的例子，在下一篇文章中我们还会碰到更多、更复杂的例子。</p>
-<p>你可能会说，<strong>为了解决幻读的问题，我们引入了这么一大串内容，有没有更简单一点的处理方法呢。</strong></p>
-<p>我在文章一开始就说过，如果没有特别说明，今天和你分析的问题都是在可重复读隔离级别下的<strong>，间隙锁是在可重复读隔离级别下才会生效的。所以，你如果把隔离级别设置为读提交的话，就没有间隙锁了</strong>。但同时，<strong>你要解决可能出现的数据和日志不一致问题，需要把binlog格式设置为row。这，也是现在不少公司使用的配置组合</strong>。</p>
-<p>前面文章的评论区有同学留言说，他们公司就使用的是<strong>读提交隔离级别加binlog_format&#x3D;row的组合</strong>。他曾问他们公司的DBA说，你为什么要这么配置。DBA直接答复说，因为大家都这么用呀。</p>
-<p>所以，这个同学在评论区就问说，这个配置到底合不合理。</p>
-<p>关于这个问题本身的答案是，<strong>如果读提交隔离级别够用，也就是说，业务不需要可重复读的保证，这样考虑到读提交下操作数据的锁范围更小（没有间隙锁）</strong>，这个选择是合理的。</p>
-<p>但其实我想说的是，<strong>配置是否合理，跟业务场景有关，需要具体问题具体分析。</strong></p>
-<p>但是，如果DBA认为之所以这么用的原因是“大家都这么用”，那就有问题了，或者说，迟早会出问题。</p>
-<p>比如说，大家都用读提交，可是逻辑备份的时候，mysqldump为什么要把备份线程设置成可重复读呢？（这个我在前面的文章中已经解释过了，你可以再回顾下第6篇文章<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/69862">《全局锁和表锁 ：给表加个字段怎么有这么多阻碍？》</a>的内容）</p>
-<p>然后，在备份期间，<strong>备份线程用的是可重复读，而业务线程用的是读提交。同时存在两种事务隔离级别，会不会有问题？</strong></p>
-<p>进一步地，这两个不同的隔离级别现象有什么不一样的，关于我们的业务，“用读提交就够了”这个结论是怎么得到的？</p>
-<p>如果业务开发和运维团队这些问题都没有弄清楚，那么“没问题”这个结论，本身就是有问题的。</p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天我们从上一篇文章的课后问题说起，提到了全表扫描的加锁方式。<strong>我们发现即使给所有的行都加上行锁，仍然无法解决幻读问题，因此引入了间隙锁的概念。</strong></p>
-<p>我碰到过很多对数据库有一定了解的业务开发人员，他们在设计数据表结构和业务SQL语句的时候，<strong>对行锁有很准确的认识，但却很少考虑到间隙锁。最后的结果，就是生产库上会经常出现由于间隙锁导致的死锁现象</strong>。</p>
-<p><strong>行锁确实比较直观，判断规则也相对简单，间隙锁的引入会影响系统的并发度，也增加了锁分析的复杂度，但也有章可循。</strong>下一篇文章，我就会为你讲解InnoDB的加锁规则，帮你理顺这其中的“章法”。</p>
-<p><img src="/2024/09/12/MySQL20/image-20240912103017577.png" alt="image-20240912103017577"></p>
-<p>如果你之前没有了解过本篇文章的相关内容，一定觉得这三个语句简直是风马牛不相及。但实际上，这里session B和session C的insert 语句都会进入锁等待状态。</p>
-<p>你可以试着分析一下，出现这种情况的原因是什么？</p>
-<p>这里需要说明的是，这其实是我在下一篇文章介绍加锁规则后才能回答的问题，是留给你作为预习的，其中session C被锁住这个分析是有点难度的。如果你没有分析出来，也不要气馁，我会在下一篇文章和你详细说明。</p>
-<p>你也可以说说，<strong>你的线上MySQL配置的是什么隔离级别，为什么会这么配置？你有没有碰到什么场景，是必须使用可重复读隔离级别的呢？</strong></p>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>我们在本文的开头回答了上期问题。有同学的回答中还说明了读提交隔离级别下，<strong>在语句执行完成后，是只有行锁的。而且语句执行完成后，InnoDB就会把不满足条件的行行锁去掉。</strong></p>
-<p>当然了，c&#x3D;5这一行的行锁，还是会等到commit的时候才释放的。</p>
-<blockquote>
-<p><strong>在读提交隔离级别下，是只有行锁的。</strong></p>
-<p>需要说明一下，需要在启动配置里面增加<strong>performance_schema&#x3D;on，才能用上这个功能，performance_schema库里的表才有数据。</strong></p>
-</blockquote>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/20-huan-du-shi-shi-mo-huan-du-you-shi-mo-wen-ti">20 幻读是什么，幻读有什么问题？ | MySql实战45讲 (gitbook.io)</a></p>
+<p>这节课，我们来了解下缓存的特征和 Redis 适用于缓存的天然优势，以及 Redis 缓存的具体工作机制。</p>
+<h2 id="缓存的特征"><a href="#缓存的特征" class="headerlink" title="缓存的特征"></a>缓存的特征</h2><p>要想弄明白 Redis 为什么适合用作缓存，我们得清楚缓存都有什么特征。</p>
+<p>首先，你要知道，<strong>一个系统中的不同层之间的访问速度不一样，所以我们才需要缓存，这样就可以把一些需要频繁访问的数据放在缓存中，以加快它们的访问速度。</strong></p>
+<p>为了让你能更好地理解，我以计算机系统为例，来解释一下。<strong>下图是计算机系统中的三层存储结构，以及它们各自的常用容量和访问性能。最上面是处理器，中间是内存，最下面是磁盘。</strong></p>
+<p><img src="/2024/09/17/Redis23/ac80f6e1714f3e1e8eabcfd8da3d689c.jpg" alt="img"></p>
+<p>从图上可以看到，<strong>CPU、内存和磁盘这三层的访问速度从几十 ns 到 100ns，再到几 ms，性能的差异很大</strong>。</p>
+<p>想象一下，如果每次 CPU 处理数据时，<strong>都要从 ms 级别的慢速磁盘中读取数据，然后再进行处理，那么，CPU 只能等磁盘的数据传输完成。这样一来，高速的 CPU 就被慢速的磁盘拖累了，整个计算机系统的运行速度会变得非常慢。</strong></p>
+<p>所以，计算机系统中，默认有两种缓存：</p>
+<ul>
+<li>CPU 里面的<strong>末级缓存，即 LLC，用来缓存内存中的数据，避免每次从内存中存取数据</strong>；</li>
+<li><strong>内存中的高速页缓存，即 page cache，用来缓存磁盘中的数据，避免每次从磁盘中存取数据</strong>。</li>
+</ul>
+<p><img src="/2024/09/17/Redis23/7dyycf727f9396eb9788644474855a44.jpg" alt="img"></p>
+<p><strong>跟内存相比，LLC 的访问速度更快，而跟磁盘相比，内存的访问是更快的</strong>。所以，我们可以看出来缓存的<strong>第一个特征</strong>：在一个层次化的系统中，<strong>缓存一定是一个快速子系统，数据存在缓存中时，能避免每次从慢速子系统中存取数据</strong>。对应到互联网应用来说，Redis 就是快速子系统，而数据库就是慢速子系统了。</p>
+<p><strong>知道了这一点，你就能理解，为什么我们必须想尽办法让 Redis 提供高性能的访问，因为，如果访问速度很慢，Redis 作为缓存的价值就不大了。</strong></p>
+<p>我们再看一下刚才的计算机分层结构。<strong>LLC 的大小是 MB 级别，page cache 的大小是 GB 级别，而磁盘的大小是 TB 级别</strong>。这其实包含了缓存的<strong>第二个特征：缓存系统的容量大小总是小于后端慢速系统的，我们不可能把所有数据都放在缓存系统中</strong>。</p>
+<p>这个很有意思，它表明，<strong>缓存的容量终究是有限的，缓存中的数据量也是有限的，肯定是没法时刻都满足访问需求的。所以，缓存和后端慢速系统之间，必然存在数据写回和再读取的交互过程。简单来说，缓存中的数据需要按一定规则淘汰出去，写回后端系统，而新的数据又要从后端系统中读取进来，写入缓存。</strong></p>
+<p>说到这儿，你肯定会想到，<strong>Redis 本身是支持按一定规则淘汰数据的，相当于实现了缓存的数据淘汰，其实，这也是 Redis 适合用作缓存的一个重要原因</strong>。</p>
+<p>好了，我们现在了解了缓存的两个重要特征，那么，接下来，我们就来学习下，缓存是怎么处理请求的。实际上，业务应用在访问 Redis 缓存中的数据时，数据不一定存在，因此，处理的方式也不同。</p>
+<h2 id="Redis-缓存处理请求的两种情况"><a href="#Redis-缓存处理请求的两种情况" class="headerlink" title="Redis 缓存处理请求的两种情况"></a>Redis 缓存处理请求的两种情况</h2><p>把 Redis 用作缓存时，<strong>我们会把 Redis 部署在数据库的前端，业务应用在访问数据时，会先查询 Redis 中是否保存了相应的数据。此时，根据数据是否存在缓存中，会有两种情况。</strong></p>
+<ul>
+<li><strong>缓存命中</strong>：Redis 中有相应数据，就直接读取 Redis，性能非常快。</li>
+<li><strong>缓存缺失</strong>：Redis 中没有保存相应数据，就从后端数据库中读取数据，性能就会变慢。<strong>而且，一旦发生缓存缺失，为了让后续请求能从缓存中读取到数据，我们需要把缺失的数据写入 Redis，这个过程叫作缓存更新</strong>。<strong>缓存更新操作会涉及到保证缓存和数据库之间的数据一致性问题，关于这一点，我会在第 25 讲中再具体介绍。</strong></li>
+</ul>
+<p>我画了一张图，清晰地展示了发生缓存命中或缺失时，应用读取数据的情况，你可以看下这张图片。</p>
+<p><img src="/2024/09/17/Redis23/6b0b489ec0c1c5049c8df84d77fa243d.jpg" alt="img"></p>
+<p>假设我们在一个 Web 应用中，使用 Redis 作为缓存。用户请求发送给 Tomcat，Tomcat 负责处理业务逻辑。如果要访问数据，就需要从 MySQL 中读写数据。那么，我们可以把 Redis 部署在 MySQL 前端。如果访问的数据在 Redis 中，此时缓存命中，Tomcat 可以直接从 Redis 中读取数据，加速应用的访问。否则，Tomcat 就需要从慢速的数据库中读取数据了。</p>
+<p>到这里，你可能已经发现了，使用 Redis 缓存时，我们基本有三个操作：</p>
+<ul>
+<li>应用读取数据时，需要先读取 Redis；</li>
+<li>发生缓存缺失时，需要从数据库读取数据；</li>
+<li>发生缓存缺失时，还需要更新缓存。</li>
+</ul>
+<p>那么，这些操作具体是由谁来做的呢？这和 Redis 缓存的使用方式相关。接下来，我就来和你聊聊 Redis 作为<strong>旁路缓存</strong>的使用操作方式。</p>
+<h2 id="Redis-作为旁路缓存的使用操作"><a href="#Redis-作为旁路缓存的使用操作" class="headerlink" title="Redis 作为旁路缓存的使用操作"></a>Redis 作为旁路缓存的使用操作</h2><p><strong>Redis 是一个独立的系统软件，和业务应用程序是两个软件，当我们部署了 Redis 实例后，它只会被动地等待客户端发送请求，然后再进行处理。</strong>所以，<strong>如果应用程序想要使用 Redis 缓存，我们就要在程序中增加相应的缓存操作代码。所以，我们也把 Redis 称为旁路缓存，也就是说，读取缓存、读取数据库和更新缓存的操作都需要在应用程序中来完成。</strong></p>
+<p>这和我刚才讲的计算机系统中的 LLC 和 page cache <strong>不一样</strong>。<strong>你可以回想下，平时在开发程序时，我们是没有专门在代码中显式地创建 LLC 或 page cache 的实例的，也没有显式调用过它们的 GET 接口</strong>。这是因为，<strong>我们在构建计算机硬件系统时，已经把 LLC 和 page cache 放在了应用程序的数据访问路径上，应用程序访问数据时直接就能用上缓存。</strong></p>
+<p>那么，使用 Redis 缓存时，具体来说，我们需要在应用程序中增加三方面的代码：</p>
+<ul>
+<li>当应用程序需要读取数据时，<strong>我们需要在代码中显式调用 Redis 的 GET 操作接口，进行查询；</strong></li>
+<li>如果缓存缺失了，<strong>应用程序需要再和数据库连接，从数据库中读取数据；</strong></li>
+<li>当缓存中的数据需要更新时，<strong>我们也需要在应用程序中显式地调用 SET 操作接口，把更新的数据写入缓存。</strong></li>
+</ul>
+<p>那么，代码应该怎么加呢？我给你展示一段 Web 应用中使用 Redis 缓存的伪代码示例。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">cacheKey</span> <span class="operator">=</span> “productid_11010003”;</span><br><span class="line"></span><br><span class="line"><span class="type">String</span> <span class="variable">cacheValue</span> <span class="operator">=</span> redisCache.get(cacheKey)；</span><br><span class="line"></span><br><span class="line"><span class="comment">//缓存命中</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> ( cacheValue != NULL)</span><br><span class="line"></span><br><span class="line">   <span class="keyword">return</span> cacheValue;</span><br><span class="line"></span><br><span class="line"><span class="comment">//缓存缺失</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">else</span></span><br><span class="line"></span><br><span class="line">   cacheValue = getProductFromDB();</span><br><span class="line"></span><br><span class="line">   redisCache.put(cacheValue)  <span class="comment">//缓存更新</span></span><br></pre></td></tr></table></figure>
+
+<p>可以看到，为了使用缓存，<strong>Web 应用程序需要有一个表示缓存系统的实例对象 redisCache，还需要主动调用 Redis 的 GET 接口，并且要处理缓存命中和缓存缺失时的逻辑，例如在缓存缺失时，需要更新缓存。</strong></p>
+<p>了解了这一点，我们在使用 Redis 缓存时，有一个地方就需要注意了：<strong>因为需要新增程序代码来使用缓存，所以，Redis 并不适用于那些无法获得源码的应用，例如一些很早之前开发的应用程序，它们的源码已经没有再维护了，或者是第三方供应商开发的应用，没有提供源码，所以，我们就没有办法在这些应用中进行缓存操作。</strong></p>
+<p>在使用旁路缓存时，<strong>我们需要在应用程序中增加操作代码，增加了使用 Redis 缓存的额外工作量，但是，也正因为 Redis 是旁路缓存，是一个独立的系统，我们可以单独对 Redis 缓存进行扩容或性能优化。而且，只要保持操作接口不变，我们在应用程序中增加的代码就不用再修改了。</strong></p>
+<p>好了，到这里，我们知道了，<strong>通过在应用程序中加入 Redis 的操作代码，我们可以让应用程序使用 Redis 缓存数据了。不过，除了从 Redis 缓存中查询、读取数据以外，应用程序还可能会对数据进行修改，这时，我们既可以在缓存中修改，也可以在后端数据库中进行修改，我们该怎么选择呢</strong>？</p>
+<p>其实，这就涉及到了 Redis 缓存的两种类型：<strong>只读缓存和读写缓存</strong>。<strong>只读缓存能加速读请求，而读写缓存可以同时加速读写请求。而且，读写缓存又有两种数据写回策略，可以让我们根据业务需求，在保证性能和保证数据可靠性之间进行选择。所以，接下来，我们来具体了解下 Redis 的缓存类型和相应的写回策略。</strong></p>
+<h2 id="缓存的类型"><a href="#缓存的类型" class="headerlink" title="缓存的类型"></a>缓存的类型</h2><p>按照 Redis 缓存是否接受写请求，<strong>我们可以把它分成只读缓存和读写缓存</strong>。先来了解下只读缓存。</p>
+<h3 id="只读缓存"><a href="#只读缓存" class="headerlink" title="只读缓存"></a>只读缓存</h3><p>当 Redis 用作只读缓存时，<strong>应用要读取数据的话，会先调用 Redis GET 接口，查询数据是否存在。而所有的数据写请求，会直接发往后端的数据库，在数据库中增删改。对于删改的数据来说，如果 Redis 已经缓存了相应的数据，应用需要把这些缓存的数据删除，Redis 中就没有这些数据了。</strong></p>
+<p><strong>当应用再次读取这些数据时，会发生缓存缺失，应用会把这些数据从数据库中读出来，并写到缓存中。这样一来，这些数据后续再被读取时，就可以直接从缓存中获取了，能起到加速访问的效果。</strong></p>
+<p>我给你举个例子。假设业务应用要修改数据 A，此时，数据 A 在 Redis 中也缓存了，那么，应用会先直接在数据库里修改 A，并把 Redis 中的 A 删除。<strong>等到应用需要读取数据 A 时，会发生缓存缺失，此时，应用从数据库中读取 A，并写入 Redis，以便后续请求从缓存中直接读取</strong>，如下图所示：</p>
+<p><img src="/2024/09/17/Redis23/464ea24a098c87b9d292cf61a2b2fecd.jpg" alt="img"></p>
+<p><strong>只读缓存直接在数据库中更新数据的好处是，所有最新的数据都在数据库中，而数据库是提供数据可靠性保障的，这些数据不会有丢失的风险。当我们需要缓存图片、短视频这些用户只读的数据时，就可以使用只读缓存这个类型了。</strong></p>
+<h3 id="读写缓存"><a href="#读写缓存" class="headerlink" title="读写缓存"></a>读写缓存</h3><p>知道了只读缓存，读写缓存也就很容易理解了。</p>
+<p>对于读写缓存来说，<strong>除了读请求会发送到缓存进行处理（直接在缓存中查询数据是否存在)，所有的写请求也会发送到缓存，在缓存中直接对数据进行增删改操作</strong>。此时，得益于 Redis 的高性能访问特性，<strong>数据的增删改操作可以在缓存中快速完成，处理结果也会快速返回给业务应用，这就可以提升业务应用的响应速度</strong>。</p>
+<p>但是，和只读缓存不一样的是，<strong>在使用读写缓存时，最新的数据是在 Redis 中，而 Redis 是内存数据库，一旦出现掉电或宕机，内存中的数据就会丢失。这也就是说，应用的最新数据可能会丢失，给应用业务带来风险。</strong></p>
+<p>所以，<strong>根据业务应用对数据可靠性和缓存性能的不同要求，我们会有同步直写和异步写回两种策略</strong>。其中<strong>，同步直写策略优先保证数据可靠性，而异步写回策略优先提供快速响应</strong>。学习了解这两种策略，可以帮助我们根据业务需求，做出正确的设计选择。</p>
+<p>接下来，我们来具体看下这两种策略。</p>
+<p>同步直写是指，<strong>写请求发给缓存的同时，也会发给后端数据库进行处理，等到缓存和数据库都写完数据，才给客户端返回</strong>。这样，<strong>即使缓存宕机或发生故障，最新的数据仍然保存在数据库中，这就提供了数据可靠性保证</strong>。</p>
+<p>不过，同步直写会降低缓存的访问性能。<strong>这是因为缓存中处理写请求的速度是很快的，而数据库处理写请求的速度较慢。即使缓存很快地处理了写请求，也需要等待数据库处理完所有的写请求，才能给应用返回结果，这就增加了缓存的响应延迟。</strong></p>
+<p>而异步写回策略，<strong>则是优先考虑了响应延迟</strong>。<strong>此时，所有写请求都先在缓存中处理。等到这些增改的数据要被从缓存中淘汰出来时，缓存将它们写回后端数据库。这样一来，处理这些数据的操作是在缓存中进行的，很快就能完成。只不过，如果发生了掉电，而它们还没有被写回数据库，就会有丢失的风险了。</strong></p>
+<p>为了便于你理解，我也画了下面这张图，你可以看下。</p>
+<p><img src="/2024/09/17/Redis23/009d055bb91d42c28b9316c649f87f66.jpg" alt="img"></p>
+<p>关于是选择只读缓存，还是读写缓存，主要看我们对写请求是否有加速的需求。</p>
+<ul>
+<li>如果<strong>需要对写请求进行加速，我们选择读写缓存；</strong></li>
+<li>如果<strong>写请求很少，或者是只需要提升读请求的响应速度的话</strong>，我们选择只读缓存。</li>
+</ul>
+<p>举个例子，在商品大促的场景中，商品的库存信息会一直被修改。<strong>如果每次修改都需到数据库中处理，就会拖慢整个应用，此时，我们通常会选择读写缓存的模式。</strong>而在短视频 App 的场景中，虽然视频的属性有很多，<strong>但是，一般确定后，修改并不频繁，此时，在数据库中进行修改对缓存影响不大，所以只读缓存模式是一个合适的选择。</strong></p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>今天，我们学习了缓存的两个特征，<strong>分别是在分层系统中，数据暂存在快速子系统中有助于加速访问；缓存容量有限，缓存写满时，数据需要被淘汰。而 Redis 天然就具有高性能访问和数据淘汰机制，正好符合缓存的这两个特征的要求，所以非常适合用作缓存。</strong></p>
+<p>另外，我们还学习了 Redis 作为旁路缓存的特性，<strong>旁路缓存就意味着需要在应用程序中新增缓存逻辑处理的代码。当然，如果是无法修改源码的应用场景，就不能使用 Redis 做缓存了。</strong></p>
+<p><strong>Redis 做缓存时，还有两种模式，分别是只读缓存和读写缓存</strong>。<strong>其中，读写缓存还提供了同步直写和异步写回这两种模式，同步直写模式侧重于保证数据可靠性，而异步写回模式则侧重于提供低延迟访问，我们要根据实际的业务场景需求来进行选择。</strong></p>
+<p>这节课，虽然我提到了 Redis 有数据淘汰机制，但是并没有展开讲具体的淘汰策略。那么，Redis 究竟是怎么淘汰数据的呢？我会在下节课给你具体介绍。</p>
+<h2 id="每课一问"><a href="#每课一问" class="headerlink" title="每课一问"></a>每课一问</h2><p>按照惯例，我给你提一个小问题。这节课，我提到了 Redis 只读缓存和使用直写策略的读写缓存，这两种缓存都会把数据同步写到后端数据库中，你觉得，它们有什么区别吗？</p>
+<p>Redis只读缓存和使用直写策略的读写缓存，这两种缓存都会把数据同步写到后端数据库中，它们的区别在于：</p>
+<ul>
+<li><strong>1、使用只读缓存时，是先把修改写到后端数据库中，再把缓存中的数据删除。</strong>当下次访问这个数据时，会以后端数据库中的值为准，重新加载到缓存中。<strong>这样做的优点是，数据库和缓存可以保证完全一致，并且缓存中永远保留的是经常访问的热点数据。缺点是每次修改操作都会把缓存中的数据删除，之后访问时都会先触发一次缓存缺失，然后从后端数据库加载数据到缓存中，这个过程访问延迟会变大。</strong></li>
+<li><strong>2、使用读写缓存时，是同时修改数据库和缓存中的值。这样做的优点是，被修改后的数据永远在缓存中存在，下次访问时，能够直接命中缓存，不用再从后端数据库中查询，这个过程拥有比较好的性能，比较适合先修改又立即访问的业务场景。</strong>但缺点是在高并发场景下，如果存在多个操作同时修改同一个值的情况，可能会导致缓存和数据库的不一致。</li>
+<li><strong>3、当使用只读缓存时，如果修改数据库失败了，那么缓存中的数据也不会被删除，此时数据库和缓存中的数据依旧保持一致。而使用读写缓存时，如果是先修改缓存，后修改数据库，如果缓存修改成功，而数据库修改失败了，那么此时数据库和缓存数据就不一致了。如果先修改数据库，再修改缓存，也会产生上面所说的并发场景下的不一致。</strong></li>
+</ul>
+<p>我个人总结，<strong>只读缓存是牺牲了一定的性能，优先保证数据库和缓存的一致性，它更适合对于一致性要求比较要高的业务场景。而如果对于数据库和缓存一致性要求不高，或者不存在并发修改同一个值的情况，那么使用读写缓存就比较合适</strong>，它可以保证更好的访问性能。</p>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://geekdaxue.co/read/haofeiyu@redis/gbcdbf">缓存 - 23 | 旁路缓存：Redis是如何工作的？ - 《Redis 读书笔记》 - 极客文档 (geekdaxue.co)</a></p>
 
                 
             </div>
@@ -559,7 +509,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/12/MySQL20/">http://example.com/2024/09/12/MySQL20/</a>
+                    <a href="http://example.com/2024/09/17/Redis23/">http://example.com/2024/09/17/Redis23/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -597,8 +547,8 @@
                     
                         <div class="article-tag">
                             
-                                <a href="/tags/MySQL/">
-                                    <span class="chip bg-color">MySQL</span>
+                                <a href="/tags/Redis/">
+                                    <span class="chip bg-color">Redis</span>
                                 </a>
                             
                         </div>
@@ -944,17 +894,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/12/MySQL21/">
+                <a href="/2024/09/17/Redis23/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/11.jpg" class="responsive-img" alt="为什么我只改一行的语句，锁这么多？">
+                        <img src="/medias/featureimages/8.jpg" class="responsive-img" alt="旁路缓存：Redis是如何工作的？">
                         
-                        <span class="card-title">为什么我只改一行的语句，锁这么多？</span>
+                        <span class="card-title">旁路缓存：Redis是如何工作的？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -964,26 +915,27 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-12
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-17
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/MySQL/" class="post-category">
-                                    MySQL
+                            <a href="/categories/Redis/" class="post-category">
+                                    Redis
                                 </a>
                             
                             
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/MySQL/">
-                        <span class="chip bg-color">MySQL</span>
+                    <a href="/tags/Redis/">
+                        <span class="chip bg-color">Redis</span>
                     </a>
                     
                 </div>
@@ -997,13 +949,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/12/MySQL19/">
+                <a href="/2024/09/16/Redis15/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/10.jpg" class="responsive-img" alt="为什么我只查一行的语句，也执行这么慢？">
+                        <img src="/medias/featureimages/11.jpg" class="responsive-img" alt="消息队列的考验：Redis有哪些解决方案？">
                         
-                        <span class="card-title">为什么我只查一行的语句，也执行这么慢？</span>
+                        <span class="card-title">消息队列的考验：Redis有哪些解决方案？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -1014,14 +966,14 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-12
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-16
                             </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/MySQL/" class="post-category">
-                                    MySQL
+                            <a href="/categories/Redis/" class="post-category">
+                                    Redis
                                 </a>
                             
                             
@@ -1031,8 +983,8 @@
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/MySQL/">
-                        <span class="chip bg-color">MySQL</span>
+                    <a href="/tags/Redis/">
+                        <span class="chip bg-color">Redis</span>
                     </a>
                     
                 </div>
