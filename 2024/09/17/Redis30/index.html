@@ -4,9 +4,9 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="数据同步：主从库如何实现数据一致？, zoloy">
-    <meta name="description" content="前两节课，我们学习了 AOF 和 RDB，如果 Redis 发生了宕机，它们可以分别通过回放日志和重新读入 RDB 文件的方式恢复数据，从而保证尽量少丢失数据，提升可靠性。
-不过，即使用了这两种方法，也依然存在服务不可用的问题。比如说，我们">
+    <meta name="keywords" content="如何使用Redis实现分布式锁？, zoloy">
+    <meta name="description" content="上节课，我提到，在应对并发问题时，除了原子操作，Redis 客户端还可以通过加锁的方式，来控制并发写操作对共享数据的修改，从而保证数据的正确性。
+但是，Redis 属于分布式系统，当有多个客户端需要争抢锁时，我们必须要保证，这把锁不能是某个">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -18,7 +18,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>数据同步：主从库如何实现数据一致？ | zoloy&#39;s blog</title>
+    <title>如何使用Redis实现分布式锁？ | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -291,12 +291,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/21.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/23.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">数据同步：主从库如何实现数据一致？</h1>
+                    <h1 class="description center-align post-title">如何使用Redis实现分布式锁？</h1>
                 </div>
             </div>
         </div>
@@ -345,28 +345,28 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-15
+                    2024-09-17
                 </div>
                 
 
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
-                    2024-09-16
+                    2024-09-17
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    5.4k
+                    6.1k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    18 分
+                    21 分
                 </div>
                 
 
@@ -389,93 +389,134 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <p>前两节课，我们学习了 AOF 和 RDB，<strong>如果 Redis 发生了宕机，它们可以分别通过回放日志和重新读入 RDB 文件的方式恢复数据，从而保证尽量少丢失数据，提升可靠性。</strong></p>
-<p>不过，即使用了这两种方法，也依然存在服务不可用的问题。<strong>比如说，我们在实际使用时只运行了一个 Redis 实例，那么，如果这个实例宕机了，它在恢复期间，是无法服务新来的数据存取请求的。</strong></p>
-<p>那我们总说的 Redis 具有高可靠性，又是什么意思呢？其实，这里有两层含义：一是<strong>数据尽量少丢失</strong>，二是<strong>服务尽量少中断</strong>。AOF 和 RDB 保证了前者，而对于后者，Redis 的做法就是<strong>增加副本冗余量</strong>，将一份数据同时保存在多个实例上。<strong>即使有一个实例出现了故障，需要过一段时间才能恢复，其他实例也可以对外提供服务，不会影响业务使用。</strong></p>
-<p>多实例保存同一份数据，听起来好像很不错，但是，我们必须要考虑一个问题：<strong>这么多副本，它们之间的数据如何保持一致呢？数据读写操作可以发给所有的实例吗？</strong></p>
-<p><strong>实际上，Redis 提供了主从库模式，以保证数据副本的一致，主从库之间采用的是读写分离的方式。</strong></p>
+                <p>上节课，我提到，<strong>在应对并发问题时，除了原子操作，Redis 客户端还可以通过加锁的方式，来控制并发写操作对共享数据的修改，从而保证数据的正确性</strong>。</p>
+<p>但是，Redis 属于分布式系统，当有多个客户端需要争抢锁时，我们必须要保证，<strong>这把锁不能是某个客户端本地的锁</strong>。否则的话，其它客户端是无法访问这把锁的，当然也就不能获取这把锁了。</p>
+<p>所以，在分布式系统中，<strong>当有多个客户端需要获取锁时，我们需要分布式锁。此时，锁是保存在一个共享存储系统中的，可以被多个客户端共享访问和获取</strong>。</p>
+<p><strong>Redis 本身可以被多个客户端共享访问，正好就是一个共享存储系统，可以用来保存分布式锁。而且 Redis 的读写性能高，可以应对高并发的锁操作场景。所以，这节课，我就来和你聊聊如何基于 Redis 实现分布式锁</strong>。</p>
+<p>我们日常在写程序的时候，<strong>经常会用到单机上的锁，你应该也比较熟悉了。而分布式锁和单机上的锁既有相似性，但也因为分布式锁是用在分布式场景中，所以又具有一些特殊的要求。</strong></p>
+<p>所以，接下来，我就先带你对比下分布式锁和单机上的锁，找出它们的联系与区别，这样就可以加深你对分布式锁的概念和实现要求的理解。</p>
+<h2 id="单机上的锁和分布式锁的联系与区别"><a href="#单机上的锁和分布式锁的联系与区别" class="headerlink" title="单机上的锁和分布式锁的联系与区别"></a>单机上的锁和分布式锁的联系与区别</h2><p>我们先来看下单机上的锁。</p>
+<p><strong>对于在单机上运行的多线程程序来说，锁本身可以用一个变量表示。</strong></p>
 <ul>
-<li><strong>读操作</strong>：主库、从库都可以接收；</li>
-<li><strong>写操作</strong>：首先到主库执行，然后，主库将写操作同步给从库。</li>
+<li>变量值为 0 时，<strong>表示没有线程获取锁；</strong></li>
+<li>变量值为 1 时，<strong>表示已经有线程获取到锁了。</strong></li>
 </ul>
-<p><img src="/2024/09/15/Redis06/809d6707404731f7e493b832aa573a2f.jpg" alt="img"></p>
-<p>Redis主从库和读写分离</p>
-<p>那么，为什么要采用读写分离的方式呢？</p>
-<p><strong>你可以设想一下，如果在上图中，不管是主库还是从库，都能接收客户端的写操作，那么，一个直接的问题就是：如果客户端对同一个数据（例如 k1）前后修改了三次，每一次的修改请求都发送到不同的实例上，在不同的实例上执行，那么，这个数据在这三个实例上的副本就不一致了（分别是 v1、v2 和 v3）。在读取这个数据的时候，就可能读取到旧的值。</strong></p>
-<p>如果我们非要保持这个数据在三个实例上一致，<strong>就要涉及到加锁、实例间协商是否完成修改等一系列操作，但这会带来巨额的开销，当然是不太能接受的。</strong></p>
-<p>而主从库模式一旦采用了读写分离，<strong>所有数据的修改只会在主库上进行，不用协调三个实例。主库有了最新的数据后，会同步给从库，这样，主从库的数据就是一致的。</strong></p>
-<p><strong>那么，主从库同步是如何完成的呢？主库数据是一次性传给从库，还是分批同步？要是主从库间的网络断连了，数据还能保持一致吗？这节课，我就和你聊聊主从库同步的原理，以及应对网络断连风险的方案。</strong></p>
-<p>好了，<strong>我们先来看看主从库间的第一次同步是如何进行的，这也是 Redis 实例建立主从库模式后的规定动作。</strong></p>
-<h2 id="主从库间如何进行第一次同步？"><a href="#主从库间如何进行第一次同步？" class="headerlink" title="主从库间如何进行第一次同步？"></a>主从库间如何进行第一次同步？</h2><p>当我们启动多个 Redis 实例的时候，<strong>它们相互之间就可以通过 replicaof（Redis 5.0 之前使用 slaveof）命令形成主库和从库的关系，之后会按照三个阶段完成数据的第一次同步。</strong></p>
-<p>例如，现在有实例 1（ip：172.16.19.3）和实例 2（ip：172.16.19.5），我们在实例 2 上执行以下这个命令后，<strong>实例 2 就变成了实例 1 的从库，并从实例 1 上复制数据：</strong></p>
-<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">replicaof  172.16.19.3  6379</span><br></pre></td></tr></table></figure>
+<p>我们通常说的线程调用加锁和释放锁的操作，到底是啥意思呢？我来解释一下。<strong>实际上，一个线程调用加锁操作，其实就是检查锁变量值是否为 0。如果是 0，就把锁的变量值设置为 1，表示获取到锁，如果不是 0，就返回错误信息，表示加锁失败，已经有别的线程获取到锁了。而一个线程调用释放锁操作，其实就是将锁变量的值置为 0，以便其它线程可以来获取锁。</strong></p>
+<p>我用一段代码来展示下加锁和释放锁的操作，其中，lock 为锁变量。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">acquire_lock()&#123;</span><br><span class="line"></span><br><span class="line">  if lock == 0</span><br><span class="line"></span><br><span class="line">      lock = 1</span><br><span class="line"></span><br><span class="line">      return 1</span><br><span class="line"></span><br><span class="line">  else</span><br><span class="line"></span><br><span class="line">      return 0</span><br><span class="line"></span><br><span class="line">&#125; </span><br><span class="line"></span><br><span class="line">release_lock()&#123;</span><br><span class="line"></span><br><span class="line">  lock = 0</span><br><span class="line"></span><br><span class="line">  return 1</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>接下来，我们就要学习主从库间数据第一次同步的三个阶段了。你可以先看一下下面这张图，有个整体感知，接下来我再具体介绍。</p>
-<p><img src="/2024/09/15/Redis06/63d18fd41efc9635e7e9105ce1c33da1.jpg" alt="img"></p>
-<p>主从库第一次同步的流程</p>
-<p>第一阶段是主从库间建立连接、协商同步的过程，主要是为<strong>全量复制</strong>做准备。在这一步，<strong>从库和主库建立起连接，并告诉主库即将进行同步，主库确认回复后，主从库间就可以开始同步了</strong>。</p>
-<p>具体来说，<strong>从库给主库发送 psync 命令，表示要进行数据同步，主库根据这个命令的参数来启动复制</strong>。psync 命令包含了<strong>主库的 runID</strong> 和<strong>复制进度 offset</strong> 两个参数。</p>
+<p>和单机上的锁类似，分布式锁同样可以<strong>用一个变量来实现</strong>。客户端加锁和释放锁的操作逻辑，也和单机上的加锁和释放锁操作逻辑一致：<strong>加锁时同样需要判断锁变量的值，根据锁变量值来判断能否加锁成功；释放锁时需要把锁变量值设置为 0，表明客户端不再持有锁</strong>。</p>
+<p>但是，和线程在单机上操作锁不同的是，在分布式场景下，<strong>锁变量需要由一个共享存储系统来维护</strong>，只有这样，多个客户端才可以通过访问共享存储系统来访问锁变量。相应的，<strong>加锁和释放锁的操作就变成了读取、判断和设置共享存储系统中的锁变量值</strong>。</p>
+<p>这样一来，我们就可以得出实现分布式锁的两个要求。</p>
 <ul>
-<li>runID，<strong>是每个 Redis 实例启动时都会自动生成的一个随机 ID，用来唯一标记这个实例</strong>。当从库和主库第一次复制时，<strong>因为不知道主库的 runID，所以将 runID 设为“？”。</strong></li>
-<li>offset，<strong>此时设为 -1，表示第一次复制。</strong></li>
+<li>要求一：<strong>分布式锁的加锁和释放锁的过程，涉及多个操作。所以，在实现分布式锁时，我们需要保证这些锁操作的原子性；</strong></li>
+<li>要求二：<strong>共享存储系统保存了锁变量，如果共享存储系统发生故障或宕机，那么客户端也就无法进行锁操作了。在实现分布式锁时，我们需要考虑保证共享存储系统的可靠性，进而保证锁的可靠性。</strong></li>
 </ul>
-<p>主库收到 psync 命令后，<strong>会用 FULLRESYNC 响应命令带上两个参数：主库 runID 和主库目前的复制进度 offset，返回给从库。从库收到响应后，会记录下这两个参数。</strong></p>
-<p>这里有个地方需要注意，<strong>FULLRESYNC 响应表示第一次复制采用的全量复制，也就是说，主库会把当前所有的数据都复制给从库</strong>。</p>
-<p>在第二阶段，<strong>主库将所有数据同步给从库。从库收到数据后，在本地完成数据加载</strong>。这个过程依赖于内存快照生成的 RDB 文件。</p>
-<p>具体来说，<strong>主库执行 bgsave 命令，生成 RDB 文件，接着将文件发给从库。从库接收到 RDB 文件后，会先清空当前数据库，然后加载 RDB 文件</strong>。<strong>这是因为从库在通过 replicaof 命令开始和主库同步前，可能保存了其他数据。为了避免之前数据的影响，从库需要先把当前数据库清空。（这个我之前好像在配置Redis集群的时候遇见过）</strong></p>
-<p><strong>在主库将数据同步给从库的过程中，主库不会被阻塞，仍然可以正常接收请求。否则，Redis 的服务就被中断了。</strong>但是，<strong>这些请求中的写操作并没有记录到刚刚生成的 RDB 文件中。为了保证主从库的数据一致性，主库会在内存中用专门的 replication buffer，记录 RDB 文件生成后收到的所有写操作。</strong></p>
-<p>最后，也就是第三个阶段，<strong>主库会把第二阶段执行过程中新收到的写命令，再发送给从库。具体的操作是，当主库完成 RDB 文件发送后，就会把此时 replication buffer 中的修改操作发给从库，从库再重新执行这些操作</strong>。这样一来，主从库就实现同步了。</p>
-<h2 id="主从级联模式分担全量复制时的主库压力"><a href="#主从级联模式分担全量复制时的主库压力" class="headerlink" title="主从级联模式分担全量复制时的主库压力"></a>主从级联模式分担全量复制时的主库压力</h2><p>通过分析主从库间第一次数据同步的过程，你可以看到，<strong>一次全量复制中，对于主库来说，需要完成两个耗时的操作：生成 RDB 文件和传输 RDB 文件</strong>。</p>
-<p>如果从库数量很多，而且都要和主库进行全量复制的话，<strong>就会导致主库忙于 fork 子进程生成 RDB 文件，进行数据全量同步</strong>。fork 这个操作<strong>会阻塞主线程处理正常请求，从而导致主库响应应用程序的请求速度变慢</strong>。此外，<strong>传输 RDB 文件也会占用主库的网络带宽，同样会给主库的资源使用带来压力</strong>。那么，有没有好的解决方法可以分担主库压力呢？</p>
-<p><strong>其实是有的，这就是“主 - 从 - 从”模式。</strong></p>
-<p>在刚才介绍的主从库模式中，所有的从库都是和主库连接，所有的全量复制也都是和主库进行的。现在，我们可以<strong>通过“主 - 从 - 从”模式将主库生成 RDB 和传输 RDB 的压力，以级联的方式分散到从库上</strong>。</p>
-<p>简单来说，<strong>我们在部署主从集群的时候，可以手动选择一个从库（比如选择内存资源配置较高的从库），用于级联其他的从库。然后，我们可以再选择一些从库（例如三分之一的从库），在这些从库上执行如下命令，让它们和刚才所选的从库，建立起主从关系。</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">replicaof  所选从库的IP 6379</span><br></pre></td></tr></table></figure>
+<p>好了，知道了具体的要求，接下来，我们就来学习下 Redis 是怎么实现分布式锁的。</p>
+<p>其实，<strong>我们既可以基于单个 Redis 节点来实现，也可以使用多个 Redis 节点实现。在这两种情况下，锁的可靠性是不一样的。我们先来看基于单个 Redis 节点的实现方法。</strong></p>
+<h2 id="基于单个-Redis-节点实现分布式锁"><a href="#基于单个-Redis-节点实现分布式锁" class="headerlink" title="基于单个 Redis 节点实现分布式锁"></a>基于单个 Redis 节点实现分布式锁</h2><p>作为分布式锁实现过程中的共享存储系统，<strong>Redis 可以使用键值对来保存锁变量，再接收和处理不同客户端发送的加锁和释放锁的操作请求。那么，键值对的键和值具体是怎么定的呢？</strong></p>
+<p>我们要赋予锁变量一个变量名，<strong>把这个变量名作为键值对的键，而锁变量的值，则是键值对的值，这样一来，Redis 就能保存锁变量了，客户端也就可以通过 Redis 的命令操作来实现锁操作。</strong></p>
+<p>为了帮助你理解，我画了一张图片，它展示 Redis 使用键值对保存锁变量，以及两个客户端同时请求加锁的操作过程。</p>
+<p><img src="/2024/09/17/Redis30/1d18742c1e5fc88835ec27f1becfc145.jpg" alt="img"></p>
+<p>可以看到，<strong>Redis 可以使用一个键值对 lock_key:0 来保存锁变量，其中，键是 lock_key，也是锁变量的名称，锁变量的初始值是 0。</strong></p>
+<p>我们再来分析下加锁操作。</p>
+<p>在图中，客户端 A 和 C 同时请求加锁。<strong>因为 Redis 使用单线程处理请求，所以，即使客户端 A 和 C 同时把加锁请求发给了 Redis，Redis 也会串行处理它们的请求。</strong></p>
+<p><strong>我们假设 Redis 先处理客户端 A 的请求，读取 lock_key 的值，发现 lock_key 为 0，所以，Redis 就把 lock_key 的 value 置为 1，表示已经加锁了。紧接着，Redis 处理客户端 C 的请求，此时，Redis 会发现 lock_key 的值已经为 1 了，所以就返回加锁失败的信息。</strong></p>
+<p>刚刚说的是加锁的操作，那释放锁该怎么操作呢？其实，释放锁就是直接把锁变量值设置为 0。</p>
+<p>我还是借助一张图片来解释一下。这张图片展示了客户端 A 请求释放锁的过程。当客户端 A 持有锁时，锁变量 lock_key 的值为 1。<strong>客户端 A 执行释放锁操作后，Redis 将 lock_key 的值置为 0，表明已经没有客户端持有锁了。</strong></p>
+<p><img src="/2024/09/17/Redis30/c7c413b47d42f06f08fce92404f31e82.jpg" alt="img"></p>
+<p><strong>因为加锁包含了三个操作（读取锁变量、判断锁变量值以及把锁变量值设置为 1），而这三个操作在执行时需要保证原子性。</strong>那怎么保证原子性呢？</p>
+<p>上节课，我们学过，要想保证操作的原子性，有两种通用的方法，分别是<strong>使用 Redis 的单命令操作和使用 Lua 脚本</strong>。那么，在分布式加锁场景下，该怎么应用这两个方法呢？</p>
+<p>我们先来看下，Redis 可以用哪些单命令操作实现加锁操作。</p>
+<p><strong>首先是 SETNX 命令，它用于设置键值对的值。具体来说，就是这个命令在执行时会判断键值对是否存在，如果不存在，就设置键值对的值，如果存在，就不做任何设置。</strong></p>
+<p>举个例子，如果执行下面的命令时，key 不存在，那么 key 会被创建，并且值会被设置为 value；如果 key 已经存在，SETNX 不做任何赋值操作。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">SETNX key value</span><br></pre></td></tr></table></figure>
 
-<p>这样一来，这些从库就会知道，在进行同步时，不用再和主库进行交互了，只要和级联的从库进行写操作同步就行了，<strong>这就可以减轻主库上的压力</strong>，如下图所示：</p>
-<p><img src="/2024/09/15/Redis06/403c2ab725dca8d44439f8994959af45.jpg" alt="img"></p>
-<p>级联的“主-从-从”模式</p>
-<p>好了，到这里，<strong>我们了解了主从库间通过全量复制实现数据同步的过程，以及通过“主 - 从 - 从”模式分担主库压力的方式。那么，一旦主从库完成了全量复制，它们之间就会一直维护一个网络连接</strong>，主库会通过这个连接将后续陆续收到的命令操作再同步给从库，这个过程也称为<strong>基于长连接的命令传播</strong>，<strong>可以避免频繁建立连接的开销。</strong></p>
-<p>听上去好像很简单，但不可忽视的是，这个过程中存在着风险点，最常见的就是<strong>网络断连或阻塞</strong>。<strong>如果网络断连，主从库之间就无法进行命令传播了，从库的数据自然也就没办法和主库保持一致了，客户端就可能从从库读到旧数据。</strong></p>
-<p>接下来，我们就来聊聊网络断连后的解决办法。</p>
-<h2 id="主从库间网络断了怎么办？"><a href="#主从库间网络断了怎么办？" class="headerlink" title="主从库间网络断了怎么办？"></a>主从库间网络断了怎么办？</h2><p><strong>在 Redis 2.8 之前，如果主从库在命令传播时出现了网络闪断，那么，从库就会和主库重新进行一次全量复制，开销非常大。</strong></p>
-<p><strong>从 Redis 2.8 开始，网络断了之后，主从库会采用增量复制的方式继续同步。听名字大概就可以猜到它和全量复制的不同：全量复制是同步所有数据，而增量复制只会把主从库网络断连期间主库收到的命令，同步给从库。</strong></p>
-<p><strong>那么，增量复制时，主从库之间具体是怎么保持同步的呢？这里的奥妙就在于 repl_backlog_buffer 这个缓冲区。</strong>我们先来看下它是如何用于增量命令的同步的。</p>
-<p><strong>当主从库断连后，主库会把断连期间收到的写操作命令，写入 replication buffer，同时也会把这些操作命令也写入 repl_backlog_buffer 这个缓冲区。</strong></p>
-<p>repl_backlog_buffer 是一个环形缓冲区，<strong>主库会记录自己写到的位置，从库则会记录自己已经读到的位置（哦，这玩意我之前学过，总记得Redis有个环什么的，原来是在这里）</strong>。</p>
-<p>刚开始的时候，<strong>主库和从库的写读位置在一起，这算是它们的起始位置。随着主库不断接收新的写操作，它在缓冲区中的写位置会逐步偏离起始位置，我们通常用偏移量来衡量这个偏移距离的大小，对主库来说，对应的偏移量就是 master_repl_offset。主库接收的新写操作越多，这个值就会越大。</strong></p>
-<p>同样，从库在复制完写操作命令后，它在缓冲区中的读位置也开始逐步偏移刚才的起始位置，<strong>此时，从库已复制的偏移量 slave_repl_offset 也在不断增加。正常情况下，这两个偏移量基本相等。</strong></p>
-<p><img src="/2024/09/15/Redis06/13f26570a1b90549e6171ea24554b737.jpg" alt="img"></p>
-<p>Redis repl_backlog_buffer的使用</p>
-<p>主从库的连接恢复之后，<strong>从库首先会给主库发送 psync 命令，并把自己当前的 slave_repl_offset 发给主库，主库会判断自己的 master_repl_offset 和 slave_repl_offset 之间的差距。</strong></p>
-<p>在网络断连阶段，<strong>主库可能会收到新的写操作命令，所以，一般来说，master_repl_offset 会大于 slave_repl_offset。此时，主库只用把 master_repl_offset 和 slave_repl_offset 之间的命令操作同步给从库就行。</strong></p>
-<p>就像刚刚示意图的中间部分，主库和从库之间相差了 put d e 和 put d f 两个操作，在增量复制时，主库只需要把它们同步给从库，就行了。</p>
-<p>说到这里，我们再借助一张图，回顾下增量复制的流程。</p>
-<p><img src="/2024/09/15/Redis06/20e233bd30c3dacb0221yy0c77780b16.jpg" alt="img"></p>
-<p>Redis增量复制流程</p>
-<p>不过，有一个地方我要强调一下，因为 repl_backlog_buffer 是一个环形缓冲区，所以在缓冲区写满后，主库会继续写入，此时，就会覆盖掉之前写入的操作。<strong>如果从库的读取速度比较慢，就有可能导致从库还未读取的操作被主库新写的操作覆盖了，这会导致主从库间的数据不一致</strong>。</p>
-<p>因此，我们要想办法避免这一情况，一般而言，我们可以调整 <strong>repl_backlog_size</strong> 这个参数。<strong>这个参数和所需的缓冲空间大小有关。缓冲空间的计算公式是：缓冲空间大小 &#x3D; 主库写入命令速度 * 操作大小 - 主从库间网络传输命令速度 * 操作大小。在实际应用中，考虑到可能存在一些突发的请求压力，我们通常需要把这个缓冲空间扩大一倍，即 repl_backlog_size &#x3D; 缓冲空间大小 * 2，这也就是 repl_backlog_size 的最终值。</strong></p>
-<p>举个例子，如果主库每秒写入 2000 个操作，每个操作的大小为 2KB，网络每秒能传输 1000 个操作，那么，有 1000 个操作需要缓冲起来，<strong>这就至少需要 2MB 的缓冲空间。否则，新写的命令就会覆盖掉旧操作了。为了应对可能的突发压力，我们最终把 repl_backlog_size 设为 4MB。</strong></p>
-<p>这样一来，增量复制时主从库的数据不一致风险就降低了。<strong>不过，如果并发请求量非常大，连两倍的缓冲空间都存不下新操作请求的话，此时，主从库数据仍然可能不一致。</strong></p>
-<p>针对这种情况，<strong>一方面，你可以根据 Redis 所在服务器的内存资源再适当增加 repl_backlog_size 值，比如说设置成缓冲空间大小的 4 倍，另一方面，你可以考虑使用切片集群来分担单个主库的请求压力。关于切片集群，我会在第 9 讲具体介绍。</strong></p>
-<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>这节课，我们一起学习了 Redis 的主从库同步的基本原理，<strong>总结来说，有三种模式：全量复制、基于长连接的命令传播，以及增量复制。</strong></p>
-<p>全量复制虽然耗时，但是对于从库来说，如果是第一次同步，全量复制是无法避免的，所以，我给你一个小建议：<strong>一个 Redis 实例的数据库不要太大</strong>，<strong>一个实例大小在几 GB 级别比较合适，这样可以减少 RDB 文件生成、传输和重新加载的开销。另外，为了避免多个从库同时和主库进行全量复制，给主库过大的同步压力，我们也可以采用“主 - 从 - 从”这一级联模式，来缓解主库的压力。</strong></p>
-<p><strong>长连接复制是主从库正常运行后的常规同步阶段</strong>。在这个阶段中，主从库之间通过命令传播实现同步。<strong>不过，这期间如果遇到了网络断连，增量复制就派上用场了。我特别建议你留意一下 repl_backlog_size 这个配置参数。如果它配置得过小，在增量复制阶段，可能会导致从库的复制进度赶不上主库，进而导致从库重新进行全量复制。所以，通过调大这个参数，可以减少从库在网络断连时全量复制的风险。</strong></p>
-<p>不过，<strong>主从库模式使用读写分离虽然避免了同时写多个实例带来的数据不一致问题，但是还面临主库故障的潜在风险。主库故障了从库该怎么办，数据还能保持一致吗，Redis 还能正常提供服务吗？在接下来的两节课里，我会和你具体聊聊主库故障后，保证服务可靠性的解决方案。</strong></p>
-<h2 id="每课一问"><a href="#每课一问" class="headerlink" title="每课一问"></a>每课一问</h2><p>按照惯例，我给你提一个小问题。这节课，我提到，主从库间的数据复制同步使用的是 RDB 文件，前面我们学习过，AOF 记录的操作命令更全，相比于 RDB 丢失的数据更少。那么，为什么主从库间的复制不使用 AOF 呢？</p>
-<p>主从全量同步使用RDB而不使用AOF的原因：</p>
-<p><strong>1、RDB文件内容是经过压缩的二进制数据（不同数据类型数据做了针对性优化），文件很小。而AOF文件记录的是每一次写操作的命令，写操作越多文件会变得很大，其中还包括很多对同一个key的多次冗余操作。在主从全量数据同步时，传输RDB文件可以尽量降低对主库机器网络带宽的消耗</strong>，<strong>从库在加载RDB文件时，一是文件小，读取整个文件的速度会很快，二是因为RDB文件存储的都是二进制数据，从库直接按照RDB协议解析还原数据即可，速度会非常快，而AOF需要依次重放每个写命令，这个过程会经历冗长的处理逻辑，恢复速度相比RDB会慢得多，所以使用RDB进行主从全量同步的成本最低。</strong></p>
-<p>2、假设要使用AOF做全量同步，意味着必须打开AOF功能，<strong>打开AOF就要选择文件刷盘的策略，选择不当会严重影响Redis性能。而RDB只有在需要定时备份和主从全量同步数据时才会触发生成一次快照。而在很多丢失数据不敏感的业务场景，其实是不需要开启AOF的。</strong></p>
-<p>另外，需要指出老师文章的错误：“当主从库断连后，主库会把断连期间收到的写操作命令，写入 replication buffer，同时也会把这些操作命令也写入 repl_backlog_buffer 这个缓冲区。”</p>
-<p>1、主从库连接都断开了，哪里来replication buffer呢？</p>
-<p>2、应该不是“主从库断连后”主库才把写操作写入repl_backlog_buffer，只要有从库存在，这个repl_backlog_buffer就会存在。<strong>主库的所有写命令除了传播给从库之外，都会在这个repl_backlog_buffer中记录一份</strong>，缓存起来，只有预先缓存了这些命令，当从库断连后，从库重新发送psync <code>$master_runid $offset</code>，主库才能通过<code>$offset</code>在repl_backlog_buffer中找到从库断开的位置，只发送<code>$offset</code>之后的增量数据给从库即可。</p>
-<p>有同学对repl_backlog_buffer和replication buffer理解比较混淆，我大概解释一下：</p>
+<p>对于释放锁操作来说，<strong>我们可以在执行完业务逻辑后，使用 DEL 命令删除锁变量。不过，你不用担心锁变量被删除后，其他客户端无法请求加锁了。因为 SETNX 命令在执行时，如果要设置的键值对（也就是锁变量）不存在，SETNX 命令会先创建键值对，然后设置它的值。</strong>所以，释放锁之后，再有客户端请求加锁时，<strong>SETNX 命令会创建保存锁变量的键值对，并设置锁变量的值，完成加锁</strong>。</p>
+<p>总结来说，<strong>我们就可以用 SETNX 和 DEL 命令组合来实现加锁和释放锁操作</strong>。下面的伪代码示例显示了锁操作的过程，你可以看下。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">// 加锁</span><br><span class="line"></span><br><span class="line">SETNX lock_key 1</span><br><span class="line"></span><br><span class="line">// 业务逻辑</span><br><span class="line"></span><br><span class="line">DO THINGS</span><br><span class="line"></span><br><span class="line">// 释放锁</span><br><span class="line"></span><br><span class="line">DEL lock_key</span><br></pre></td></tr></table></figure>
+
+<p>不过，使用 SETNX 和 DEL 命令组合实现分布锁，存在两个潜在的风险。</p>
+<p>第一个风险是，<strong>假如某个客户端在执行了 SETNX 命令、加锁之后，紧接着却在操作共享数据时发生了异常，结果一直没有执行最后的 DEL 命令释放锁。因此，锁就一直被这个客户端持有，其它客户端无法拿到锁，也无法访问共享数据和执行后续操作，这会给业务应用带来影响。</strong></p>
+<p>针对这个问题，一个有效的解决方法是，<strong>给锁变量设置一个过期时间</strong>。这样一来，即使持有锁的客户端发生了异常，无法主动地释放锁，<strong>Redis 也会根据锁变量的过期时间，在锁变量过期后，把它删除</strong>。其它客户端在锁变量过期后，就可以重新请求加锁，这就不会出现无法加锁的问题了。</p>
+<p>我们再来看第二个风险。如果客户端 A 执行了 SETNX 命令加锁后，假设客户端 B 执行了 DEL 命令释放锁，<strong>此时，客户端 A 的锁就被误释放了。如果客户端 C 正好也在申请加锁，就可以成功获得锁，进而开始操作共享数据</strong>。这样一来，客户端 A 和 C 同时在对共享数据进行操作，<strong>数据就会被修改错误，这也是业务层不能接受的。</strong></p>
+<p>为了应对这个问题，我们需要<strong>能区分来自不同客户端的锁操作</strong>，具体咋做呢？其实，我们可以在锁变量的值上想想办法。</p>
+<p>在使用 SETNX 命令进行加锁的方法中，我们通过把锁变量值设置为 1 或 0，表示是否加锁成功。1 和 0 只有两种状态，无法表示究竟是哪个客户端进行的锁操作。<strong>所以，我们在加锁操作时，可以让每个客户端给锁变量设置一个唯一值，这里的唯一值就可以用来标识当前操作的客户端。在释放锁操作时，客户端需要判断，当前锁变量的值是否和自己的唯一标识相等，只有在相等的情况下，才能释放锁。这样一来，就不会出现误释放锁的问题了。</strong></p>
+<p>知道了解决方案，那么，在 Redis 中，具体是怎么实现的呢？我们再来了解下。</p>
+<p>在查看具体的代码前，我要先带你学习下 Redis 的 SET 命令。</p>
+<p>我们刚刚在说 SETNX 命令的时候提到，对于不存在的键值对，它会先创建再设置值（也就是“不存在即设置”），为了能达到和 SETNX 命令一样的效果，<strong>Redis 给 SET 命令提供了类似的选项 NX，用来实现“不存在即设置”。如果使用了 NX 选项，SET 命令只有在键值对不存在时，才会进行设置，否则不做赋值操作。此外，SET 命令在执行时还可以带上 EX 或 PX 选项，用来设置键值对的过期时间</strong>。</p>
+<p>举个例子，执行下面的命令时，只有 key 不存在时，SET 才会创建 key，并对 key 进行赋值。另外，<strong>key 的存活时间由 seconds 或者 milliseconds 选项值来决定</strong>。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">SET key value [EX seconds | PX milliseconds]  [NX]</span><br></pre></td></tr></table></figure>
+
+<p>有了 SET 命令的 NX 和 EX&#x2F;PX 选项后，我们就可以用下面的命令来实现加锁操作了。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">// 加锁, unique_value作为客户端唯一性的标识</span><br><span class="line"></span><br><span class="line">SET lock_key unique_value NX PX 10000</span><br></pre></td></tr></table></figure>
+
+<p><strong>其中，unique_value 是客户端的唯一标识，可以用一个随机生成的字符串来表示，PX 10000 则表示 lock_key 会在 10s 后过期，以免客户端在这期间发生异常而无法释放锁。</strong></p>
+<p><strong>因为在加锁操作中，每个客户端都使用了一个唯一标识，所以在释放锁操作时，我们需要判断锁变量的值，是否等于执行释放锁操作的客户端的唯一标识</strong>，如下所示：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">//释放锁 比较unique_value是否相等，避免误释放</span><br><span class="line">if redis.call(&quot;get&quot;,KEYS[1]) == ARGV[1] then</span><br><span class="line"></span><br><span class="line">     return redis.call(&quot;del&quot;,KEYS[1])</span><br><span class="line"></span><br><span class="line">else</span><br><span class="line"></span><br><span class="line">     return 0</span><br><span class="line"></span><br><span class="line">end</span><br></pre></td></tr></table></figure>
+
+<p><strong>这是使用 Lua 脚本（unlock.script）实现的释放锁操作的伪代码，其中，KEYS[1]表示 lock_key，ARGV[1]是当前客户端的唯一标识，这两个值都是我们在执行 Lua 脚本时作为参数传入的。</strong></p>
+<p>最后，我们执行下面的命令，就可以完成锁释放操作了。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">redis-cli  --eval  unlock.script lock_key , unique_value </span><br></pre></td></tr></table></figure>
+
+<p>你可能也注意到了，在释放锁操作中，我们使用了 Lua 脚本，<strong>这是因为，释放锁操作的逻辑也包含了读取锁变量、判断值、删除锁变量的多个操作，而 Redis 在执行 Lua 脚本时，可以以原子性的方式执行，从而保证了锁释放操作的原子性。</strong></p>
+<p>好了，到这里，<strong>你了解了如何使用 SET 命令和 Lua 脚本在 Redis 单节点上实现分布式锁。但是，我们现在只用了一个 Redis 实例来保存锁变量，如果这个 Redis 实例发生故障宕机了，那么锁变量就没有了。此时，客户端也无法进行锁操作了，这就会影响到业务的正常执行。所以，我们在实现分布式锁时，还需要保证锁的可靠性。那怎么提高呢？这就要提到基于多个 Redis 节点实现分布式锁的方式了。</strong></p>
+<h2 id="基于多个-Redis-节点实现高可靠的分布式锁"><a href="#基于多个-Redis-节点实现高可靠的分布式锁" class="headerlink" title="基于多个 Redis 节点实现高可靠的分布式锁"></a>基于多个 Redis 节点实现高可靠的分布式锁</h2><p><strong>当我们要实现高可靠的分布式锁时，就不能只依赖单个的命令操作了，我们需要按照一定的步骤和规则进行加解锁操作，否则，就可能会出现锁无法工作的情况</strong>。“一定的步骤和规则”是指啥呢？其实就是分布式锁的算法。</p>
+<p><strong>为了避免 Redis 实例故障而导致的锁无法工作的问题，Redis 的开发者 Antirez 提出了分布式锁算法 Redlock</strong>。</p>
+<p>Redlock 算法的基本思路，<strong>是让客户端和多个独立的 Redis 实例依次请求加锁，如果客户端能够和半数以上的实例成功地完成加锁操作，那么我们就认为，客户端成功地获得分布式锁了，否则加锁失败。这样一来，即使有单个 Redis 实例发生故障，因为锁变量在其它实例上也有保存，所以，客户端仍然可以正常地进行锁操作，锁变量并不会丢失。</strong></p>
+<p>我们来具体看下 Redlock 算法的执行步骤。<strong>Redlock 算法的实现需要有 N 个独立的 Redis 实例。接下来，我们可以分成 3 步来完成加锁操作</strong>。</p>
+<p><strong>第一步是，客户端获取当前时间。</strong></p>
+<p><strong>第二步是，客户端按顺序依次向 N 个 Redis 实例执行加锁操作。</strong></p>
+<p><strong>这里的加锁操作和在单实例上执行的加锁操作一样，使用 SET 命令，带上 NX，EX&#x2F;PX 选项，以及带上客户端的唯一标识。当然，如果某个 Redis 实例发生故障了，为了保证在这种情况下，Redlock 算法能够继续运行，我们需要给加锁操作设置一个超时时间。</strong></p>
+<p><strong>如果客户端在和一个 Redis 实例请求加锁时，一直到超时都没有成功，那么此时，客户端会和下一个 Redis 实例继续请求加锁。加锁操作的超时时间需要远远地小于锁的有效时间，一般也就是设置为几十毫秒。</strong></p>
+<p><strong>第三步是，一旦客户端完成了和所有 Redis 实例的加锁操作，客户端就要计算整个加锁过程的总耗时。</strong></p>
+<p>客户端只有在满足下面的这两个条件时，才能认为是加锁成功。</p>
 <ul>
-<li>1、<strong>repl_backlog_buffer：就是上面我解释到的，它是为了从库断开之后，如何找到主从差异数据而设计的环形缓冲区，从而避免全量同步带来的性能开销。</strong>如果从库断开时间太久，<strong>repl_backlog_buffer环形缓冲区被主库的写命令覆盖了，那么从库连上主库后只能乖乖地进行一次全量同步，所以repl_backlog_buffer配置尽量大一些，可以降低主从断开后全量同步的概率。</strong>而在repl_backlog_buffer中找主从差异的数据后，如何发给从库呢？这就用到了replication buffer。</li>
-<li>2、<strong>replication buffer：Redis和客户端通信也好，和从库通信也好，Redis都需要给分配一个 内存buffer进行数据交互，客户端是一个client，从库也是一个client，我们每个client连上Redis后，Redis都会分配一个client buffer，所有数据交互都是通过这个buffer进行的</strong>：<strong>Redis先把数据写到这个buffer中，然后再把buffer中的数据发到client socket中再通过网络发送出去，这样就完成了数据交互</strong>。所以主从在增量同步时，<strong>从库作为一个client，也会分配一个buffer，只不过这个buffer专门用来传播用户的写命令到从库，保证主从数据一致，我们通常把它叫做replication buffer。</strong></li>
-<li>3、再延伸一下，既然有这个内存buffer存在，那么这个buffer有没有限制呢？<strong>如果主从在传播命令时，因为某些原因从库处理得非常慢，那么主库上的这个buffer就会持续增长，消耗大量的内存资源，甚至OOM。所以Redis提供了client-output-buffer-limit参数限制这个buffer的大小，如果超过限制，主库会强制断开这个client的连接</strong>，也就是说从库处理慢导致主库内存buffer的积压达到限制后，主库会强制断开从库的连接，<strong>此时主从复制会中断，中断后如果从库再次发起复制请求，那么此时可能会导致恶性循环，引发复制风暴，这种情况需要格外注意。</strong></li>
+<li>条件一：<strong>客户端从超过半数（大于等于 N&#x2F;2+1）的 Redis 实例上成功获取到了锁；</strong></li>
+<li>条件二：<strong>客户端获取锁的总耗时没有超过锁的有效时间。</strong></li>
 </ul>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://geekdaxue.co/read/haofeiyu@redis/owmafw">基础篇 - 06 | 数据同步：主从库如何实现数据一致？ - 《Redis 读书笔记》 - 极客文档 (geekdaxue.co)</a></p>
+<p>在满足了这两个条件后，<strong>我们需要重新计算这把锁的有效时间，计算的结果是锁的最初有效时间减去客户端为获取锁的总耗时。如果锁的有效时间已经来不及完成共享数据的操作了，我们可以释放锁，以免出现还没完成数据操作，锁就过期了的情况。</strong></p>
+<p>当然，<strong>如果客户端在和所有实例执行完加锁操作后，没能同时满足这两个条件，那么，客户端向所有 Redis 节点发起释放锁的操作。</strong></p>
+<p>在 Redlock 算法中，<strong>释放锁的操作和在单实例上释放锁的操作一样，只要执行释放锁的 Lua 脚本就可以了。这样一来，只要 N 个 Redis 实例中的半数以上实例能正常工作，就能保证分布式锁的正常工作了。</strong></p>
+<p>所以，在实际的业务应用中，<strong>如果你想要提升分布式锁的可靠性，就可以通过 Redlock 算法来实现。</strong></p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p><strong>分布式锁是由共享存储系统维护的变量，多个客户端可以向共享存储系统发送命令进行加锁或释放锁操作。Redis 作为一个共享存储系统，可以用来实现分布式锁。</strong></p>
+<p>在基于单个 Redis 实例实现分布式锁时，对于加锁操作，我们需要满足三个条件：</p>
+<ul>
+<li><strong>加锁包括了读取锁变量、检查锁变量值和设置锁变量值三个操作，但需要以原子操作的方式完成，所以，我们使用 SET 命令带上 NX 选项来实现加锁；</strong></li>
+<li><strong>锁变量需要设置过期时间，以免客户端拿到锁后发生异常，导致锁一直无法释放，所以，我们在 SET 命令执行时加上 EX&#x2F;PX 选项，设置其过期时间；</strong></li>
+<li><strong>锁变量的值需要能区分来自不同客户端的加锁操作，以免在释放锁时，出现误释放操作，所以，我们使用 SET 命令设置锁变量值时，每个客户端设置的值是一个唯一值，用于标识客户端。</strong></li>
+</ul>
+<p>和加锁类似，<strong>释放锁也包含了读取锁变量值、判断锁变量值和删除锁变量三个操作，不过，我们无法使用单个命令来实现，所以，我们可以采用 Lua 脚本执行释放锁操作，通过 Redis 原子性地执行 Lua 脚本，来保证释放锁操作的原子性。</strong></p>
+<p>不过，<strong>基于单个 Redis 实例实现分布式锁时，会面临实例异常或崩溃的情况，这会导致实例无法提供锁操作</strong>，正因为此，Redis 也提供了 Redlock 算法，用来实现基于多个实例的分布式锁。这样一来，<strong>锁变量由多个实例维护，即使有实例发生了故障，锁变量仍然是存在的，客户端还是可以完成锁操作。Redlock 算法是实现高可靠分布式锁的一种有效解决方案，你可以在实际应用中把它用起来</strong>。</p>
+<h2 id="每课一问"><a href="#每课一问" class="headerlink" title="每课一问"></a>每课一问</h2><p>按照惯例，我给你提个小问题。这节课，我提到，我们可以使用 SET 命令带上 NX 和 EX&#x2F;PX 选项进行加锁操作，那么，我想请你再思考一下，我们是否可以用下面的方式来实现加锁操作呢？</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">// 加锁</span><br><span class="line"></span><br><span class="line">SETNX lock_key unique_value</span><br><span class="line"></span><br><span class="line">EXPIRE lock_key 10S</span><br><span class="line"></span><br><span class="line">// 业务逻辑</span><br><span class="line"></span><br><span class="line">DO THINGS</span><br></pre></td></tr></table></figure>
+
+<p>是否可以使用 SETNX + EXPIRE 来完成加锁操作？</p>
+<p>不可以这么使用。<strong>使用 2 个命令无法保证操作的原子性，在异常情况下，加锁结果会不符合预期</strong>。异常情况主要分为以下几种情况：</p>
+<ul>
+<li>1、SETNX 执行成功，执行 EXPIRE 时由于网络问题设置过期失败</li>
+<li>2、SETNX 执行成功，此时 Redis 实例宕机，EXPIRE 没有机会执行</li>
+<li>3、SETNX 执行成功，客户端异常崩溃，EXPIRE 没有机会执行</li>
+</ul>
+<p>如果发生以上情况，<strong>并且客户端在释放锁时发生异常，没有正常释放锁，那么这把锁就会一直无法释放，其他线程都无法再获得锁</strong>。</p>
+<p>下面说一下关于 Redis 分布式锁可靠性的问题。</p>
+<p><strong>使用单个 Redis 节点（只有一个master）使用分布锁，如果实例宕机，那么无法进行锁操作了。那么采用主从集群模式部署是否可以保证锁的可靠性？</strong></p>
+<p>答案是也很难保证。<strong>如果在 master 上加锁成功，此时 master 宕机，由于主从复制是异步的，加锁操作的命令还未同步到 slave，此时主从切换，新 master 节点依旧会丢失该锁，对业务来说相当于锁失效了。</strong></p>
+<p><strong>所以 Redis 作者才提出基于多个 Redis 节点（master节点）的 Redlock 算法，但这个算法涉及的细节很多，作者在提出这个算法时，业界的分布式系统专家还与 Redis 作者发生过一场争论，来评估这个算法的可靠性，争论的细节都是关于异常情况可能导致 Redlock 失效的场景，例如加锁过程中客户端发生了阻塞、机器时钟发生跳跃等等。</strong></p>
+<p>感兴趣的可以看下这篇文章，详细介绍了争论的细节，以及 Redis 分布式锁在各种异常情况是否安全的分析，收益会非常大：<a target="_blank" rel="noopener" href="http://zhangtielei.com/posts/blog-redlock-reasoning.html%E3%80%82">http://zhangtielei.com/posts/blog-redlock-reasoning.html。</a></p>
+<p>简单总结，基于 Redis 使用分布锁的注意点：</p>
+<ul>
+<li>1、使用 SET <code>$lock_key $unique_val EX $second NX</code> 命令<strong>保证加锁原子性，并为锁设置过期时间</strong></li>
+<li>2、<strong>锁的过期时间要提前评估好，要大于操作共享资源的时间</strong></li>
+<li>3、<strong>每个线程加锁时设置随机值，释放锁时判断是否和加锁设置的值一致，防止自己的锁被别人释放</strong></li>
+<li>4、<strong>释放锁时使用 Lua 脚本，保证操作的原子性</strong></li>
+<li>5、<strong>基于多个节点的 Redlock，加锁时超过半数节点操作成功，并且获取锁的耗时没有超过锁的有效时间才算加锁成功</strong></li>
+<li>6、Redlock 释放锁时，<strong>要对所有节点释放（即使某个节点加锁失败了），因为加锁时可能发生服务端加锁成功，由于网络问题，给客户端回复网络包失败的情况，所以需要把所有节点可能存的锁都释放掉</strong></li>
+<li>7、使用 Redlock 时<strong>要避免机器时钟发生跳跃</strong>，需要运维来保证，对运维有一定要求，否则可能会导致 Redlock 失效。<strong>例如共 3 个节点，线程 A 操作 2 个节点加锁成功，但其中 1 个节点机器时钟发生跳跃，锁提前过期，线程 B 正好在另外 2 个节点也加锁成功，此时 Redlock 相当于失效了（Redis 作者和分布式系统专家争论的重要点就在这）</strong></li>
+<li>8、如果为了效率，<strong>使用基于单个 Redis 节点的分布式锁即可，此方案缺点是允许锁偶尔失效，优点是简单效率高</strong></li>
+<li>9、如果是为了正确性，<strong>业务对于结果要求非常严格，建议使用 Redlock，但缺点是使用比较重，部署成本高</strong></li>
+</ul>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://geekdaxue.co/read/haofeiyu@redis/cgcm2v">锁 - 30 | 如何使用Redis实现分布式锁？ - 《Redis 读书笔记》 - 极客文档 (geekdaxue.co)</a></p>
 
                 
             </div>
@@ -502,7 +543,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/15/Redis06/">http://example.com/2024/09/15/Redis06/</a>
+                    <a href="http://example.com/2024/09/17/Redis30/">http://example.com/2024/09/17/Redis30/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -887,17 +928,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/16/Redis07/">
+                <a href="/2024/09/17/Redis30/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/7.jpg" class="responsive-img" alt="哨兵机制：主库挂了，如何不间断服务？">
+                        <img src="/medias/featureimages/23.jpg" class="responsive-img" alt="如何使用Redis实现分布式锁？">
                         
-                        <span class="card-title">哨兵机制：主库挂了，如何不间断服务？</span>
+                        <span class="card-title">如何使用Redis实现分布式锁？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -907,9 +949,9 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-16
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-17
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
@@ -922,6 +964,7 @@
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
@@ -940,13 +983,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/15/Redis05/">
+                <a href="/2024/09/17/Redis29/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/14.jpg" class="responsive-img" alt="内存快照：宕机后，Redis如何实现快速恢复？">
+                        <img src="/medias/featureimages/9.jpg" class="responsive-img" alt="无锁的原子操作：Redis如何应对并发访问？">
                         
-                        <span class="card-title">内存快照：宕机后，Redis如何实现快速恢复？</span>
+                        <span class="card-title">无锁的原子操作：Redis如何应对并发访问？</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -957,7 +1000,7 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-15
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-17
                             </span>
                         <span class="publish-author">
                             
