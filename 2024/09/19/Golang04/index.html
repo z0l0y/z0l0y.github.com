@@ -4,8 +4,9 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="什么时候会使用内部临时表？, zoloy">
-    <meta name="description" content="在第16和第34篇文章中，我分别和你介绍了sort buffer、内存临时表和join buffer。这三个数据结构都是用来存放语句执行过程中的中间数据，以辅助SQL语句的执行的。其中，我们在排序的时候用到了sort buffer，在使用j">
+    <meta name="keywords" content="程序实体的那些事儿（上）, zoloy">
+    <meta name="description" content="我已经为你打开了 Go 语言编程之门，并向你展示了“程序从初建到拆分，再到模块化”的基本演化路径。
+一个编程老手让程序完成基本演化，可能也就需要几十分钟甚至十几分钟，因为他们一开始就会把车开到模块化编程的道路上。我相信，等你真正理解了这个过">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -17,7 +18,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>什么时候会使用内部临时表？ | zoloy&#39;s blog</title>
+    <title>程序实体的那些事儿（上） | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -290,12 +291,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/20.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/8.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">什么时候会使用内部临时表？</h1>
+                    <h1 class="description center-align post-title">程序实体的那些事儿（上）</h1>
                 </div>
             </div>
         </div>
@@ -319,8 +320,8 @@
                     
                     <div class="article-tag">
                         
-                            <a href="/tags/MySQL/">
-                                <span class="chip bg-color">MySQL</span>
+                            <a href="/tags/Golang/">
+                                <span class="chip bg-color">Golang</span>
                             </a>
                         
                     </div>
@@ -331,8 +332,8 @@
                     <div class="post-cate">
                         <i class="fas fa-bookmark fa-fw icon-category"></i>
                         
-                            <a href="/categories/MySQL/" class="post-category">
-                                MySQL
+                            <a href="/categories/Golang/" class="post-category">
+                                Golang
                             </a>
                         
                     </div>
@@ -344,28 +345,28 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-13
+                    2024-09-19
                 </div>
                 
 
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
-                    2024-09-13
+                    2024-09-19
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    3.4k
+                    4k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    12 分
+                    14 分
                 </div>
                 
 
@@ -388,163 +389,110 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <p>在<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/73479">第16</a>和<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/79700">第34</a>篇文章中，我分别和你介绍了sort buffer、内存临时表和join buffer。<strong>这三个数据结构都是用来存放语句执行过程中的中间数据，以辅助SQL语句的执行的。其中，我们在排序的时候用到了sort buffer，在使用join语句的时候用到了join buffer。</strong></p>
-<p>然后，你可能会有这样的疑问，MySQL什么时候会使用内部临时表呢？</p>
-<p>今天这篇文章，<strong>我就先给你举两个需要用到内部临时表的例子，来看看内部临时表是怎么工作的。然后，我们再来分析，什么情况下会使用内部临时表。</strong></p>
-<h3 id="union-执行流程"><a href="#union-执行流程" class="headerlink" title="union 执行流程"></a>union 执行流程</h3><p>为了便于量化分析，我用下面的表t1来举例。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">create table t1(id int primary key, a int, b int, index(a));</span><br><span class="line">delimiter ;;</span><br><span class="line">create procedure idata()</span><br><span class="line">begin</span><br><span class="line">  declare i int;</span><br><span class="line"></span><br><span class="line">  set i=1;</span><br><span class="line">  while(i&lt;=1000)do</span><br><span class="line">    insert into t1 values(i, i, i);</span><br><span class="line">    set i=i+1;</span><br><span class="line">  end while;</span><br><span class="line">end;;</span><br><span class="line">delimiter ;</span><br><span class="line">call idata();</span><br></pre></td></tr></table></figure>
+                <p>我已经为你打开了 Go 语言编程之门，并向你展示了“<strong>程序从初建到拆分，再到模块化</strong>”的基本演化路径。</p>
+<p>一个编程老手让程序完成基本演化，可能也就需要几十分钟甚至十几分钟，因为他们一开始就会把车开到模块化编程的道路上。我相信，等你真正理解了这个过程之后，也会驾轻就熟的。</p>
+<p>上述套路是通用的，不是只适用于 Go 语言。但从本篇开始，<strong>我会开始向你介绍 Go 语言中的各种特性以及相应的编程方法和思想。</strong></p>
+<hr>
+<p>我在讲解那两种源码文件基本编写方法的时候，声明和使用了一些程序实体。你也许已经若有所觉，也许还在云里雾里。没关系，我现在就与你一起梳理这方面的重点。</p>
+<p>还记得吗？<strong>Go 语言中的程序实体包括变量、常量、函数、结构体和接口。</strong> Go 语言是<strong>静态类型的编程语言</strong>，所以我们在声明变量或常量的时候，<strong>都需要指定它们的类型，或者给予足够的信息，这样才可以让 Go 语言能够推导出它们的类型</strong>。</p>
+<blockquote>
+<p>在 Go 语言中，变量的类型可以是其预定义的那些类型，也可以是程序自定义的函数、结构体或接口。常量的合法类型不多，只能是那些 Go 语言预定义的基本类型。它的声明方式也更简单一些。</p>
+</blockquote>
+<p>好了，下面这个简单的问题你需要了解一下。</p>
+<h3 id="问题：声明变量有几种方式？"><a href="#问题：声明变量有几种方式？" class="headerlink" title="问题：声明变量有几种方式？"></a><strong>问题：声明变量有几种方式？</strong></h3><p>先看段代码。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line"><span class="string">&quot;flag&quot;</span></span><br><span class="line"><span class="string">&quot;fmt&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line"><span class="keyword">var</span> name <span class="type">string</span> <span class="comment">// [1]</span></span><br><span class="line">flag.StringVar(&amp;name, <span class="string">&quot;name&quot;</span>, <span class="string">&quot;everyone&quot;</span>, <span class="string">&quot;The greeting object.&quot;</span>) <span class="comment">// [2]</span></span><br><span class="line">flag.Parse()</span><br><span class="line">fmt.Printf(<span class="string">&quot;Hello, %v!\n&quot;</span>, name)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>然后，我们执行下面这条语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(select 1000 as f) union (select id from t1 order by id desc limit 2);</span><br></pre></td></tr></table></figure>
+<p>这是一个很简单的命令源码文件，我把它命名为 demo7.go。它是 demo2.go 的微调版。我只是把变量<code>name</code>的声明和对<code>flag.StringVar</code>函数的调用，都移动到了<code>main</code>函数中，这分别对应代码中的注释<code>[1]</code>和<code>[2]</code>。</p>
+<p>具体的问题是，除了<code>var name string</code>这种声明变量<code>name</code>的方式，还有其他方式吗？你可以选择性地改动注释<code>[1]</code>和<code>[2]</code>处的代码。</p>
+<h3 id="典型回答"><a href="#典型回答" class="headerlink" title="典型回答"></a><strong>典型回答</strong></h3><p>这有几种做法，我在这里只说最典型的两种。</p>
+<p><strong>第一种方式</strong>需要先对注释<code>[2]</code>处的代码稍作改动，把被调用的函数由<code>flag.StringVar</code>改为<code>flag.String</code>，传参的列表也需要随之修改，这是为了<code>[1]</code>和<code>[2]</code>处代码合并的准备工作。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> name = *flag.String(<span class="string">&quot;name&quot;</span>, <span class="string">&quot;everyone&quot;</span>, <span class="string">&quot;The greeting object.&quot;</span>)</span><br></pre></td></tr></table></figure>
 
-<p>这条语句用到了union，它的语义是，<strong>取这两个子查询结果的并集。并集的意思就是这两个集合加起来，重复的行只保留一行。</strong></p>
-<p>下图是这个语句的explain结果。</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173204559.png" alt="image-20240913173204559"></p>
-<p>可以看到：</p>
-<ul>
-<li>第二行的key&#x3D;PRIMARY，<strong>说明第二个子句用到了索引id。</strong></li>
-<li>第三行的Extra字段，<strong>表示在对子查询的结果集做union的时候，使用了临时表(Using temporary)。</strong></li>
-</ul>
-<p>这个语句的执行流程是这样的：</p>
+<p>合并后的代码看起来更简洁一些。我把注释<code>[1]</code>处的代码中的<code>string</code>去掉了，右边添加了一个<code>=</code>，然后再拼接上经过修改的<code>[2]</code>处代码。</p>
+<p><strong>我在调用<code>flag.String</code>函数的代码左边加了一个<code>*</code>，这是因为该函数返回的结果值类型是<code>*string</code>而不是<code>string</code>。类型<code>*string</code>代表的是字符串的指针类型，而不是字符串类型。</strong></p>
+<p>关于 Go 语言中的指针，我在后面会有专门的介绍。<strong>你在这里只需要知道，我通过一个“<code>*</code>”把这个字符串指针值指向的字符串值取出来了，然后通过赋值符号“<code>=</code>”把后者赋给了<code>name</code>变量。</strong></p>
+<p>好了，我想你已经基本理解了这行代码中的每一个部分。</p>
+<p><strong>下面我接着说第二种方式。</strong>第二种方式与第一种方式非常类似，<strong>它基于第一种方式的代码，赋值符号<code>=</code>右边的代码不动，左边只留下<code>name</code>，再把<code>=</code>变成<code>:=</code>。</strong></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">name := *flag.String(<span class="string">&quot;name&quot;</span>, <span class="string">&quot;everyone&quot;</span>, <span class="string">&quot;The greeting object.&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<h3 id="问题解析"><a href="#问题解析" class="headerlink" title="问题解析"></a><strong>问题解析</strong></h3><p>这个问题的基本考点有两个。<strong>一个是你要知道 Go 语言中的类型推断，以及它在代码中的基本体现，另一个是短变量声明的用法。</strong></p>
+<p>第一种方式中的代码在声明变量<code>name</code>的同时，还为它赋了值，而这时声明中并没有显式指定<code>name</code>的类型。</p>
+<p>还记得吗？之前的变量声明语句是<code>var name string</code>。这里利用了 Go 语言自身的类型推断而省去了<code>string</code>。</p>
+<blockquote>
+<p>简单地说，<strong>类型推断是一种编程语言在编译期自动解释表达式类型的能力</strong>。什么是表达式？详细的解释你可以参看 Go 语言规范中的<a target="_blank" rel="noopener" href="https://golang.google.cn/ref/spec#Expressions">表达式</a>和<a target="_blank" rel="noopener" href="https://golang.google.cn/ref/spec#Expression_statements">表达式语句</a>章节。我在这里就不赘述了。</p>
+</blockquote>
+<p>你可以认为，<strong>表达式类型就是对表达式进行求值后得到结果的类型。Go 语言中的类型推断是很简约的，这也是 Go 语言整体的风格</strong>。</p>
+<p>它只能用于对变量或常量的初始化，就像上述回答中描述的那样。对<code>flag.String</code>函数的调用其实就是一个调用表达式，而这个表达式的类型是<code>*string</code>，即字符串的指针类型。</p>
+<p>这也是调用<code>flag.String</code>函数后得到结果的类型。<strong>随后，Go 语言把这个调用了<code>flag.String</code>函数的表达式类型，直接作为了变量<code>name</code>的类型，这就是“推断”一词所指代的操作了</strong>。</p>
+<p>至于第二种方式所用的短变量声明，<strong>实际上就是 Go 语言的类型推断再加上一点点语法糖</strong>。</p>
+<p>我们只能在<strong>函数体内部使用短变量声明</strong>。在编写<code>if</code>、<code>for</code>或<code>switch</code>语句的时候，<strong>我们经常把它安插在初始化子句中，并用来声明一些临时的变量</strong>。而相比之下，第一种方式更加通用，它可以被用在任何地方。</p>
+<p>比如在 if 中的使用：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;fmt&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="comment">// 短变量声明</span></span><br><span class="line">    <span class="keyword">if</span> x := <span class="number">10</span>; x &gt; <span class="number">5</span> &#123;</span><br><span class="line">        fmt.Println(<span class="string">&quot;x is greater than 5&quot;</span>)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// x 在这里不可用，因为它只在 if 语句的作用域内可见</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在 for 中的使用：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;fmt&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="keyword">for</span> i := <span class="number">0</span>; i &lt; <span class="number">5</span>; i++ &#123;</span><br><span class="line">        fmt.Println(i) <span class="comment">// i 在这里有效</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// i 在这里不可用，因为它只在 for 循环的作用域内可见</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>短变量声明还有其他的玩法，我稍后就会讲到。</p>
+<h3 id="知识扩展"><a href="#知识扩展" class="headerlink" title="知识扩展"></a><strong>知识扩展</strong></h3><h4 id="1-Go-语言的类型推断可以带来哪些好处？"><a href="#1-Go-语言的类型推断可以带来哪些好处？" class="headerlink" title="1. Go 语言的类型推断可以带来哪些好处？"></a><strong>1. Go 语言的类型推断可以带来哪些好处？</strong></h4><p>如果面试官问你这个问题，你应该怎样回答？</p>
+<p>当然，在写代码时，<strong>我们通过使用 Go 语言的类型推断，而节省下来的键盘敲击次数几乎可以忽略不计。但它真正的好处，往往会体现在我们写代码之后的那些事情上，比如代码重构</strong>。</p>
+<p>为了更好的演示，我们先要做一点准备工作。我们依然通过调用一个函数在声明<code>name</code>变量的同时为它赋值，但是这个函数不是<code>flag.String</code>，而是由我们自己定义的某个函数，比如叫<code>getTheFlag</code>。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line"><span class="string">&quot;flag&quot;</span></span><br><span class="line"><span class="string">&quot;fmt&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line"><span class="keyword">var</span> name = getTheFlag()</span><br><span class="line">flag.Parse()</span><br><span class="line">fmt.Printf(<span class="string">&quot;Hello, %v!\n&quot;</span>, *name)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">getTheFlag</span><span class="params">()</span></span> *<span class="type">string</span> &#123;</span><br><span class="line"><span class="keyword">return</span> flag.String(<span class="string">&quot;name&quot;</span>, <span class="string">&quot;everyone&quot;</span>, <span class="string">&quot;The greeting object.&quot;</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们可以用<code>getTheFlag</code>函数包裹（或者说包装）那个对<code>flag.String</code>函数的调用，并把其结果直接作为<code>getTheFlag</code>函数的结果，结果的类型是<code>*string</code>。</p>
+<p>这样一来，<code>var name =</code>右边的表达式，可以变为针对<code>getTheFlag</code>函数的调用表达式了。<strong>这实际上是对“声明并赋值<code>name</code>变量的那行代码”的重构。</strong></p>
+<blockquote>
+<p><strong>我们通常把不改变某个程序与外界的任何交互方式和规则，而只改变其内部实现”的代码修改方式，叫做对该程序的重构</strong>。重构的对象可以是<strong>一行代码、一个函数、一个功能模块，甚至一个软件系统</strong>。</p>
+</blockquote>
+<p>好了，在准备工作做完之后，你会发现，你可以随意改变<code>getTheFlag</code>函数的内部实现，及其返回结果的类型，而不用修改<code>main</code>函数中的任何代码。</p>
+<p>这个命令源码文件依然可以通过编译，并且构建和运行也都不会有问题。<strong>也许你能感觉得到，这是一个关于程序灵活性的质变</strong>。</p>
+<p>我们不显式地指定变量<code>name</code>的类型，<strong>使得它可以被赋予任何类型的值。也就是说，变量<code>name</code>的类型可以在其初始化时，由其他程序动态地确定</strong>。</p>
+<p>在你改变<code>getTheFlag</code>函数的结果类型之后，Go 语言的编译器会在你再次构建该程序的时候，自动地更新变量<code>name</code>的类型。<strong>如果你使用过<code>Python</code>或<code>Ruby</code>这种动态类型的编程语言的话，一定会觉得这情景似曾相识</strong>。</p>
+<p>没错，通过这种类型推断，<strong>你可以体验到动态类型编程语言所带来的一部分优势，即程序灵活性的明显提升</strong>。但在那些编程语言中，这种提升可以说是用程序的可维护性和运行效率换来的。</p>
+<p>Go 语言是静态类型的，<strong>所以一旦在初始化变量时确定了它的类型，之后就不可能再改变。这就避免了在后面维护程序时的一些问题</strong>。另外，请记住，<strong>这种类型的确定是在编译期完成的，因此不会对程序的运行效率产生任何影响</strong>。</p>
+<p>现在，你应该已经对这个问题有一个比较深刻的理解了。</p>
+<p>如果只用一两句话回答这个问题的话，我想可以是这样的：<strong>Go 语言的类型推断可以明显提升程序的灵活性，使得代码重构变得更加容易，同时又不会给代码的维护带来额外负担</strong>（实际上，它恰恰可以避免散弹式的代码修改），<strong>更不会损失程序的运行效率</strong>。</p>
+<h4 id="2-变量的重声明是什么意思？"><a href="#2-变量的重声明是什么意思？" class="headerlink" title="2. 变量的重声明是什么意思？"></a><strong>2. 变量的重声明是什么意思？</strong></h4><p>这涉及了短变量声明。通过使用它，我们可以对同一个代码块中的变量进行重声明。</p>
+<p>既然说到了代码块，我先来解释一下它。在 Go 语言中，代码块一般就是一个由花括号括起来的区域，里面可以包含表达式和语句。<strong>Go 语言本身以及我们编写的代码共同形成了一个非常大的代码块，也叫全域代码块。</strong></p>
+<p>这主要体现在，<strong>只要是公开的全局变量，都可以被任何代码所使用。相对小一些的代码块是代码包，一个代码包可以包含许多子代码包</strong>，所以这样的代码块也可以很大。</p>
+<p>接下来，每个源码文件也都是一个代码块，每个函数也是一个代码块，每个<code>if</code>语句、<code>for</code>语句、<code>switch</code>语句和<code>select</code>语句都是一个代码块。甚至，<code>switch</code>或<code>select</code>语句中的<code>case</code>子句也都是独立的代码块。</p>
+<p>走个极端，我就在<code>main</code>函数中写一对紧挨着的花括号算不算一个代码块？当然也算，这甚至还有个名词，叫“空代码块”。</p>
+<p>回到变量重声明的问题上。<strong>其含义是对已经声明过的变量再次声明。变量重声明的前提条件如下。</strong></p>
 <ol>
-<li><strong>创建一个内存临时表，这个临时表只有一个整型字段f，并且f是主键字段</strong>。</li>
-<li>执行第一个子查询，得到1000这个值，并存入临时表中。</li>
-<li>执行第二个子查询：<ul>
-<li><strong>拿到第一行id&#x3D;1000，试图插入临时表中。但由于1000这个值已经存在于临时表了，违反了唯一性约束，所以插入失败，然后继续执行；</strong></li>
-<li><strong>取到第二行id&#x3D;999，插入临时表成功。</strong></li>
-</ul>
-</li>
-<li><strong>从临时表中按行取出数据，返回结果，并删除临时表，结果中包含两行数据分别是1000和999。</strong></li>
-</ol>
-<p>这个过程的流程图如下所示：</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173231736.png" alt="image-20240913173231736"></p>
-<p>可以看到，<strong>这里的内存临时表起到了暂存数据的作用，而且计算过程还用上了临时表主键id的唯一性约束，实现了union的语义。</strong></p>
-<p>顺便提一下，<strong>如果把上面这个语句中的union改成union all的话，就没有了“去重”的语义。这样执行的时候，就依次执行子查询，得到的结果直接作为结果集的一部分，发给客户端。因此也就不需要临时表了。</strong></p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173244260.png" alt="image-20240913173244260"></p>
-<p>可以看到，<strong>第二行的Extra字段显示的是Using index，表示只使用了覆盖索引，没有用临时表了。</strong></p>
-<h3 id="group-by-执行流程"><a href="#group-by-执行流程" class="headerlink" title="group by 执行流程"></a>group by 执行流程</h3><p>另外一个<strong>常见的使用临时表的例子是group by</strong>，我们来看一下这个语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select id%10 as m, count(*) as c from t1 group by m;</span><br></pre></td></tr></table></figure>
+<li><p><strong>由于变量的类型在其初始化时就已经确定了，所以对它再次声明时赋予的类型必须与其原本的类型相同，否则会产生编译错误。</strong></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;fmt&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    a := <span class="number">10</span>        <span class="comment">// a 是 int 类型</span></span><br><span class="line">    a, b := <span class="number">20</span>, <span class="number">30</span> <span class="comment">// 这里 a 被重声明为 int 类型，b 是新的 int 类型变量</span></span><br><span class="line">    fmt.Println(a, b) <span class="comment">// 输出: 20 30</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>这个语句的逻辑是把表t1里的数据，<strong>按照 id%10 进行分组统计，并按照m的结果排序后输出</strong>。它的explain结果如下：</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173306798.png" alt="image-20240913173306798"></p>
-<p>在Extra字段里面，我们可以看到三个信息：</p>
-<ul>
-<li><strong>Using index</strong>，表示这个语句<strong>使用了覆盖索引</strong>，选择了索引a，<strong>不需要回表</strong>；</li>
-<li><strong>Using temporary</strong>，<strong>表示使用了临时表</strong>；</li>
-<li><strong>Using filesort</strong>，<strong>表示需要排序</strong>。</li>
-</ul>
-<p>这个语句的执行流程是这样的：</p>
-<ol>
-<li><strong>创建内存临时表，表里有两个字段m和c，主键是m；</strong></li>
-<li>扫描表t1的索引a，<strong>依次取出叶子节点上的id值，计算id%10的结果，记为x</strong>；<ul>
-<li>如果临时表中没有主键为x的行，就插入一个记录(x,1);</li>
-<li>如果表中有主键为x的行，就将x这一行的c值加1；</li>
-</ul>
-</li>
-<li>遍历完成后，<strong>再根据字段m做排序</strong>，得到结果集返回给客户端。</li>
-</ol>
-<p>这个流程的执行图如下：</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173316396.png" alt="image-20240913173316396"></p>
-<p>图中最后一步，<strong>对内存临时表的排序，在<a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/73795">第17篇文章</a>中已经有过介绍，我把图贴过来</strong>，方便你回顾。</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173326878.png" alt="image-20240913173326878"></p>
-<p>其中，临时表的排序过程就是图6中虚线框内的过程。</p>
-<p>接下来，我们再看一下这条语句的执行结果：</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173340506.png" alt="image-20240913173340506"></p>
-<p>如果<strong>你的需求并不需要对结果进行排序，那你可以在SQL语句末尾增加order by null</strong>，也就是改成：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select id%10 as m, count(*) as c from t1 group by m order by null;</span><br></pre></td></tr></table></figure>
+<p>如果尝试将 <code>a</code> 的类型更改为不同的类型，将导致编译错误</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// a, b := &quot;hello&quot;, 30 // 错误：无法重声明 a，类型不匹配</span></span><br></pre></td></tr></table></figure>
 
-<p>这样就跳过了最后排序的阶段，<strong>直接从临时表中取数据返回</strong>。返回的结果如图8所示。</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173404604.png" alt="image-20240913173404604"></p>
-<p>由于表t1中的id值是从1开始的，因此返回的结果集中第一行是id&#x3D;1；<strong>扫描到id&#x3D;10的时候才插入m&#x3D;0这一行，因此结果集里最后一行才是m&#x3D;0</strong>。</p>
-<p>这个例子里由于临时表只有10行，<strong>内存可以放得下，因此全程只使用了内存临时表。但是，内存临时表的大小是有限制的，参数tmp_table_size就是控制这个内存大小的，默认是16M。</strong></p>
-<p>如果我执行下面这个语句序列：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">set tmp_table_size=1024;</span><br><span class="line">select id%100 as m, count(*) as c from t1 group by m order by null limit 10;</span><br></pre></td></tr></table></figure>
-
-<p>把内存临时表的大小限制为最大1024字节，并把语句改成id % 100，这样返回结果里有100行数据。<strong>但是，这时的内存临时表大小不够存下这100行数据，也就是说，执行过程中会发现内存临时表大小到达了上限（1024字节）。</strong></p>
-<p>那么，<strong>这时候就会把内存临时表转成磁盘临时表，磁盘临时表默认使用的引擎是InnoDB</strong>。 这时，返回的结果如图9所示。</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173427874.png" alt="image-20240913173427874"></p>
-<p>如果这个表t1的数据量很大，<strong>很可能这个查询需要的磁盘临时表就会占用大量的磁盘空间</strong>。</p>
-<h3 id="group-by-优化方法-–索引"><a href="#group-by-优化方法-–索引" class="headerlink" title="group by 优化方法 –索引"></a>group by 优化方法 –索引</h3><p>可以看到，<strong>不论是使用内存临时表还是磁盘临时表，group by逻辑都需要构造一个带唯一索引的表</strong>，执行代价都是比较高的。如果表的数据量比较大，上面这个group by语句执行起来就会很慢，我们有什么优化的方法呢？</p>
-<p>要解决group by语句的优化问题，你可以先想一下这个问题：执行group by语句为什么需要临时表？</p>
-<p>group by的语义逻辑，<strong>是统计不同的值出现的个数。但是，由于每一行的id%100的结果是无序的，所以我们就需要有一个临时表，来记录并统计结果。</strong></p>
-<p>那么，<strong>如果扫描过程中可以保证出现的数据是有序的</strong>，是不是就简单了呢？</p>
-<p>假设，现在有一个类似图10的这么一个数据结构，我们来看看group by可以怎么做。</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173439134.png" alt="image-20240913173439134"></p>
-<p>可以看到，<strong>如果可以确保输入的数据是有序的，那么计算group by的时候，就只需要从左到右，顺序扫描，依次累加。也就是下面这个过程：</strong></p>
-<ul>
-<li>当碰到第一个1的时候，已经知道累积了X个0，结果集里的第一行就是(0,X);</li>
-<li>当碰到第一个2的时候，已经知道累积了Y个1，结果集里的第一行就是(1,Y);</li>
-</ul>
-<p><strong>按照这个逻辑执行的话，扫描到整个输入的数据结束，就可以拿到group by的结果，不需要临时表，也不需要再额外排序。</strong></p>
-<p>你一定想到了，<strong>InnoDB的索引，就可以满足这个输入有序的条件</strong>。</p>
-<p>在MySQL 5.7版本支持了<strong>generated column机制，用来实现列数据的关联更新</strong>。你可以用下面的方法创建一个列z，<strong>然后在z列上创建一个索引（如果是MySQL 5.6及之前的版本，你也可以创建普通列和索引，来解决这个问题）。</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">alter table t1 add column z int generated always as(id % 100), add index(z);</span><br></pre></td></tr></table></figure>
-
-<p>看不懂的话，建议看看这个解释：</p>
-<ol>
-<li>**<code>alter table t1</code>**：<ul>
-<li>这是一个用于修改表结构的命令，指定要修改的表是 <code>t1</code>。</li>
-</ul>
+<p>对一个已经声明的变量进行重声明时，<strong>新的类型必须与原来的类型相同</strong>，否则会产生编译错误。</p>
 </li>
-<li>**<code>add column z int generated always as (id % 100)</code>**：<ul>
-<li>这部分表示添加一个新列 <code>z</code>。</li>
-<li><code>z</code> 的数据类型是 <code>int</code>。</li>
-<li><code>generated always as (id % 100)</code> 表示 <code>z</code> 列是一个计算列，它的值总是根据 <code>id</code> 列的值计算得出，即 <code>id</code> 对 100 取模的结果。</li>
-<li>也就是说，<code>z</code> 的值将自动计算并存储为 <code>id</code> 除以 100 的余数。</li>
-</ul>
+<li><p><strong>变量的重声明只可能发生在某一个代码块中。</strong>如果与当前的变量重名的是外层代码块中的变量，那么就是另外一种含义了，我在下一篇文章中会讲到。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;fmt&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    x := <span class="number">1</span> <span class="comment">// 外层 x</span></span><br><span class="line">    &#123;</span><br><span class="line">        x := <span class="number">2</span> <span class="comment">// 内层 x，重声明</span></span><br><span class="line">        fmt.Println(x) <span class="comment">// 输出: 2</span></span><br><span class="line">    &#125;</span><br><span class="line">    fmt.Println(x) <span class="comment">// 输出: 1，外层 x</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果外层代码块中有同名变量，<strong>那么在内层代码块中重声明时会被视为不同的变量</strong>。</p>
 </li>
-<li>**<code>add index(z)</code>**：<ul>
-<li>这部分表示为新添加的列 <code>z</code> 创建一个索引。</li>
-<li>索引可以加快对 <code>z</code> 列的查询速度，尤其是在 <code>z</code> 列被用于过滤或排序时。</li>
-</ul>
+<li><p><strong>变量的重声明只有在使用短变量声明时才会发生，否则也无法通过编译。</strong>如果要在此处声明全新的变量，那么就应该使用包含关键字<code>var</code>的声明语句，但是这时就不能与同一个代码块中的任何变量有重名了。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;fmt&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    y := <span class="number">5</span></span><br><span class="line">    <span class="comment">// var y int // 错误：y 已经声明过，不能再次声明</span></span><br><span class="line">    y, z := <span class="number">10</span>, <span class="number">15</span> <span class="comment">// 这里 y 被重声明，z 是新变量</span></span><br><span class="line">    fmt.Println(y, z) <span class="comment">// 输出: 10 15</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>变量的重声明<strong>只能通过短变量声明实现，使用 <code>var</code> 声明时不会造成重声明</strong>。</p>
+</li>
+<li><p><strong>被“声明并赋值”的变量必须是多个，并且其中至少有一个是新的变量。</strong>这时我们才可以说对其中的旧变量进行了重声明。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;fmt&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    a := <span class="number">1</span></span><br><span class="line">    a, b := <span class="number">2</span>, <span class="number">3</span> <span class="comment">// a 被重声明，b 是新变量</span></span><br><span class="line">    fmt.Println(a, b) <span class="comment">// 输出: 2 3</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>重声明要求<strong>在同一语句中至少有一个新变量</strong>。</p>
 </li>
 </ol>
-<p>仔细一看的话和这张图差不多了（索引已经排好序了）</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173439134.png" alt="image-20240913173439134"></p>
-<p>这样，索引z上的数据就是类似图10这样有序的了。<strong>上面的group by语句就可以改成：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select z, count(*) as c from t1 group by z;</span><br></pre></td></tr></table></figure>
+<p>这样来看，<strong>变量重声明其实算是一个语法糖（或者叫便利措施）。它允许我们在使用短变量声明时不用理会被赋值的多个变量中是否包含旧变量。</strong>可以想象，如果不这样会多写不少代码。</p>
+<p>我把一个简单的例子写在了“Golang_Puzzlers”项目的<code>puzzlers/article4/q3</code>包中的 demo9.go 文件中，你可以去看一下。</p>
+<p>这其中最重要的两行代码如下：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> err <span class="type">error</span></span><br><span class="line">n, err := io.WriteString(os.Stdout, <span class="string">&quot;Hello, everyone!\n&quot;</span>)</span><br></pre></td></tr></table></figure>
 
-<p>优化后的group by语句的explain结果，如下图所示：</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173508732.png" alt="image-20240913173508732"></p>
-<p>从Extra字段可以看到，<strong>这个语句的执行不再需要临时表，也不需要排序了</strong>。</p>
-<h3 id="group-by优化方法-–直接排序"><a href="#group-by优化方法-–直接排序" class="headerlink" title="group by优化方法 –直接排序"></a>group by优化方法 –直接排序</h3><p>所以，<strong>如果可以通过加索引来完成group by逻辑就再好不过了。但是，如果碰上不适合创建索引的场景，我们还是要老老实实做排序的</strong>。那么，这时候的group by要怎么优化呢？</p>
-<p>如果我们明明知道，<strong>一个group by语句中需要放到临时表上的数据量特别大，却还是要按照“先放到内存临时表，插入一部分数据后，发现内存临时表不够用了再转成磁盘临时表”，看上去就有点儿傻。</strong></p>
-<p>那么，我们就会想了，MySQL有没有让我们直接走磁盘临时表的方法呢？</p>
-<p>答案是，有的。</p>
-<p><strong>在group by语句中加入SQL_BIG_RESULT这个提示（hint），就可以告诉优化器：这个语句涉及的数据量很大，请直接用磁盘临时表。</strong></p>
-<p>MySQL的优化器一看，<strong>磁盘临时表是B+树存储，存储效率不如数组来得高。所以，既然你告诉我数据量很大，那从磁盘空间考虑，还是直接用数组来存吧。</strong></p>
-<p>因此，下面这个语句</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select SQL_BIG_RESULT id%100 as m, count(*) as c from t1 group by m;</span><br></pre></td></tr></table></figure>
-
-<p>的执行流程就是这样的：</p>
-<ol>
-<li><strong>初始化sort_buffer</strong>，确定放入一个整型字段，记为m；</li>
-<li>扫描表t1的索引a，依次取出里面的id值, 将 id%100的值存入sort_buffer中；</li>
-<li>扫描完成后，对sort_buffer的字段m做排序<strong>（如果sort_buffer内存不够用，就会利用磁盘临时文件辅助排序）；</strong></li>
-<li><strong>排序完成后，就得到了一个有序数组</strong>。</li>
-</ol>
-<p>根据有序数组，得到数组里面的不同值，以及每个值的出现次数。这一步的逻辑，你已经从前面的图10中了解过了。</p>
-<p>下面两张图分别是执行流程图和执行explain命令得到的结果。</p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173534548.png" alt="image-20240913173534548"></p>
-<p><img src="/2024/09/13/MySQL37/image-20240913173543600.png" alt="image-20240913173543600"></p>
-<p>从Extra字段可以看到，<strong>这个语句的执行没有再使用临时表，而是直接用了排序算法</strong>。</p>
-<p>基于上面的union、union all和group by语句的执行过程的分析，我们来回答文章开头的问题：MySQL什么时候会使用内部临时表？</p>
-<ol>
-<li><strong>如果语句执行过程可以一边读数据，一边直接得到结果，是不需要额外内存的，否则就需要额外的内存，来保存中间结果；（在MySQL 5.7版本支持了generated column机制）</strong></li>
-<li><strong>join_buffer是无序数组，sort_buffer是有序数组，临时表是二维表结构；</strong></li>
-<li><strong>如果执行逻辑需要用到二维表特性，就会优先考虑使用临时表。比如我们的例子中，union需要用到唯一索引约束， group by还需要用到另外一个字段来存累积计数。</strong></li>
-</ol>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>通过今天这篇文章，我重点和你讲了group by的几种实现算法，从中可以总结一些使用的指导原则：</p>
-<ol>
-<li><strong>如果对group by语句的结果没有排序要求，要在语句后面加 order by null；</strong></li>
-<li><strong>尽量让group by过程用上表的索引，确认方法是explain结果里没有Using temporary 和 Using filesort；</strong></li>
-<li><strong>如果group by需要统计的数据量不大，尽量只使用内存临时表；也可以通过适当调大tmp_table_size参数，来避免用到磁盘临时表；</strong></li>
-<li><strong>如果数据量实在太大，使用SQL_BIG_RESULT这个提示，来告诉优化器直接使用排序算法得到group by的结果。</strong></li>
-</ol>
-<p>文章中图8和图9都是order by null，为什么图8的返回结果里面，0是在结果集的最后一行，而图9的结果里面，0是在结果集的第一行？</p>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>上期的问题是：为什么不能用rename修改临时表的改名。</p>
-<p>在实现上，执行rename table语句的时候，<strong>要求按照“库名&#x2F;表名.frm”的规则去磁盘找文件，但是临时表在磁盘上的frm文件是放在tmpdir目录下的，并且文件名的规则是“#sql{进程id}_{线程id}_序列号.frm”，因此会报“找不到文件名”的错误</strong>。</p>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/37-shi-mo-shi-hou-hui-shi-yong-nei-bu-lin-shi-biao#group-by-zhi-xing-liu-cheng">37 什么时候会使用内部临时表？ | MySql实战45讲 (gitbook.io)</a></p>
+<p><strong>我使用短变量声明对新变量<code>n</code>和旧变量<code>err</code>进行了“声明并赋值”，这时也是对后者的重声明。</strong></p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>在本篇中，我们聚焦于最基本的 Go 语言程序实体：变量。并详细解说了变量声明和赋值的基本方法，及其背后的重要概念和知识。<strong>我们使用关键字<code>var</code>和短变量声明，都可以实现对变量的“声明并赋值”</strong>。</p>
+<p>这两种方式各有千秋，有着各自的特点和适用场景。<strong>前者可以被用在任何地方，而后者只能被用在函数或者其他更小的代码块中</strong>。</p>
+<p>不过，<strong>通过前者我们无法对已有的变量进行重声明，也就是说它无法处理新旧变量混在一起的情况</strong>。不过它们也有一个很重要的共同点，即：基于类型推断，<strong>Go 语言的类型推断只应用在了对变量或常量的初始化方面</strong>。</p>
+<h3 id="思考题"><a href="#思考题" class="headerlink" title="思考题"></a><strong>思考题</strong></h3><p>本次的思考题只有一个：如果与当前的变量重名的是外层代码块中的变量，那么这意味着什么？</p>
+<p>这道题对于你来说可能有些难，不过我鼓励你多做几次试验试试，你可以在代码中多写一些打印语句，然后运行它，并记录下每次试验的结果。如果有疑问也一定要写下来，答案将在下篇文章中揭晓。</p>
 
                 
             </div>
@@ -571,7 +519,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/13/MySQL37/">http://example.com/2024/09/13/MySQL37/</a>
+                    <a href="http://example.com/2024/09/19/Golang04/">http://example.com/2024/09/19/Golang04/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -609,8 +557,8 @@
                     
                         <div class="article-tag">
                             
-                                <a href="/tags/MySQL/">
-                                    <span class="chip bg-color">MySQL</span>
+                                <a href="/tags/Golang/">
+                                    <span class="chip bg-color">Golang</span>
                                 </a>
                             
                         </div>
@@ -956,17 +904,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/14/MySQL39/">
+                <a href="/2024/09/19/Golang04/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/1.jpg" class="responsive-img" alt="自增主键为什么不是连续的？">
+                        <img src="/medias/featureimages/8.jpg" class="responsive-img" alt="程序实体的那些事儿（上）">
                         
-                        <span class="card-title">自增主键为什么不是连续的？</span>
+                        <span class="card-title">程序实体的那些事儿（上）</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -976,26 +925,27 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-14
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-19
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/MySQL/" class="post-category">
-                                    MySQL
+                            <a href="/categories/Golang/" class="post-category">
+                                    Golang
                                 </a>
                             
                             
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/MySQL/">
-                        <span class="chip bg-color">MySQL</span>
+                    <a href="/tags/Golang/">
+                        <span class="chip bg-color">Golang</span>
                     </a>
                     
                 </div>
@@ -1009,13 +959,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/13/MySQL35/">
+                <a href="/2024/09/19/Golang03/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/11.jpg" class="responsive-img" alt="join语句怎么优化？">
+                        <img src="/medias/featureimages/19.jpg" class="responsive-img" alt="库源码文件">
                         
-                        <span class="card-title">join语句怎么优化？</span>
+                        <span class="card-title">库源码文件</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -1026,14 +976,14 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-13
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-19
                             </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/MySQL/" class="post-category">
-                                    MySQL
+                            <a href="/categories/Golang/" class="post-category">
+                                    Golang
                                 </a>
                             
                             
@@ -1043,8 +993,8 @@
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/MySQL/">
-                        <span class="chip bg-color">MySQL</span>
+                    <a href="/tags/Golang/">
+                        <span class="chip bg-color">Golang</span>
                     </a>
                     
                 </div>
