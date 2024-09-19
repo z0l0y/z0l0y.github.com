@@ -4,10 +4,8 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="为什么这些SQL语句逻辑相同，性能却差异巨大？, zoloy">
-    <meta name="description" content="在MySQL中，有很多看上去逻辑相同，但性能却差异巨大的SQL语句。对这些语句使用不当的话，就会不经意间导致整个数据库的压力变大。
-我今天挑选了三个这样的案例和你分享。希望再遇到相似的问题时，你可以做到举一反三、快速解决问题。
-案例一：条件">
+    <meta name="keywords" content="Java基础知识大全, zoloy">
+    <meta name="description" content="JDKJDK（Java Development Kit）是一个功能齐全的 Java 开发工具包，供开发者使用，用于创建和编译 Java 程序。它包含了 JRE（Java Runtime Environment），以及编译器 javac （用">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -19,7 +17,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>为什么这些SQL语句逻辑相同，性能却差异巨大？ | zoloy&#39;s blog</title>
+    <title>Java基础知识大全 | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -292,12 +290,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/6.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/14.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">为什么这些SQL语句逻辑相同，性能却差异巨大？</h1>
+                    <h1 class="description center-align post-title">Java基础知识大全</h1>
                 </div>
             </div>
         </div>
@@ -321,8 +319,8 @@
                     
                     <div class="article-tag">
                         
-                            <a href="/tags/MySQL/">
-                                <span class="chip bg-color">MySQL</span>
+                            <a href="/tags/Java/">
+                                <span class="chip bg-color">Java</span>
                             </a>
                         
                     </div>
@@ -333,8 +331,8 @@
                     <div class="post-cate">
                         <i class="fas fa-bookmark fa-fw icon-category"></i>
                         
-                            <a href="/categories/MySQL/" class="post-category">
-                                MySQL
+                            <a href="/categories/Java%E5%9F%BA%E7%A1%80/" class="post-category">
+                                Java基础
                             </a>
                         
                     </div>
@@ -346,28 +344,28 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-12
+                    2024-09-19
                 </div>
                 
 
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
-                    2024-09-12
+                    2024-09-19
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    4.1k
+                    2.1k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    15 分
+                    7 分
                 </div>
                 
 
@@ -390,147 +388,87 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <p>在MySQL中，有很多看上去<strong>逻辑相同，但性能却差异巨大的SQL语句</strong>。<strong>对这些语句使用不当的话，就会不经意间导致整个数据库的压力变大</strong>。</p>
-<p>我今天挑选了三个这样的案例和你分享。希望再遇到相似的问题时，你可以做到举一反三、快速解决问题。</p>
-<h3 id="案例一：条件字段函数操作"><a href="#案例一：条件字段函数操作" class="headerlink" title="案例一：条件字段函数操作"></a>案例一：条件字段函数操作</h3><p>假设你现在维护了一个交易系统，其中交易记录表tradelog包含交易流水号（tradeid）、交易员id（operator）、交易时间（t_modified）等字段。为了便于描述，我们先忽略其他字段。这个表的建表语句如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; CREATE TABLE `tradelog` (</span><br><span class="line">  `id` int(11) NOT NULL,</span><br><span class="line">  `tradeid` varchar(32) DEFAULT NULL,</span><br><span class="line">  `operator` int(11) DEFAULT NULL,</span><br><span class="line">  `t_modified` datetime DEFAULT NULL,</span><br><span class="line">  PRIMARY KEY (`id`),</span><br><span class="line">  KEY `tradeid` (`tradeid`),</span><br><span class="line">  KEY `t_modified` (`t_modified`)</span><br><span class="line">) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</span><br></pre></td></tr></table></figure>
-
-<p>假设，现在已经记录了从2016年初到2018年底的所有数据，运营部门有一个需求是，<strong>要统计发生在所有年份中7月份的交易记录总数。这个逻辑看上去并不复杂，你的SQL语句可能会这么写：</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select count(*) from tradelog where month(t_modified)=7;</span><br></pre></td></tr></table></figure>
-
-<p>由于t_modified字段上有索引，<strong>于是你就很放心地在生产库中执行了这条语句，但却发现执行了特别久，才返回了结果。</strong></p>
-<p>如果你问DBA同事为什么会出现这样的情况，他大概会告诉你：<strong>如果对字段做了函数计算，就用不上索引了，这是MySQL的规定。</strong></p>
-<p>现在你已经学过了InnoDB的索引结构了，可以再追问一句为什么？为什么条件是where t_modified&#x3D;’2018-7-1’的时候可以用上索引，而改成where month(t_modified)&#x3D;7的时候就不行了？</p>
-<p>下面是这个t_modified索引的示意图。方框上面的数字就是month()函数对应的值。</p>
-<p><img src="/2024/09/12/MySQL18/image-20240912080302192.png" alt="image-20240912080302192"></p>
-<p>如果你的SQL语句条件用的是where t_modified&#x3D;’2018-7-1’的话，引擎就会按照上面绿色箭头的路线，快速定位到 t_modified&#x3D;’2018-7-1’需要的结果。</p>
-<p><strong>实际上，B+树提供的这个快速定位能力，来源于同一层兄弟节点的有序性。</strong></p>
-<p><strong>但是，如果计算month()函数的话，你会看到传入7的时候，在树的第一层就不知道该怎么办了。（我们建立索引之后日期是有序的，但是月份并不保证有序）</strong></p>
-<p>也就是说，<strong>对索引字段做函数操作，可能会破坏索引值的有序性，因此优化器就决定放弃走树搜索功能。</strong></p>
-<p>需要注意的是，优化器并不是要放弃使用这个索引。</p>
-<p>在这个例子里，放弃了树搜索功能，优化器可以选择遍历主键索引，也可以选择遍历索引t_modified，<strong>优化器对比索引大小后发现，索引t_modified更小，遍历这个索引比遍历主键索引来得更快。因此最终还是会选择索引t_modified。</strong></p>
-<p>接下来，我们使用explain命令，查看一下这条SQL语句的执行结果。</p>
-<p><img src="/2024/09/12/MySQL18/image-20240912080317773.png" alt="image-20240912080317773"></p>
-<p><strong>key&#x3D;”t_modified”表示的是，使用了t_modified这个索引</strong>；我在测试表数据中插入了10万行数据，rows&#x3D;100335，说明这条语句<strong>扫描了整个索引的所有值</strong>；<strong>Extra字段的Using index，表示的是使用了覆盖索引。</strong></p>
-<p>也就是说，由于在t_modified字段加了month()函数操作，导致了全索引扫描。<strong>为了能够用上索引的快速定位能力，我们就要把SQL语句改成基于字段本身的范围查询。按照下面这个写法，优化器就能按照我们预期的，用上t_modified索引的快速定位能力了。</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select count(*) from tradelog where</span><br><span class="line">    -&gt; (t_modified &gt;= &#x27;2016-7-1&#x27; and t_modified&lt;&#x27;2016-8-1&#x27;) or</span><br><span class="line">    -&gt; (t_modified &gt;= &#x27;2017-7-1&#x27; and t_modified&lt;&#x27;2017-8-1&#x27;) or </span><br><span class="line">    -&gt; (t_modified &gt;= &#x27;2018-7-1&#x27; and t_modified&lt;&#x27;2018-8-1&#x27;);</span><br></pre></td></tr></table></figure>
-
-<p>当然，如果你的系统上线时间更早，或者后面又插入了之后年份的数据的话，你就需要再把其他年份补齐。</p>
-<p>到这里我给你说明了，<strong>由于加了month()函数操作，MySQL无法再使用索引快速定位功能，而只能使用全索引扫描。</strong></p>
-<p>不过优化器在个问题上确实有“偷懒”行为，<strong>即使是对于不改变有序性的函数，也不会考虑使用索引。比如，对于select * from tradelog where id + 1 &#x3D; 10000这个SQL语句，这个加1操作并不会改变有序性，但是MySQL优化器还是不能用id索引快速定位到9999这一行。所以，需要你在写SQL语句的时候，手动改写成 where id &#x3D; 10000 -1才可以。（这也和MySQL索引使用的规则有关系。MySQL 的索引优化基于列的值，而不是基于表达式或计算结果。<code>id + 1</code> 是一个计算表达式，MySQL 不能将其直接映射到索引上的值。）</strong></p>
-<h3 id="案例二：隐式类型转换"><a href="#案例二：隐式类型转换" class="headerlink" title="案例二：隐式类型转换"></a>案例二：隐式类型转换</h3><p>接下来我再跟你说一说，另一个经常让程序员掉坑里的例子。</p>
-<p>我们一起看一下这条SQL语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from tradelog where tradeid=110717;</span><br></pre></td></tr></table></figure>
-
-<p>交易编号tradeid这个字段上，<strong>本来就有索引，但是explain的结果却显示，这条语句需要走全表扫描。你可能也发现了，tradeid的字段类型是varchar(32)，而输入的参数却是整型，所以需要做类型转换。</strong></p>
-<p>那么，现在这里就有两个问题：</p>
-<ol>
-<li>数据类型转换的规则是什么？</li>
-<li>为什么有数据类型转换，就需要走全索引扫描？</li>
-</ol>
-<p>先来看第一个问题，你可能会说，数据库里面类型这么多，这种数据类型转换规则更多，我记不住，应该怎么办呢？</p>
-<p>这里有一个简单的方法，看 select “10” &gt; 9的结果：</p>
-<ol>
-<li><strong>如果规则是“将字符串转成数字”，那么就是做数字比较，结果应该是1；</strong></li>
-<li><strong>如果规则是“将数字转成字符串”，那么就是做字符串比较，结果应该是0。</strong></li>
-</ol>
-<p>验证结果如图3所示。</p>
-<p><img src="/2024/09/12/MySQL18/image-20240912080358504.png" alt="image-20240912080358504"></p>
-<p>从图中可知，select “10” &gt; 9返回的是1，所以你就能确认MySQL里的转换规则了：<strong>在MySQL中，字符串和数字做比较的话，是将字符串转换成数字（原来在MySQL中也有数据类型转换）</strong>。</p>
-<p>这时，你再看这个全表扫描的语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from tradelog where tradeid=110717;</span><br></pre></td></tr></table></figure>
-
-<p>就知道对于优化器来说，这个语句相当于：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from tradelog where  CAST(tradid AS signed int) = 110717;</span><br></pre></td></tr></table></figure>
-
-<p>也就是说，<strong>这条语句触发了我们上面说到的规则：对索引字段做函数操作，优化器会放弃走树搜索功能</strong>。</p>
-<p>现在，我留给你一个小问题，id的类型是int，如果执行下面这个语句，是否会导致全表扫描呢？</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select * from tradelog where id=&quot;83126&quot;;</span><br></pre></td></tr></table></figure>
-
-<p>你可以先自己分析一下，再到数据库里面去验证确认。</p>
-<p>接下来，我们再来看一个稍微复杂点的例子。</p>
-<h3 id="案例三：隐式字符编码转换"><a href="#案例三：隐式字符编码转换" class="headerlink" title="案例三：隐式字符编码转换"></a>案例三：隐式字符编码转换</h3><p>假设系统里还有另外一个表trade_detail，用于记录交易的操作细节。为了便于量化分析和复现，我往交易日志表tradelog和交易详情表trade_detail这两个表里插入一些数据。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; CREATE TABLE `trade_detail` (</span><br><span class="line">  `id` int(11) NOT NULL,</span><br><span class="line">  `tradeid` varchar(32) DEFAULT NULL,</span><br><span class="line">  `trade_step` int(11) DEFAULT NULL, /*操作步骤*/</span><br><span class="line">  `step_info` varchar(32) DEFAULT NULL, /*步骤信息*/</span><br><span class="line">  PRIMARY KEY (`id`),</span><br><span class="line">  KEY `tradeid` (`tradeid`)</span><br><span class="line">) ENGINE=InnoDB DEFAULT CHARSET=utf8;</span><br><span class="line"></span><br><span class="line">insert into tradelog values(1, &#x27;aaaaaaaa&#x27;, 1000, now());</span><br><span class="line">insert into tradelog values(2, &#x27;aaaaaaab&#x27;, 1000, now());</span><br><span class="line">insert into tradelog values(3, &#x27;aaaaaaac&#x27;, 1000, now());</span><br><span class="line"></span><br><span class="line">insert into trade_detail values(1, &#x27;aaaaaaaa&#x27;, 1, &#x27;add&#x27;);</span><br><span class="line">insert into trade_detail values(2, &#x27;aaaaaaaa&#x27;, 2, &#x27;update&#x27;);</span><br><span class="line">insert into trade_detail values(3, &#x27;aaaaaaaa&#x27;, 3, &#x27;commit&#x27;);</span><br><span class="line">insert into trade_detail values(4, &#x27;aaaaaaab&#x27;, 1, &#x27;add&#x27;);</span><br><span class="line">insert into trade_detail values(5, &#x27;aaaaaaab&#x27;, 2, &#x27;update&#x27;);</span><br><span class="line">insert into trade_detail values(6, &#x27;aaaaaaab&#x27;, 3, &#x27;update again&#x27;);</span><br><span class="line">insert into trade_detail values(7, &#x27;aaaaaaab&#x27;, 4, &#x27;commit&#x27;);</span><br><span class="line">insert into trade_detail values(8, &#x27;aaaaaaac&#x27;, 1, &#x27;add&#x27;);</span><br><span class="line">insert into trade_detail values(9, &#x27;aaaaaaac&#x27;, 2, &#x27;update&#x27;);</span><br><span class="line">insert into trade_detail values(10, &#x27;aaaaaaac&#x27;, 3, &#x27;update again&#x27;);</span><br><span class="line">insert into trade_detail values(11, &#x27;aaaaaaac&#x27;, 4, &#x27;commit&#x27;);</span><br></pre></td></tr></table></figure>
-
-<p>这时候，如果要查询id&#x3D;2的交易的所有操作步骤信息，SQL语句可以这么写：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select d.* from tradelog l, trade_detail d where d.tradeid=l.tradeid and l.id=2; /*语句Q1*/</span><br></pre></td></tr></table></figure>
-
-<p><img src="/2024/09/12/MySQL18/image-20240912080532236.png" alt="image-20240912080532236"></p>
-<p>我们一起来看下这个结果：</p>
-<ol>
-<li>第一行显示优化器会先在交易记录表tradelog上查到id&#x3D;2的行，这个步骤用上了<strong>主键索引</strong>，rows&#x3D;1表示只扫描一行；</li>
-<li>第二行key&#x3D;NULL，表示没有用上交易详情表trade_detail上的tradeid索引，进行了全表扫描。</li>
-</ol>
-<p>在这个执行计划里，<strong>是从tradelog表中取tradeid字段，再去trade_detail表里查询匹配字段。因此，我们把tradelog称为驱动表，把trade_detail称为被驱动表，把tradeid称为关联字段。（这不就是关联表吗？）</strong></p>
-<p>接下来，我们看下这个explain结果表示的执行流程：</p>
-<p><img src="/2024/09/12/MySQL18/image-20240912080546148.png" alt="image-20240912080546148"></p>
-<p>图中：</p>
+                <h2 id="JDK"><a href="#JDK" class="headerlink" title="JDK"></a>JDK</h2><p>JDK（Java Development Kit）是一个功能齐全的 Java 开发<strong>工具包</strong>，供开发者使用，用于创建和编译 Java 程序。它包含了 JRE（Java Runtime Environment），以及编译器 javac （用于<strong>将 Java 源代码编译为字节码（.class 文件）</strong>）和其他工具，如 ：</p>
 <ul>
-<li>第1步，是根据id在tradelog表里找到L2这一行；</li>
-<li>第2步，是从L2中取出tradeid字段的值；</li>
-<li>第3步，是根据tradeid值到trade_detail表中查找条件匹配的行。explain的结果里面第二行的key&#x3D;NULL表示的就是，<strong>这个过程是通过遍历主键索引的方式，一个一个地判断tradeid的值是否匹配。</strong></li>
+<li>javadoc（<strong>文档生成器</strong>，基于注释生成 HTML 格式的 API 文档）。</li>
+<li>jdb（调试器，<strong>用于调试 Java 程序</strong>，允许开发者设置断点、查看变量值等）。</li>
+<li>jconsole（监控工具，用于<strong>监控 Java 应用程序的性能和资源使用情况</strong>，支持 JMX（Java Management Extensions））。</li>
+<li>javap（反编译工具，<strong>用于查看字节码内容</strong>，帮助开发者理解编译后的类文件结构）。</li>
 </ul>
-<p>进行到这里，你会发现第3步不符合我们的预期。因为表trade_detail里tradeid字段上是有索引的，我们本来是希望通过使用tradeid索引能够快速定位到等值的行。但，这里并没有。</p>
-<p>如果你去问DBA同学，他们可能会告诉你，<strong>因为这两个表的字符集不同，一个是utf8，一个是utf8mb4，所以做表连接查询的时候用不上关联字段的索引。这个回答，也是通常你搜索这个问题时会得到的答案。（真的细节）</strong></p>
-<p>但是你应该再追问一下，为什么字符集不同就用不上索引呢？</p>
-<p>我们说问题是出在执行步骤的第3步，如果单独把这一步改成SQL语句的话，那就是：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from trade_detail where tradeid=$L2.tradeid.value; </span><br></pre></td></tr></table></figure>
-
-<p><strong>其中，$L2.tradeid.value的字符集是utf8mb4。</strong></p>
-<p>参照前面的两个例子，你肯定就想到了，<strong>字符集utf8mb4是utf8的超集，所以当这两个类型的字符串在做比较的时候，MySQL内部的操作是，先把utf8字符串转成utf8mb4字符集，再做比较。</strong></p>
+<p>上面提到的工具有一些我还使用过，一般开发不会使用到， IDE 已经帮助我们集成了大部分的功能。</p>
+<p>JRE 是运行已编译 Java 程序所需的环境，主要包含以下两个部分：</p>
+<ol>
+<li><strong>JVM</strong> : 也就是我们上面提到的 Java 虚拟机。</li>
+<li><strong>Java 基础类库（Class Library）</strong>：一组标准的类库，提供常用的功能和 API（如 I&#x2F;O 操作、网络通信、数据结构等）。</li>
+</ol>
+<p>简单来说，<strong>JRE 只包含运行 Java 程序所需的环境和类库，而 JDK 不仅包含 JRE，还包括用于开发和调试 Java 程序的工具</strong>。</p>
+<p>下图清晰展示了 JDK、JRE 和 JVM 的关系。</p>
+<p><img src="/2024/09/19/Java01/jdk-include-jre.png" alt="jdk-include-jre"></p>
+<p>不过，从 JDK 9 开始，就不需要区分 JDK 和 JRE 的关系了，取而代之的是<strong>模块系统</strong>（JDK 被重新组织成 94 个模块）+ <a target="_blank" rel="noopener" href="http://openjdk.java.net/jeps/282">jlinkopen in new window</a> 工具 (随 Java 9 一起发布的新命令行工具，用于生成自定义 Java 运行时映像，该映像仅包含给定应用程序所需的模块) 。并且，从 JDK 11 开始，Oracle 不再提供单独的 JRE 下载。</p>
+<p>很多语言最后都走向模块化了，这里的 JDK 只是例子之一，比如 Go Modules ，使用的也是模块化思想。</p>
+<h2 id="字节码"><a href="#字节码" class="headerlink" title="字节码"></a>字节码</h2><p>在 Java 中，<strong>JVM 可以理解的代码就叫做字节码（即扩展名为 <code>.class</code> 的文件）</strong>，它不面向任何特定的处理器，只面向虚拟机。<strong>Java 语言通过字节码的方式，在一定程度上解决了传统解释型语言执行效率低的问题，同时又保留了解释型语言可移植的特点</strong>。所以， Java 程序运行时相对来说还是高效的（不过，和 C、 C++，Rust，Go 等语言还是有一定差距的），而且，由于字节码并不针对一种特定的机器，因此，Java 程序无须重新编译便可在多种不同操作系统的计算机上运行。</p>
+<p><strong>Java 程序从源代码到运行的过程如下图所示</strong>：</p>
+<p><img src="/2024/09/19/Java01/java-code-to-machine-code.png" alt="Java程序转变为机器代码的过程"></p>
+<p>我们需要格外注意的是 <code>.class-&gt;机器码</code> 这一步。<strong>在这一步 JVM 类加载器首先加载字节码文件，然后通过解释器逐行解释执行，这种方式的执行速度会相对比较慢</strong>。而且，有些方法和代码块是经常需要被调用的(也就是所谓的热点代码)，所以后面引进了 <strong>JIT（Just in Time Compilation）</strong> 编译器，而 JIT 属于运行时编译。当 JIT 编译器完成第一次编译后，其会将字节码对应的机器码保存下来，下次可以直接使用。而我们知道，机器码的运行效率肯定是高于 Java 解释器的。这也解释了我们为什么经常会说 <strong>Java 是编译与解释共存的语言</strong> 。</p>
+<p><img src="/2024/09/19/Java01/java-code-to-machine-code-with-jit.png" alt="Java程序转变为机器代码的过程"></p>
 <blockquote>
-<p><strong>这个设定很好理解，utf8mb4是utf8的超集。类似地，在程序设计语言里面，做自动类型转换的时候，为了避免数据在转换过程中由于截断导致数据错误，也都是“按数据长度增加的方向”进行转换的。</strong></p>
+<p>HotSpot 采用了惰性评估(Lazy Evaluation)的做法，根据二八定律，<strong>消耗大部分系统资源的只有那一小部分的代码（热点代码），而这也就是 JIT 所需要编译的部分</strong>。JVM 会根据代码每次被执行的情况收集信息并相应地做出一些优化，因此执行的次数越多，它的速度就越快。</p>
 </blockquote>
-<p>因此， 在执行上面这个语句的时候，<strong>需要将被驱动数据表里的字段一个个地转换成utf8mb4，再跟L2做比较</strong>。</p>
-<p>也就是说，实际上这个语句等同于下面这个写法：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select * from trade_detail  where CONVERT(traideid USING utf8mb4)=$L2.tradeid.value; </span><br></pre></td></tr></table></figure>
-
-<p><strong>CONVERT()函数，在这里的意思是把输入的字符串转成utf8mb4字符集。</strong></p>
-<p><strong>这就再次触发了我们上面说到的原则：对索引字段做函数操作，优化器会放弃走树搜索功能。</strong></p>
-<p>到这里，你终于明确了，<strong>字符集不同只是条件之一</strong>，<strong>连接过程中要求在被驱动表的索引字段上加函数操作</strong>，是直接导致对被驱动表做全表扫描的原因。</p>
-<p>作为对比验证，我给你提另外一个需求，“查找trade_detail表里id&#x3D;4的操作，对应的操作者是谁”，再来看下这个语句和它的执行计划。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt;select l.operator from tradelog l , trade_detail d where d.tradeid=l.tradeid and d.id=4;</span><br></pre></td></tr></table></figure>
-
-<p><img src="/2024/09/12/MySQL18/image-20240912080737873.png" alt="image-20240912080737873"></p>
-<p>这个语句里trade_detail 表成了驱动表，但是explain结果的第二行显示，**这次的查询操作用上了被驱动表tradelog里的索引(tradeid)**，扫描行数是1。</p>
-<p>这也是两个tradeid字段的join操作，为什么这次能用上被驱动表的tradeid索引呢？我们来分析一下。</p>
-<p>假设驱动表trade_detail里id&#x3D;4的行记为R4，那么在连接的时候（图5的第3步），被驱动表tradelog上执行的就是类似这样的SQL 语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select operator from tradelog  where traideid =$R4.tradeid.value; </span><br></pre></td></tr></table></figure>
-
-<p>这时候**$R4.tradeid.value的字符集是utf8, 按照字符集转换规则，要转成utf8mb4，所以这个过程就被改写成：**</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select operator from tradelog  where traideid =CONVERT($R4.tradeid.value USING utf8mb4); </span><br></pre></td></tr></table></figure>
-
-<p>你看，<strong>这里的CONVERT函数是加在输入参数上的</strong>，这样就可以用上被驱动表的traideid索引。</p>
-<p>理解了原理以后，就可以用来指导操作了。如果要优化语句</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select d.* from tradelog l, trade_detail d where d.tradeid=l.tradeid and l.id=2;</span><br></pre></td></tr></table></figure>
-
-<p>的执行过程，有两种做法：</p>
+<p>JDK、JRE、JVM、JIT 这四者的关系如下图所示。</p>
+<p><img src="/2024/09/19/Java01/jdk-jre-jvm-jit.png" alt="JDK、JRE、JVM、JIT 这四者的关系"></p>
+<p>JVM 的大致结构模型如下图所示。</p>
+<p><img src="/2024/09/19/Java01/jvm-rough-structure-model.png" alt="JVM 的大致结构模型"></p>
+<h2 id="Java-和-C-的区别"><a href="#Java-和-C-的区别" class="headerlink" title="Java 和 C++ 的区别?"></a>Java 和 C++ 的区别?</h2><p>虽然，Java 和 C++ 都是面向对象的语言，都支持封装、继承和多态，但是，它们还是有挺多不相同的地方：</p>
 <ul>
-<li><p>比较常见的优化方法是，<strong>把trade_detail表上的tradeid字段的字符集也改成utf8mb4，这样就没有字符集转换的问题了。</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">alter table trade_detail modify tradeid varchar(32) CHARACTER SET utf8mb4 default null;</span><br></pre></td></tr></table></figure>
+<li>Java 不提供指针来直接访问内存，程序内存更加安全</li>
+<li>Java 的类是单继承的，C++ 支持多重继承；虽然 Java 的类不可以多继承，但是接口可以多继承。</li>
+<li>Java 有自动内存管理垃圾回收机制(GC)，不需要程序员手动释放无用内存。</li>
+<li>C ++同时支持方法重载和操作符重载，但是 Java 只支持方法重载（操作符重载增加了复杂性，这与 Java 最初的设计思想不符）。</li>
+</ul>
+<h2 id="注释"><a href="#注释" class="headerlink" title="注释"></a>注释</h2><p>《Clean Code》这本书明确指出：</p>
+<blockquote>
+<p><strong>代码的注释不是越详细越好。实际上好的代码本身就是注释，我们要尽量规范和美化自己的代码来减少不必要的注释。</strong></p>
+<p><strong>若编程语言足够有表达力，就不需要注释，尽量通过代码来阐述。</strong></p>
+<p>举个例子：</p>
+<p>去掉下面复杂的注释，只需要创建一个与注释所言同一事物的函数即可</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// check to see if the employee is eligible for full benefits</span></span><br><span class="line"><span class="keyword">if</span> ((employee.flags &amp; HOURLY_FLAG) &amp;&amp; (employee.age &gt; <span class="number">65</span>))</span><br></pre></td></tr></table></figure>
+
+<p>应替换为</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (employee.isEligibleForFullBenefits())</span><br></pre></td></tr></table></figure>
+</blockquote>
+<p>怎么说呢？注释不是越多越好的另外一个原因是软件的迭代比较快，如果有大量的注释会大大增加项目维护的难度，所以我们要尽量避免写出无用的注释，最好是直接让代码见名知意。</p>
+<h2 id="移位运算符"><a href="#移位运算符" class="headerlink" title="移位运算符"></a>移位运算符</h2><p>Java 中有三种移位运算符：</p>
+<ul>
+<li><strong><code>&lt;&lt;</code> :左移运算符</strong>，向左移若干位，高位丢弃，低位补零。<code>x &lt;&lt; n</code>,相当于 x 乘以 2 的 n 次方(不溢出的情况下)。</li>
+<li><strong><code>&gt;&gt;</code> :带符号右移</strong>，向右移若干位，<strong>高位补符号位</strong>，低位丢弃。正数高位补 0,负数高位补 1。<code>x &gt;&gt; n</code>,相当于 x 除以 2 的 n 次方。</li>
+<li><strong><code>&gt;&gt;&gt;</code> :无符号右移</strong>，忽略符号位，空位都以 0 补齐。</li>
+</ul>
+<p>虽然移位运算本质上可以分为左移和右移，但在实际应用中，右移操作需要考虑符号位的处理方式。</p>
+<p>由于 <code>double</code>，<code>float</code> 在二进制中的表现比较特殊，因此<strong>不能</strong>来进行移位操作。</p>
+<p>移位操作符实际上支持的类型只有<code>int</code>和<code>long</code>，编译器在对<code>short</code>、<code>byte</code>、<code>char</code>类型进行移位前，都会将其转换为<code>int</code>类型再操作。</p>
+<p><strong>如果移位的位数超过数值所占有的位数会怎样？</strong></p>
+<p>当 int 类型左移&#x2F;右移位数大于等于 32 位操作时，<strong>会先求余（%）后再进行左移&#x2F;右移操作</strong>。也就是说左移&#x2F;右移 32 位相当于不进行移位操作（32%32&#x3D;0），左移&#x2F;右移 42 位相当于左移&#x2F;右移 10 位（42%32&#x3D;10）。<strong>当 long 类型进行左移&#x2F;右移操作时，由于 long 对应的二进制是 64 位，因此求余操作的基数也变成了 64。</strong></p>
+<p>也就是说：<code>x&lt;&lt;42</code>等同于<code>x&lt;&lt;10</code>，<code>x&gt;&gt;42</code>等同于<code>x&gt;&gt;10</code>，<code>x &gt;&gt;&gt;42</code>等同于<code>x &gt;&gt;&gt; 10</code>。</p>
+<p>这个我之前看 Java 核心技术卷I 的时候就看到过，还行，现在又看到了。</p>
+<h2 id="Java的基本数据类型"><a href="#Java的基本数据类型" class="headerlink" title="Java的基本数据类型"></a>Java的基本数据类型</h2><p>这下面的东西书中的内容也提到过。</p>
+<p>Java 中有 8 种基本数据类型，分别为：</p>
+<ul>
+<li>6 种数字类型： <ul>
+<li>4 种整数型：<code>byte</code>、<code>short</code>、<code>int</code>、<code>long</code>。</li>
+<li>2 种浮点型：<code>float</code>、<code>double</code>。</li>
+</ul>
 </li>
-<li><p>如果能够修改字段的字符集的话，是最好不过了。<strong>但如果数据量比较大， 或者业务上暂时不能做这个DDL的话，那就只能采用修改SQL语句的方法了。</strong></p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select d.* from tradelog l , trade_detail d where d.tradeid=CONVERT(l.tradeid USING utf8) and l.id=2; </span><br></pre></td></tr></table></figure></li>
+<li>1 种字符类型：<code>char</code>。</li>
+<li>1 种布尔型：<code>boolean</code>。</li>
 </ul>
-<p><img src="/2024/09/12/MySQL18/image-20240912080945459.png" alt="image-20240912080945459"></p>
-<p>这里，<strong>我主动把 l.tradeid转成utf8（把传递过来的参数转化为这张表的字符编码，而不是将整张表都转换为传递过来参数的字符编码）</strong>，就避免了被驱动表上的字符编码转换，从explain结果可以看到，这次索引走对了。</p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天我给你举了三个例子，其实是在说同一件事儿，即：<strong>对索引字段做函数操作，可能会破坏索引值的有序性，因此优化器就决定放弃走树搜索功能。</strong></p>
-<p>第二个例子是<strong>隐式类型转换，第三个例子是隐式字符编码转换，它们都跟第一个例子一样，因为要求在索引字段上做函数操作而导致了全索引扫描</strong>。</p>
-<p>MySQL的优化器确实有“偷懒”的嫌疑，即使简单地把where id+1&#x3D;1000改写成where id&#x3D;1000-1就能够用上索引快速查找，也不会主动做这个语句重写。</p>
-<p>因此，<strong>每次你的业务代码升级时，把可能出现的、新的SQL语句explain一下，是一个很好的习惯（这个到时候我们可以具体去分析）</strong>。</p>
-<p>你遇到过别的、类似今天我们提到的性能问题吗？你认为原因是什么，又是怎么解决的呢？</p>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>我在上篇文章的最后，留给你的问题是：我们文章中最后的一个方案是，通过三次limit Y,1 来得到需要的数据，你觉得有没有进一步的优化方法。</p>
-<p>这里我给出一种方法，<strong>取Y1、Y2和Y3里面最大的一个数，记为M，最小的一个数记为N</strong>，然后执行下面这条SQL语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from t limit N, M-N+1;</span><br></pre></td></tr></table></figure>
-
-<p><strong>再加上取整个表总行数的C行，这个方案的扫描行数总共只需要C+M+1行。</strong></p>
-<p><strong>当然也可以先取回id值，在应用中确定了三个id值以后，再执行三次where id&#x3D;X的语句也是可以的。</strong></p>
-<blockquote>
-<p>提出了重新整理的方法</p>
-<p>用rowid的方法，是类似的思路，就是让表里面保存一个无空洞的自增值，这样就可以用我们的随机算法1来实现； </p>
-<p>拿到第一个值以后，用id迭代往下找的方案，利用了主键索引的有序性。</p>
-</blockquote>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/18-wei-shi-mo-zhe-xie-sql-yu-ju-luo-ji-xiang-tong-xing-neng-que-cha-yi-ju-da">18 为什么这些SQL语句逻辑相同，性能却差异巨大？ | MySql实战45讲 (gitbook.io)</a></p>
+<p><strong>注意：</strong></p>
+<ol>
+<li>Java 里使用 <code>long</code> 类型的数据一定要在数值后面加上 <strong>L</strong>，否则将作为整型解析。</li>
+<li>Java 里使用 <code>float</code> 类型的数据一定要在数值后面加上 <strong>f 或 F</strong>，否则将无法通过编译。</li>
+<li><code>char a = &#39;h&#39;</code> :单引号，<code>String a = &quot;hello&quot;</code> :双引号。</li>
+</ol>
+<p>这八种基本类型都有对应的包装类分别为：<code>Byte</code>、<code>Short</code>、<code>Integer</code>、<code>Long</code>、<code>Float</code>、<code>Double</code>、<code>Character</code>、<code>Boolean</code> 。</p>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://javaguide.cn/java/basis/java-basic-questions-01.html#jvm-vs-jdk-vs-jre">Java基础常见面试题总结(上) | JavaGuide</a></p>
 
                 
             </div>
@@ -557,7 +495,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/12/MySQL18/">http://example.com/2024/09/12/MySQL18/</a>
+                    <a href="http://example.com/2024/09/19/Java01/">http://example.com/2024/09/19/Java01/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -595,8 +533,8 @@
                     
                         <div class="article-tag">
                             
-                                <a href="/tags/MySQL/">
-                                    <span class="chip bg-color">MySQL</span>
+                                <a href="/tags/Java/">
+                                    <span class="chip bg-color">Java</span>
                                 </a>
                             
                         </div>
@@ -942,17 +880,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/12/MySQL19/">
+                <a href="/2024/09/19/Java01/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/10.jpg" class="responsive-img" alt="为什么我只查一行的语句，也执行这么慢？">
+                        <img src="/medias/featureimages/14.jpg" class="responsive-img" alt="Java基础知识大全">
                         
-                        <span class="card-title">为什么我只查一行的语句，也执行这么慢？</span>
+                        <span class="card-title">Java基础知识大全</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -962,26 +901,27 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-12
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-19
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/MySQL/" class="post-category">
-                                    MySQL
+                            <a href="/categories/Java%E5%9F%BA%E7%A1%80/" class="post-category">
+                                    Java基础
                                 </a>
                             
                             
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/MySQL/">
-                        <span class="chip bg-color">MySQL</span>
+                    <a href="/tags/Java/">
+                        <span class="chip bg-color">Java</span>
                     </a>
                     
                 </div>
@@ -995,13 +935,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/11/MySQL17/">
+                <a href="/2024/09/19/CPP02/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/1.jpg" class="responsive-img" alt="如何正确地显示随机消息？">
+                        <img src="/medias/featureimages/8.jpg" class="responsive-img" alt="现代化的 API 设计指南">
                         
-                        <span class="card-title">如何正确地显示随机消息？</span>
+                        <span class="card-title">现代化的 API 设计指南</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -1012,14 +952,14 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-11
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-19
                             </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/MySQL/" class="post-category">
-                                    MySQL
+                            <a href="/categories/C/" class="post-category">
+                                    C++
                                 </a>
                             
                             
@@ -1029,8 +969,8 @@
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/MySQL/">
-                        <span class="chip bg-color">MySQL</span>
+                    <a href="/tags/C/">
+                        <span class="chip bg-color">C++</span>
                     </a>
                     
                 </div>
