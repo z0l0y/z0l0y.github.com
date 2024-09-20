@@ -1,0 +1,1484 @@
+<!DOCTYPE HTML>
+<html lang="zh-CN">
+
+
+<head>
+    <meta charset="utf-8">
+    <meta name="keywords" content="container包中的那些容器, zoloy">
+    <meta name="description" content="我们在上次讨论了数组和切片，当我们提到数组的时候，往往会想起链表。Go 语言的链表实现在标准库的container/list代码包中。
+这个代码包中有两个公开的程序实体——List和Element，List 实现了一个双向链表（以下简称链表">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="renderer" content="webkit|ie-stand|ie-comp">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+
+
+    <title>container包中的那些容器 | zoloy&#39;s blog</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    
+
+
+    <!-- bg-cover style     -->
+
+
+
+<link rel="stylesheet" type="text/css" href="/libs/awesome/css/all.min.css">
+<link rel="stylesheet" type="text/css" href="/libs/materialize/materialize.min.css">
+<link rel="stylesheet" type="text/css" href="/libs/aos/aos.css">
+<link rel="stylesheet" type="text/css" href="/libs/animate/animate.min.css">
+<link rel="stylesheet" type="text/css" href="/libs/lightGallery/css/lightgallery.min.css">
+<link rel="stylesheet" type="text/css" href="/css/matery.css">
+<link rel="stylesheet" type="text/css" href="/css/my.css">
+<link rel="stylesheet" type="text/css" href="/css/dark.css" media="none" onload="if(media!='all')media='all'">
+
+
+
+
+    <link rel="stylesheet" href="/libs/tocbot/tocbot.css">
+    <link rel="stylesheet" href="/css/post.css">
+
+
+
+
+    
+        <link rel="stylesheet" type="text/css" href="/css/reward.css">
+    
+
+
+
+    <script src="/libs/jquery/jquery-3.6.0.min.js"></script>
+
+<meta name="generator" content="Hexo 7.0.0"></head>
+
+
+<body>
+    <header class="navbar-fixed">
+    <nav id="headNav" class="bg-color nav-transparent">
+        <div id="navContainer" class="nav-wrapper container">
+            <div class="brand-logo">
+                <a href="/" class="waves-effect waves-light">
+                    
+                    <img src="/medias/logo.png" class="logo-img" alt="LOGO">
+                    
+                    <span class="logo-span">zoloy&#39;s blog</span>
+                </a>
+            </div>
+            
+
+<a href="#" data-target="mobile-nav" class="sidenav-trigger button-collapse"><i class="fas fa-bars"></i></a>
+<ul class="right nav-menu">
+  
+  <li class="hide-on-med-and-down nav-item">
+    
+    <a href="/" class="waves-effect waves-light">
+      
+      <i class="fas fa-home" style="zoom: 0.6;"></i>
+      
+      <span>首页</span>
+    </a>
+    
+  </li>
+  
+  <li class="hide-on-med-and-down nav-item">
+    
+    <a href="/tags" class="waves-effect waves-light">
+      
+      <i class="fas fa-tags" style="zoom: 0.6;"></i>
+      
+      <span>标签</span>
+    </a>
+    
+  </li>
+  
+  <li class="hide-on-med-and-down nav-item">
+    
+    <a href="/categories" class="waves-effect waves-light">
+      
+      <i class="fas fa-bookmark" style="zoom: 0.6;"></i>
+      
+      <span>分类</span>
+    </a>
+    
+  </li>
+  
+  <li class="hide-on-med-and-down nav-item">
+    
+    <a href="/archives" class="waves-effect waves-light">
+      
+      <i class="fas fa-archive" style="zoom: 0.6;"></i>
+      
+      <span>归档</span>
+    </a>
+    
+  </li>
+  
+  <li class="hide-on-med-and-down nav-item">
+    
+    <a href="/about" class="waves-effect waves-light">
+      
+      <i class="fas fa-user-circle" style="zoom: 0.6;"></i>
+      
+      <span>关于</span>
+    </a>
+    
+  </li>
+  
+  <li>
+    <a href="#searchModal" class="modal-trigger waves-effect waves-light">
+      <i id="searchIcon" class="fas fa-search" title="搜索" style="zoom: 0.85;"></i>
+    </a>
+  </li>
+  <li>
+    <a href="javascript:;" class="waves-effect waves-light" onclick="switchNightMode()" title="深色/浅色模式" >
+      <i id="sum-moon-icon" class="fas fa-sun" style="zoom: 0.85;"></i>
+    </a>
+  </li>
+</ul>
+
+
+<div id="mobile-nav" class="side-nav sidenav">
+
+    <div class="mobile-head bg-color">
+        
+        <img src="/medias/logo.png" class="logo-img circle responsive-img">
+        
+        <div class="logo-name">zoloy&#39;s blog</div>
+        <div class="logo-desc">
+            
+            Study notes
+            
+        </div>
+    </div>
+
+    <ul class="menu-list mobile-menu-list">
+        
+        <li class="m-nav-item">
+	  
+		<a href="/" class="waves-effect waves-light">
+			
+			    <i class="fa-fw fas fa-home"></i>
+			
+			首页
+		</a>
+          
+        </li>
+        
+        <li class="m-nav-item">
+	  
+		<a href="/tags" class="waves-effect waves-light">
+			
+			    <i class="fa-fw fas fa-tags"></i>
+			
+			标签
+		</a>
+          
+        </li>
+        
+        <li class="m-nav-item">
+	  
+		<a href="/categories" class="waves-effect waves-light">
+			
+			    <i class="fa-fw fas fa-bookmark"></i>
+			
+			分类
+		</a>
+          
+        </li>
+        
+        <li class="m-nav-item">
+	  
+		<a href="/archives" class="waves-effect waves-light">
+			
+			    <i class="fa-fw fas fa-archive"></i>
+			
+			归档
+		</a>
+          
+        </li>
+        
+        <li class="m-nav-item">
+	  
+		<a href="/about" class="waves-effect waves-light">
+			
+			    <i class="fa-fw fas fa-user-circle"></i>
+			
+			关于
+		</a>
+          
+        </li>
+        
+        
+        <li><div class="divider"></div></li>
+        <li>
+            <a href="https://github.com/z0l0y" class="waves-effect waves-light" target="_blank">
+                <i class="fab fa-github-square fa-fw"></i>Fork Me
+            </a>
+        </li>
+        
+    </ul>
+</div>
+
+
+        </div>
+
+        
+            <style>
+    .nav-transparent .github-corner {
+        display: none !important;
+    }
+
+    .github-corner {
+        position: absolute;
+        z-index: 10;
+        top: 0;
+        right: 0;
+        border: 0;
+        transform: scale(1.1);
+    }
+
+    .github-corner svg {
+        color: #0f9d58;
+        fill: #fff;
+        height: 64px;
+        width: 64px;
+    }
+
+    .github-corner:hover .octo-arm {
+        animation: a 0.56s ease-in-out;
+    }
+
+    .github-corner .octo-arm {
+        animation: none;
+    }
+
+    @keyframes a {
+        0%,
+        to {
+            transform: rotate(0);
+        }
+        20%,
+        60% {
+            transform: rotate(-25deg);
+        }
+        40%,
+        80% {
+            transform: rotate(10deg);
+        }
+    }
+</style>
+
+<a href="https://github.com/z0l0y" class="github-corner tooltipped hide-on-med-and-down" target="_blank"
+   data-tooltip="Fork Me" data-position="left" data-delay="50">
+    <svg viewBox="0 0 250 250" aria-hidden="true">
+        <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
+        <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2"
+              fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path>
+        <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z"
+              fill="currentColor" class="octo-body"></path>
+    </svg>
+</a>
+        
+    </nav>
+
+</header>
+
+    
+
+
+
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/6.jpg')">
+    <div class="container" style="right: 0px;left: 0px;">
+        <div class="row">
+            <div class="col s12 m12 l12">
+                <div class="brand">
+                    <h1 class="description center-align post-title">container包中的那些容器</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+<main class="post-container content">
+
+    
+    <div class="row">
+    <div id="main-content" class="col s12 m12 l9">
+        <!-- 文章内容详情 -->
+<div id="artDetail">
+    <div class="card">
+        <div class="card-content article-info">
+            <div class="row tag-cate">
+                <div class="col s7">
+                    
+                    <div class="article-tag">
+                        
+                            <a href="/tags/Golang/">
+                                <span class="chip bg-color">Golang</span>
+                            </a>
+                        
+                    </div>
+                    
+                </div>
+                <div class="col s5 right-align">
+                    
+                    <div class="post-cate">
+                        <i class="fas fa-bookmark fa-fw icon-category"></i>
+                        
+                            <a href="/categories/Golang/" class="post-category">
+                                Golang
+                            </a>
+                        
+                    </div>
+                    
+                </div>
+            </div>
+
+            <div class="post-info">
+                
+                <div class="post-date info-break-policy">
+                    <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
+                    2024-09-20
+                </div>
+                
+
+                
+                <div class="post-date info-break-policy">
+                    <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
+                    2024-09-20
+                </div>
+                
+
+                
+                <div class="info-break-policy">
+                    <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
+                    4.7k
+                </div>
+                
+
+                
+                <div class="info-break-policy">
+                    <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
+                    17 分
+                </div>
+                
+
+                
+                    <div id="busuanzi_container_page_pv" class="info-break-policy">
+                        <i class="far fa-eye fa-fw"></i>阅读次数:&nbsp;&nbsp;
+                        <span id="busuanzi_value_page_pv"></span>
+                    </div>
+				
+            </div>
+        </div>
+        <hr class="clearfix">
+
+        
+        <!-- 是否加载使用自带的 prismjs. -->
+        <link rel="stylesheet" href="/libs/prism/prism.min.css">
+        
+
+        
+
+        <div class="card-content article-card-content">
+            <div id="articleContent">
+                <p>我们在上次讨论了数组和切片，<strong>当我们提到数组的时候，往往会想起链表。Go 语言的链表实现在标准库的<code>container/list</code>代码包中</strong>。</p>
+<p>这个代码包中有两个公开的程序实体——<code>List</code>和<code>Element</code>，<strong>List 实现了一个双向链表（以下简称链表），而 Element 则代表了链表中元素的结构，类似于节点</strong>。</p>
+<p><strong>那么，我今天的问题是：可以把自己生成的</strong><code>Element</code><strong>类型值传给链表吗？</strong></p>
+<p>我们在这里用到了<code>List</code>的四种方法。</p>
+<ul>
+<li><code>MoveBefore</code>方法和<code>MoveAfter</code>方法，它们分别用于把给定的元素移动到<strong>另一个元素的前面和后面</strong>。</li>
+<li><code>MoveToFront</code>方法和<code>MoveToBack</code>方法，分别用于把给定的元素移动到<strong>链表的最前端和最后端</strong>。</li>
+</ul>
+<p>在这些方法中，“给定的元素”都是<code>*Element</code>类型的，<code>*Element</code>类型是<code>Element</code>类型的指针类型，<code>*Element</code>的值就是元素的指针。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(l *List)</span></span> MoveBefore(e, mark *Element)</span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(l *List)</span></span> MoveAfter(e, mark *Element)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(l *List)</span></span> MoveToFront(e *Element)</span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(l *List)</span></span> MoveToBack(e *Element)</span><br></pre></td></tr></table></figure>
+
+<p>具体问题是，如果我们自己生成这样的值，然后把它作为“给定的元素”传给链表的方法，那么会发生什么？链表会接受它吗？</p>
+<p>这里，给出一个<strong>典型回答</strong>：不会接受，这些方法将不会对链表做出任何改动。<strong>因为我们自己生成的<code>Element</code>值并不在链表中，所以也就谈不上“在链表中移动元素”。更何况链表不允许我们把自己生成的<code>Element</code>值插入其中</strong>。</p>
+<p>举例如下：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">    <span class="string">&quot;container/list&quot;</span></span><br><span class="line">    <span class="string">&quot;fmt&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="comment">// 创建一个新的链表</span></span><br><span class="line">    l := list.New()</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 向链表添加元素</span></span><br><span class="line">    e1 := l.PushBack(<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 输出当前链表的元素</span></span><br><span class="line">    fmt.Println(<span class="string">&quot;Current List:&quot;</span>)</span><br><span class="line">    <span class="keyword">for</span> e := l.Front(); e != <span class="literal">nil</span>; e = e.Next() &#123;</span><br><span class="line">        fmt.Println(e.Value)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 自己创建一个 Element</span></span><br><span class="line">    customElement := &amp;list.Element&#123;Value: <span class="number">10</span>&#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 尝试将自定义的 Element 移动到链表中</span></span><br><span class="line">    <span class="comment">// 这里将报错或者不产生任何效果</span></span><br><span class="line">    <span class="comment">// 因为 customElement 不在链表中</span></span><br><span class="line">    l.MoveBefore(customElement, e1) <span class="comment">// 这行代码不会有任何效果</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 再次输出链表的元素</span></span><br><span class="line">    fmt.Println(<span class="string">&quot;After trying to move custom Element:&quot;</span>)</span><br><span class="line">    <span class="keyword">for</span> e := l.Front(); e != <span class="literal">nil</span>; e = e.Next() &#123;</span><br><span class="line">        fmt.Println(e.Value)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 结果显示链表内容没有改变</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>输出结果：</p>
+<p><img src="/2024/09/20/Golang08/image-20240920140909089.png" alt="image-20240920140909089"></p>
+<h3 id="问题解析"><a href="#问题解析" class="headerlink" title="问题解析"></a>问题解析</h3><p>在<code>List</code>包含的方法中，<strong>用于插入新元素的那些方法都只接受<code>interface&#123;&#125;</code>类型的值。这些方法在内部会使用<code>Element</code>值，包装接收到的新元素</strong>。</p>
+<p>这样做正是为了<strong>避免直接使用我们自己生成的元素，主要原因是避免链表的内部关联，遭到外界破坏，这对于链表本身以及我们这些使用者来说都是有益的</strong>。</p>
+<p><code>List</code>的方法还有下面这几种：</p>
+<p><code>Front</code>和<code>Back</code>方法分别用于获取链表中最前端和最后端的元素， <code>InsertBefore</code>和<code>InsertAfter</code>方法分别用于在指定的元素之前和之后插入新元素，<code>PushFront</code>和<code>PushBack</code>方法则分别用于在链表的最前端和最后端插入新元素。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(l *List)</span></span> Front() *Element</span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(l *List)</span></span> Back() *Element</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(l *List)</span></span> InsertBefore(v <span class="keyword">interface</span>&#123;&#125;, mark *Element) *Element</span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(l *List)</span></span> InsertAfter(v <span class="keyword">interface</span>&#123;&#125;, mark *Element) *Element</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(l *List)</span></span> PushFront(v <span class="keyword">interface</span>&#123;&#125;) *Element</span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(l *List)</span></span> PushBack(v <span class="keyword">interface</span>&#123;&#125;) *Element</span><br></pre></td></tr></table></figure>
+
+<p>这些方法都会把一个<code>Element</code>值的指针作为结果返回，<strong>它们就是链表留给我们的安全“接口”</strong>。<strong>拿到这些内部元素的指针，我们就可以去调用前面提到的用于移动元素的方法了</strong>。</p>
+<p><strong>知识扩展</strong></p>
+<p><strong>1. 问题：为什么链表可以做到开箱即用？</strong></p>
+<p><code>List</code>和<code>Element</code>都是结构体类型。<strong>结构体类型有一个特点，那就是它们的零值都会是拥有特定结构，但是没有任何定制化内容的值，相当于一个空壳。值中的字段也都会被分别赋予各自类型的零值</strong>。</p>
+<blockquote>
+<p>广义来讲，<strong>所谓的零值就是只做了声明，但还未做初始化的变量被给予的缺省值</strong>。每个类型的零值都会依据该类型的特性而被设定。</p>
+<p>比如，经过语句<code>var a [2]int</code>声明的变量<code>a</code>的值，将会是一个包含了两个<code>0</code>的整数数组。又比如，<strong>经过语句<code>var s []int</code>声明的变量<code>s</code>的值将会是一个<code>[]int</code>类型的、值为<code>nil</code>的切片</strong>。</p>
+</blockquote>
+<p>在 Go 中，当你声明一个链表时，<strong>实际上只创建了一个空的链表结构，但链表的内部状态（如头指针、尾指针等）并没有被初始化</strong>。</p>
+<p>那么经过语句<code>var l list.List</code>声明的变量<code>l</code>的值将会是什么呢？这个零值将会是一个长度为<code>0</code>的链表。这个链表持有的根元素也将会是一个空壳，其中只会包含缺省的内容。那这样的链表我们可以直接拿来使用吗？</p>
+<p>答案是，可以的。这被称为“开箱即用”。<strong>Go 语言标准库中很多结构体类型的程序实体都做到了开箱即用。这也是在编写可供别人使用的代码包（或者说程序库）时，我们推荐遵循的最佳实践之一。那么，语句<code>var l list.List</code>声明的链表<code>l</code>可以直接使用，这是怎么做到的呢？</strong></p>
+<p>关键在于它的<strong>“延迟初始化”机制</strong>。</p>
+<p>所谓的<strong>延迟初始化</strong>，你可以理解为把初始化操作延后，仅在实际需要的时候才进行。<strong>延迟初始化的优点在于“延后”，它可以分散初始化操作带来的计算量和存储空间消耗</strong>。</p>
+<p>例如，<strong>如果我们需要集中声明非常多的大容量切片的话，那么那时的 CPU 和内存空间的使用量肯定都会一个激增</strong>，并且只有设法让其中的切片及其底层数组被回收，内存使用量才会有所降低。</p>
+<p>如果<strong>数组</strong>是可以被延迟初始化的，<strong>那么计算量和存储空间的压力就可以被分散到实际使用它们的时候</strong>。<strong>这些数组被实际使用的时间越分散，延迟初始化带来的优势就会越明显</strong>。</p>
+<blockquote>
+<p>实际上，Go 语言的切片就起到了<strong>延迟初始化其底层数组的作用</strong>，你可以想一想为什么会这么说的理由。</p>
+<p>延迟初始化的缺点恰恰也在于“延后”。<strong>你可以想象一下，如果我在调用链表的每个方法的时候，它们都需要先去判断链表是否已经被初始化，那这也会是一个计算量上的浪费</strong>。在这些方法被非常频繁地调用的情况下，这种浪费的影响就开始显现了，程序的性能将会降低。</p>
+</blockquote>
+<p>在这里的链表实现中，<strong>一些方法是无需对是否初始化做判断的。比如<code>Front</code>方法和<code>Back</code>方法，一旦发现链表的长度为<code>0</code>, 直接返回<code>nil</code>就好了</strong>。</p>
+<p>又比如，在用于删除元素、移动元素，以及一些用于插入元素的方法中，只要判断一下传入的元素中指向所属链表的指针，是否与当前链表的指针相等就可以了。</p>
+<p>如果不相等，就一定说明传入的元素不是这个链表中的，后续的操作就不用做了。反之，就一定说明这个链表已经被初始化了。</p>
+<p>原因在于，链表的<code>PushFront</code>方法、<code>PushBack</code>方法、<code>PushBackList</code>方法以及<code>PushFrontList</code>方法<strong>总会先判断链表的状态，并在必要时进行初始化，这就是延迟初始化</strong>。</p>
+<p>而且，<strong>我们在向一个空的链表中添加新元素的时候，肯定会调用这四个方法中的一个，这时新元素中指向所属链表的指针，一定会被设定为当前链表的指针</strong>。所以，<strong>指针相等是链表已经初始化的充分必要条件</strong>。</p>
+<p>明白了吗？<code>List</code>利用了自身以及<code>Element</code>在结构上的特点，巧妙地平衡了延迟初始化的优缺点，使得链表可以开箱即用，并且在性能上可以达到最优。</p>
+<p>在 Go 的链表实现中，特别是 <code>list.List</code> 类型，链表的方法如 <code>PushFront</code>、<code>PushBack</code> 等会在添加元素时自动进行初始化。这些方法的设计思路如下：</p>
+<ol>
+<li><strong>状态检查</strong>：<ul>
+<li>每当调用这些方法时，首先会检查链表的状态（是否为空）。<strong>如果链表为空（即未初始化），这些方法会自动进行初始化。</strong></li>
+<li>例如，<code>PushBack</code> 会检查链表的 <code>Head</code> 是否为 <code>nil</code>，如果是，就会初始化链表。（简单的说，就是声明的时候并没有初始化变量，而是等到实际使用的时候才会初始化他，<strong>这个分配空间的思路和C++的vector很类似，都是由STL负责申请内存空间，然后释放空间，这个延迟初始化和Java的Stream流很类似</strong>）</li>
+</ul>
+</li>
+<li><strong>指向链表的指针</strong>：<ul>
+<li>当元素被添加到链表中时，新的 <code>Element</code> 中的指针会指向当前链表。这确保了每个元素都知道它所属的链表。</li>
+<li>例如，调用 <code>PushBack</code> 时，新的元素会设置其 <code>List</code> 字段为当前链表的指针。</li>
+</ul>
+</li>
+</ol>
+<p>这里举一个例子说明一下：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">    <span class="string">&quot;container/list&quot;</span></span><br><span class="line">    <span class="string">&quot;fmt&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="comment">// 声明一个空链表</span></span><br><span class="line">    <span class="keyword">var</span> l list.List</span><br><span class="line">    </span><br><span class="line"> 	<span class="comment">// 尝试访问链表的前端和后端元素</span></span><br><span class="line">    fmt.Println(<span class="string">&quot;Front:&quot;</span>, l.Front()) <span class="comment">// 输出: Front: &lt;nil&gt;</span></span><br><span class="line">    fmt.Println(<span class="string">&quot;Back:&quot;</span>, l.Back())   <span class="comment">// 输出: Back: &lt;nil&gt;</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 尝试添加元素，触发延迟初始化</span></span><br><span class="line">    l.PushBack(<span class="number">1</span>) <span class="comment">// 这里链表会被初始化</span></span><br><span class="line">    l.PushBack(<span class="number">2</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 输出链表的元素</span></span><br><span class="line">    <span class="keyword">for</span> e := l.Front(); e != <span class="literal">nil</span>; e = e.Next() &#123;</span><br><span class="line">        fmt.Println(e.Value) <span class="comment">// 输出: 1 2</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>运行结果如下图所示：</p>
+<p><img src="/2024/09/20/Golang08/image-20240920142713385.png" alt="image-20240920142713385"></p>
+<p>如果还是有点想不没明白的话，如果你学过Java，那么应该见过很多次的空指针异常吧，其实就是null.方法了，你看上面的，明明是null，但是却可以正常调用方法应该就明白了吧。这才是延迟初始化的实际含义。</p>
+<p><strong>问题 2：<code>Ring</code>与<code>List</code>的区别在哪儿？</strong></p>
+<p><code>container/ring</code>包中的<code>Ring</code>类型实现的是一个循环链表，也就是我们俗称的环。其实<code>List</code>在内部就是一个循环链表。它的根元素（<strong>即链表的头</strong>）永远不会持有任何实际的元素值，而该元素的存在就是为了连接这个循环链表的首尾两端。（这里的根元素有点类似虚拟头节点）</p>
+<p>所以也可以说，**<code>List</code>的零值是一个只包含了根元素，但不包含任何实际元素值的空链表**。那么，既然<code>Ring</code>和<code>List</code>在本质上都是循环链表，那它们到底有什么不同呢？</p>
+<p>最主要的不同有下面几种。</p>
+<ol>
+<li><p><code>Ring</code>类型的数据结构仅由它自身即可代表，而<code>List</code>类型则需要由它以及<code>Element</code>类型联合表示。这是表示方式上的不同，也是结构复杂度上的不同。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> Ring <span class="keyword">struct</span> &#123;</span><br><span class="line">    <span class="comment">// 反正是环，一直往前冲就行了，直接Next，不用管Prev什么的</span></span><br><span class="line">    Value <span class="keyword">interface</span>&#123;&#125; <span class="comment">// 节点存储的值</span></span><br><span class="line">    Next  *Ring       <span class="comment">// 指向下一个节点</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> Element <span class="keyword">struct</span> &#123;</span><br><span class="line">    Value <span class="keyword">interface</span>&#123;&#125;</span><br><span class="line">    Next  *Element</span><br><span class="line">    Prev  *Element</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> List <span class="keyword">struct</span> &#123;</span><br><span class="line">    Head *Element</span><br><span class="line">    Tail *Element</span><br><span class="line">    Len  <span class="type">int</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+</li>
+<li><p>一个<code>Ring</code>类型的值严格来讲，<strong>只代表了其所属的循环链表中的一个元素</strong>，而一个<code>List</code>类型的值则<strong>代表了一个完整的链表</strong>。这是表示维度上的不同。</p>
+</li>
+<li><p>在创建并初始化一个<code>Ring</code>值的时候，<strong>我们可以指定它包含的元素的数量，但是对于一个<code>List</code>值来说却不能这样做（也没有必要这样做）</strong>。循环链表一旦被创建，<strong>其长度是不可变的</strong>。这是两个代码包中的<code>New</code>函数在功能上的不同，也是两个类型在初始化值方面的第一个不同。</p>
+</li>
+<li><p>仅通过<code>var r ring.Ring</code>语句声明的<code>r</code>将会是一个长度为<code>1</code>的循环链表，而<code>List</code>类型的零值则是一个长度为<code>0</code>的链表。<strong>别忘了<code>List</code>中的根元素不会持有实际元素值，因此计算长度时不会包含它</strong>。这是两个类型在初始化值方面的第二个不同。</p>
+</li>
+<li><p><code>Ring</code>值的<code>Len</code>方法的算法复杂度是 O(N) 的，<strong>而<code>List</code>值的<code>Len</code>方法的算法复杂度则是 O(1) 的</strong>。这是两者在性能方面最显而易见的差别。</p>
+</li>
+</ol>
+<p>其他的不同基本上都是方法方面的了。比如，循环链表也有用于插入、移动或删除元素的方法，不过用起来都显得更抽象一些，等等。</p>
+<p><strong>总结</strong></p>
+<p>我们今天主要讨论了<code>container/list</code>包中的链表实现。我们详细讲解了链表的一些主要的使用技巧和实现特点。由于此链表实现在内部就是一个循环链表，<strong>所以我们还把它与<code>container/ring</code>包中的循环链表实现做了一番比较，包括结构、初始化以及性能方面。</strong></p>
+<p><strong>思考题</strong></p>
+<ol>
+<li><code>container/ring</code>包中的循环链表的适用场景都有哪些？</li>
+<li>你使用过<code>container/heap</code>包中的堆吗？它的适用场景又有哪些呢？</li>
+</ol>
+<p>在这里，我们先不求对它们的实现了如指掌，能用对、用好才是我们进阶之前的第一步。好了，感谢你的收听，我们下次再见。</p>
+<hr>
+<p>补充说明：<code>List</code>这个结构体类型有两个字段，<strong>一个是<code>Element</code>类型的字段<code>root</code>，另一个是<code>int</code>类型的字段<code>len</code><strong>。顾名思义，前者代表的就是那个根元素，而后者用于存储链表的长度。注意，</strong>它们都是包级私有的，也就是说使用者无法查看和修改它们</strong>。</p>
+<p>像前面那样声明的<code>l</code>，其字段<code>root</code>和<code>len</code>都会被赋予相应的零值。<code>len</code>的零值是<code>0</code>，正好可以表明该链表还未包含任何元素。由于<code>root</code>是<code>Element</code>类型的，**所以它的零值就是该类型的空壳，用字面量表示的话就是<code>Element&#123;&#125;</code>**。</p>
+<p><code>Element</code>类型包含了几个包级私有的字段，分别用于存储前一个元素、后一个元素以及所属链表的指针值。<strong>另外还有一个名叫<code>Value</code>的公开的字段，该字段的作用就是持有元素的实际值，它是<code>interface&#123;&#125;</code>类型的。在<code>Element</code>类型的零值中，这些字段的值都会是<code>nil</code>。</strong></p>
+<p>这里解释一下所属链表的指针值是什么意思：</p>
+<p><strong>所属链表的指针</strong> (<code>List</code>):</p>
+<ul>
+<li>这个字段指向包含当前 <code>Element</code> 的链表。<strong>它是一个指向 <code>List</code> 类型的指针，表示该元素属于哪个链表。（这里的设计有点类似Redis的raw编码指向SDS的操作）</strong><img src="/2024/09/20/Golang08/ce83d1346c9642fdbbf5ffbe701bfbe3.jpg" alt="img"></li>
+</ul>
+<h3 id="参考阅读"><a href="#参考阅读" class="headerlink" title="参考阅读"></a>参考阅读</h3><h4 id="切片与数组的比较"><a href="#切片与数组的比较" class="headerlink" title="切片与数组的比较"></a>切片与数组的比较</h4><p><strong>切片本身有着占用内存少和创建便捷等特点，但它的本质上还是数组</strong>。切片的一大好处是可以让我们通过窗口快速地定位并获取，或者修改底层数组中的元素。</p>
+<p>不过，<strong>当我们想删除切片中的元素的时候就没那么简单了。元素复制一般是免不了的，就算只删除一个元素，有时也会造成大量元素的移动</strong>。<strong>这时还要注意空出的元素槽位的“清空”，否则很可能会造成内存泄漏</strong>。</p>
+<p>另一方面，<strong>在切片被频繁“扩容”的情况下，新的底层数组会不断产生，这时内存分配的量以及元素复制的次数可能就很可观了，这肯定会对程序的性能产生负面的影响。</strong></p>
+<p>尤其是当我们没有一个合理、有效的”缩容“策略的时候，旧的底层数组无法被回收，新的底层数组中也会有大量无用的元素槽位。过度的内存浪费不但会降低程序的性能，还可能会使内存溢出并导致程序崩溃。</p>
+<p>这里写了一段代码便于理解：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">    <span class="string">&quot;fmt&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="comment">// 创建一个初始容量为 2 的切片</span></span><br><span class="line">    s1 := <span class="built_in">make</span>([]<span class="type">int</span>, <span class="number">0</span>, <span class="number">2</span>)</span><br><span class="line">    fmt.Printf(<span class="string">&quot;Initial slice: %v, capacity: %d\n&quot;</span>, s1, <span class="built_in">cap</span>(s1))</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 添加元素，直到触发扩容</span></span><br><span class="line">    s1 = <span class="built_in">append</span>(s1, <span class="number">1</span>, <span class="number">2</span>)</span><br><span class="line">    fmt.Printf(<span class="string">&quot;After adding elements: %v, capacity: %d\n&quot;</span>, s1, <span class="built_in">cap</span>(s1))</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 继续添加元素，触发扩容</span></span><br><span class="line">    s2 := <span class="built_in">append</span>(s1, <span class="number">3</span>)</span><br><span class="line">    fmt.Printf(<span class="string">&quot;After adding one more element: %v, capacity: %d\n&quot;</span>, s2, <span class="built_in">cap</span>(s2))</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 观察底层数组的内存使用情况</span></span><br><span class="line">    <span class="comment">// 由于 s 已经扩容，原底层数组仍然在内存中，但未被引用</span></span><br><span class="line">    <span class="comment">// 这时，我们手动创建一个新切片以观察内存使用</span></span><br><span class="line">    oldArraySlice := s1[:<span class="number">2</span>] <span class="comment">// 参考旧的底层数组的部分</span></span><br><span class="line">    fmt.Printf(<span class="string">&quot;Old array slice: %v, capacity: %d\n&quot;</span>, oldArraySlice, <span class="built_in">cap</span>(oldArraySlice))</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 这里 oldArraySlice 仍然引用了旧的底层数组</span></span><br><span class="line">    <span class="comment">// 但 s 现在指向新的底层数组</span></span><br><span class="line">    <span class="comment">// 旧数组未被回收，导致内存浪费</span></span><br><span class="line">    fmt.Printf(<span class="string">&quot;Memory usage demonstration: oldArraySlice keeping reference to old array\n&quot;</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>运行结果如下：</p>
+<p><strong>注意切片扩容之后新数组的地址是会变化的，不是一直都在原地扩容，其实叫Clone感觉才更加合理。叫扩容感觉有点误导人了。</strong></p>
+<p><img src="/2024/09/20/Golang08/image-20240920145613397.png" alt="image-20240920145613397"></p>
+<p>由此可见，正确地使用切片是多么的重要。不过，一个更重要的事实是，任何数据结构都不是银弹。不是吗？数组的自身特点和适用场景都非常鲜明，切片也是一样。它们都是 Go 语言原生的数据结构，使用起来也都很方便. <strong>不过，你的集合类工具箱中不应该只有它们。这就是我们使用链表的原因</strong>。</p>
+<p>不过，对比来看，<strong>一个链表所占用的内存空间，往往要比包含相同元素的数组所占内存大得多</strong>。这是由于链表的元素并不是连续存储的，<strong>所以相邻的元素之间需要互相保存对方的指针。不但如此，每个元素还要存有它所属链表的指针。</strong></p>
+<p>有了这些关联，<strong>链表的结构反倒更简单了。它只持有头部元素（或称为根元素）基本上就可以了。当然了，为了防止不必要的遍历和计算，链表的长度记录在内也是必须的。</strong></p>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/36-lectures-on-golang/08-container-bao-zhong-de-na-xie-rong-qi">08 | container包中的那些容器 | Go语言核心36讲 (gitbook.io)</a></p>
+
+                
+            </div>
+            <hr/>
+
+            
+
+    <div class="reprint" id="reprint-statement">
+        
+            <div class="reprint__author">
+                <span class="reprint-meta" style="font-weight: bold;">
+                    <i class="fas fa-user">
+                        文章作者:
+                    </i>
+                </span>
+                <span class="reprint-info">
+                    <a href="/about" rel="external nofollow noreferrer">zoloy</a>
+                </span>
+            </div>
+            <div class="reprint__type">
+                <span class="reprint-meta" style="font-weight: bold;">
+                    <i class="fas fa-link">
+                        文章链接:
+                    </i>
+                </span>
+                <span class="reprint-info">
+                    <a href="http://example.com/2024/09/20/Golang08/">http://example.com/2024/09/20/Golang08/</a>
+                </span>
+            </div>
+            <div class="reprint__notice">
+                <span class="reprint-meta" style="font-weight: bold;">
+                    <i class="fas fa-copyright">
+                        版权声明:
+                    </i>
+                </span>
+                <span class="reprint-info">
+                    本博客所有文章除特別声明外，均采用
+                    <a href="https://creativecommons.org/licenses/by/4.0/deed.zh" rel="external nofollow noreferrer" target="_blank">CC BY 4.0</a>
+                    许可协议。转载请注明来源
+                    <a href="/about" target="_blank">zoloy</a>
+                    !
+                </span>
+            </div>
+        
+    </div>
+
+    <script async defer>
+      document.addEventListener("copy", function (e) {
+        let toastHTML = '<span>复制成功，请遵循本文的转载规则</span><button class="btn-flat toast-action" onclick="navToReprintStatement()" style="font-size: smaller">查看</a>';
+        M.toast({html: toastHTML})
+      });
+
+      function navToReprintStatement() {
+        $("html, body").animate({scrollTop: $("#reprint-statement").offset().top - 80}, 800);
+      }
+    </script>
+
+
+
+            <div class="tag_share" style="display: block;">
+                <div class="post-meta__tag-list" style="display: inline-block;">
+                    
+                        <div class="article-tag">
+                            
+                                <a href="/tags/Golang/">
+                                    <span class="chip bg-color">Golang</span>
+                                </a>
+                            
+                        </div>
+                    
+                </div>
+                <div class="post_share" style="zoom: 80%; width: fit-content; display: inline-block; float: right; margin: -0.15rem 0;">
+                    <link rel="stylesheet" type="text/css" href="/libs/share/css/share.min.css">
+<div id="article-share">
+
+    
+    <div class="social-share" data-sites="twitter,facebook,google,qq,qzone,wechat,weibo,douban,linkedin" data-wechat-qrcode-helper="<p>微信扫一扫即可分享！</p>"></div>
+    <script src="/libs/share/js/social-share.min.js"></script>
+    
+
+    
+
+</div>
+
+                </div>
+            </div>
+            
+                <div id="reward">
+    <a href="#rewardModal" class="reward-link modal-trigger btn-floating btn-medium waves-effect waves-light red">赏</a>
+
+    <!-- Modal Structure -->
+    <div id="rewardModal" class="modal">
+        <div class="modal-content">
+            <a class="close modal-close"><i class="fas fa-times"></i></a>
+            <h4 class="reward-title">你的赏识是我前进的动力</h4>
+            <div class="reward-content">
+                <div class="reward-tabs">
+                    <ul class="tabs row">
+                        <li class="tab col s6 alipay-tab waves-effect waves-light"><a href="#alipay">支付宝</a></li>
+                        <li class="tab col s6 wechat-tab waves-effect waves-light"><a href="#wechat">微 信</a></li>
+                    </ul>
+                    <div id="alipay">
+                        <img src="/medias/reward/alipay.jpg" class="reward-img" alt="支付宝打赏二维码">
+                    </div>
+                    <div id="wechat">
+                        <img src="/medias/reward/wechat.png" class="reward-img" alt="微信打赏二维码">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        $('.tabs').tabs();
+    });
+</script>
+
+            
+        </div>
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+        <style>
+    .valine-card {
+        margin: 1.5rem auto;
+    }
+
+    .valine-card .card-content {
+        padding: 20px 20px 5px 20px;
+    }
+
+    #vcomments textarea {
+        box-sizing: border-box;
+        background: url("/medias/comment_bg.png") 100% 100% no-repeat;
+    }
+
+    #vcomments p {
+        margin: 2px 2px 10px;
+        font-size: 1.05rem;
+        line-height: 1.78rem;
+    }
+
+    #vcomments blockquote p {
+        text-indent: 0.2rem;
+    }
+
+    #vcomments a {
+        padding: 0 2px;
+        color: #4cbf30;
+        font-weight: 500;
+        text-decoration: none;
+    }
+
+    #vcomments img {
+        max-width: 100%;
+        height: auto;
+        cursor: pointer;
+    }
+
+    #vcomments ol li {
+        list-style-type: decimal;
+    }
+
+    #vcomments ol,
+    ul {
+        display: block;
+        padding-left: 2em;
+        word-spacing: 0.05rem;
+    }
+
+    #vcomments ul li,
+    ol li {
+        display: list-item;
+        line-height: 1.8rem;
+        font-size: 1rem;
+    }
+
+    #vcomments ul li {
+        list-style-type: disc;
+    }
+
+    #vcomments ul ul li {
+        list-style-type: circle;
+    }
+
+    #vcomments table, th, td {
+        padding: 12px 13px;
+        border: 1px solid #dfe2e5;
+    }
+
+    #vcomments table, th, td {
+        border: 0;
+    }
+
+    table tr:nth-child(2n), thead {
+        background-color: #fafafa;
+    }
+
+    #vcomments table th {
+        background-color: #f2f2f2;
+        min-width: 80px;
+    }
+
+    #vcomments table td {
+        min-width: 80px;
+    }
+
+    #vcomments h1 {
+        font-size: 1.85rem;
+        font-weight: bold;
+        line-height: 2.2rem;
+    }
+
+    #vcomments h2 {
+        font-size: 1.65rem;
+        font-weight: bold;
+        line-height: 1.9rem;
+    }
+
+    #vcomments h3 {
+        font-size: 1.45rem;
+        font-weight: bold;
+        line-height: 1.7rem;
+    }
+
+    #vcomments h4 {
+        font-size: 1.25rem;
+        font-weight: bold;
+        line-height: 1.5rem;
+    }
+
+    #vcomments h5 {
+        font-size: 1.1rem;
+        font-weight: bold;
+        line-height: 1.4rem;
+    }
+
+    #vcomments h6 {
+        font-size: 1rem;
+        line-height: 1.3rem;
+    }
+
+    #vcomments p {
+        font-size: 1rem;
+        line-height: 1.5rem;
+    }
+
+    #vcomments hr {
+        margin: 12px 0;
+        border: 0;
+        border-top: 1px solid #ccc;
+    }
+
+    #vcomments blockquote {
+        margin: 15px 0;
+        border-left: 5px solid #42b983;
+        padding: 1rem 0.8rem 0.3rem 0.8rem;
+        color: #666;
+        background-color: rgba(66, 185, 131, .1);
+    }
+
+    #vcomments pre {
+        font-family: monospace, monospace;
+        padding: 1.2em;
+        margin: .5em 0;
+        background: #272822;
+        overflow: auto;
+        border-radius: 0.3em;
+        tab-size: 4;
+    }
+
+    #vcomments code {
+        font-family: monospace, monospace;
+        padding: 1px 3px;
+        font-size: 0.92rem;
+        color: #e96900;
+        background-color: #f8f8f8;
+        border-radius: 2px;
+    }
+
+    #vcomments pre code {
+        font-family: monospace, monospace;
+        padding: 0;
+        color: #e8eaf6;
+        background-color: #272822;
+    }
+
+    #vcomments pre[class*="language-"] {
+        padding: 1.2em;
+        margin: .5em 0;
+    }
+
+    #vcomments code[class*="language-"],
+    pre[class*="language-"] {
+        color: #e8eaf6;
+    }
+
+    #vcomments [type="checkbox"]:not(:checked), [type="checkbox"]:checked {
+        position: inherit;
+        margin-left: -1.3rem;
+        margin-right: 0.4rem;
+        margin-top: -1px;
+        vertical-align: middle;
+        left: unset;
+        visibility: visible;
+    }
+
+    #vcomments b,
+    strong {
+        font-weight: bold;
+    }
+
+    #vcomments dfn {
+        font-style: italic;
+    }
+
+    #vcomments small {
+        font-size: 85%;
+    }
+
+    #vcomments cite {
+        font-style: normal;
+    }
+
+    #vcomments mark {
+        background-color: #fcf8e3;
+        padding: .2em;
+    }
+
+    #vcomments table, th, td {
+        padding: 12px 13px;
+        border: 1px solid #dfe2e5;
+    }
+
+    table tr:nth-child(2n), thead {
+        background-color: #fafafa;
+    }
+
+    #vcomments table th {
+        background-color: #f2f2f2;
+        min-width: 80px;
+    }
+
+    #vcomments table td {
+        min-width: 80px;
+    }
+
+    #vcomments [type="checkbox"]:not(:checked), [type="checkbox"]:checked {
+        position: inherit;
+        margin-left: -1.3rem;
+        margin-right: 0.4rem;
+        margin-top: -1px;
+        vertical-align: middle;
+        left: unset;
+        visibility: visible;
+    }
+</style>
+
+<div class="card valine-card" data-aos="fade-up">
+    <div class="comment_headling" style="font-size: 20px; font-weight: 700; position: relative; padding-left: 20px; top: 15px; padding-bottom: 5px;">
+        <i class="fas fa-comments fa-fw" aria-hidden="true"></i>
+        <span>评论</span>
+    </div>
+    <div id="vcomments" class="card-content" style="display: grid">
+    </div>
+</div>
+
+<script src="/libs/valine/av-min.js"></script>
+<script src="/libs/valine/Valine.min.js"></script>
+<script>
+    new Valine({
+        el: '#vcomments',
+        appId: 'Pd1dPt3xNG0BSsk4Q6n7B4Py-MdYXbMMI',
+        appKey: 'DJdISLrYCotymGS7nKBgM7zE',
+        serverURLs: 'https://pd1dpt3x.api.lncldglobal.com',
+        notify: 'false' === 'true',
+        verify: 'false' === 'true',
+        visitor: 'true' === 'true',
+        avatar: 'mm',
+        pageSize: '10',
+        lang: 'zh-cn',
+        placeholder: 'just go go'
+    });
+</script>
+
+<!--酷Q推送-->
+
+
+    
+
+    
+
+    
+
+    
+
+    
+
+<article id="prenext-posts" class="prev-next articles">
+    <div class="row article-row">
+        
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
+            <div class="article-badge left-badge text-color">
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
+            <div class="card">
+                <a href="/2024/09/20/Golang08/">
+                    <div class="card-image">
+                        
+                        
+                        <img src="/medias/featureimages/6.jpg" class="responsive-img" alt="container包中的那些容器">
+                        
+                        <span class="card-title">container包中的那些容器</span>
+                    </div>
+                </a>
+                <div class="card-content article-content">
+                    <div class="summary block-with-text">
+                        
+                            
+                        
+                    </div>
+                    <div class="publish-info">
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-20
+                            </span>
+                        <span class="publish-author">
+                            
+                            <i class="fas fa-bookmark fa-fw icon-category"></i>
+                            
+                            <a href="/categories/Golang/" class="post-category">
+                                    Golang
+                                </a>
+                            
+                            
+                        </span>
+                    </div>
+                </div>
+
+                
+                <div class="card-action article-tags">
+                    
+                    <a href="/tags/Golang/">
+                        <span class="chip bg-color">Golang</span>
+                    </a>
+                    
+                </div>
+                
+            </div>
+        </div>
+        
+        
+        <div class="article col s12 m6" data-aos="fade-up">
+            <div class="article-badge right-badge text-color">
+                下一篇&nbsp;<i class="fas fa-chevron-right"></i>
+            </div>
+            <div class="card">
+                <a href="/2024/09/20/Golang07/">
+                    <div class="card-image">
+                        
+                        
+                        <img src="/medias/featureimages/8.jpg" class="responsive-img" alt="数组和切片">
+                        
+                        <span class="card-title">数组和切片</span>
+                    </div>
+                </a>
+                <div class="card-content article-content">
+                    <div class="summary block-with-text">
+                        
+                            
+                        
+                    </div>
+                    <div class="publish-info">
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-20
+                            </span>
+                        <span class="publish-author">
+                            
+                            <i class="fas fa-bookmark fa-fw icon-category"></i>
+                            
+                            <a href="/categories/Golang/" class="post-category">
+                                    Golang
+                                </a>
+                            
+                            
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="card-action article-tags">
+                    
+                    <a href="/tags/Golang/">
+                        <span class="chip bg-color">Golang</span>
+                    </a>
+                    
+                </div>
+                
+            </div>
+        </div>
+        
+    </div>
+</article>
+
+</div>
+
+
+
+<!-- 代码块功能依赖 -->
+<script type="text/javascript" src="/libs/codeBlock/codeBlockFuction.js"></script>
+
+
+  <!-- 是否加载使用自带的 prismjs. -->
+  <script type="text/javascript" src="/libs/prism/prism.min.js"></script>
+
+
+<!-- 代码语言 -->
+
+<script type="text/javascript" src="/libs/codeBlock/codeLang.js"></script>
+
+
+<!-- 代码块复制 -->
+
+<script type="text/javascript" src="/libs/codeBlock/codeCopy.js"></script>
+
+
+<!-- 代码块收缩 -->
+
+<script type="text/javascript" src="/libs/codeBlock/codeShrink.js"></script>
+
+
+
+    </div>
+    <div id="toc-aside" class="expanded col l3 hide-on-med-and-down">
+        <div class="toc-widget card" style="background-color: white;">
+            <div class="toc-title"><i class="far fa-list-alt"></i>&nbsp;&nbsp;目录</div>
+            <div id="toc-content"></div>
+        </div>
+    </div>
+</div>
+
+<!-- TOC 悬浮按钮. -->
+
+<div id="floating-toc-btn" class="hide-on-med-and-down">
+    <a class="btn-floating btn-large bg-color">
+        <i class="fas fa-list-ul"></i>
+    </a>
+</div>
+
+
+<script src="/libs/tocbot/tocbot.min.js"></script>
+<script>
+    $(function () {
+        tocbot.init({
+            tocSelector: '#toc-content',
+            contentSelector: '#articleContent',
+            headingsOffset: -($(window).height() * 0.4 - 45),
+            collapseDepth: Number('0'),
+            headingSelector: 'h2, h3, h4'
+        });
+
+        // Set scroll toc fixed.
+        let tocHeight = parseInt($(window).height() * 0.4 - 64);
+        let $tocWidget = $('.toc-widget');
+        $(window).scroll(function () {
+            let scroll = $(window).scrollTop();
+            /* add post toc fixed. */
+            if (scroll > tocHeight) {
+                $tocWidget.addClass('toc-fixed');
+            } else {
+                $tocWidget.removeClass('toc-fixed');
+            }
+        });
+
+        
+        /* 修复文章卡片 div 的宽度. */
+        let fixPostCardWidth = function (srcId, targetId) {
+            let srcDiv = $('#' + srcId);
+            if (srcDiv.length === 0) {
+                return;
+            }
+
+            let w = srcDiv.width();
+            if (w >= 450) {
+                w = w + 21;
+            } else if (w >= 350 && w < 450) {
+                w = w + 18;
+            } else if (w >= 300 && w < 350) {
+                w = w + 16;
+            } else {
+                w = w + 14;
+            }
+            $('#' + targetId).width(w);
+        };
+
+        // 切换TOC目录展开收缩的相关操作.
+        const expandedClass = 'expanded';
+        let $tocAside = $('#toc-aside');
+        let $mainContent = $('#main-content');
+        $('#floating-toc-btn .btn-floating').click(function () {
+            if ($tocAside.hasClass(expandedClass)) {
+                $tocAside.removeClass(expandedClass).hide();
+                $mainContent.removeClass('l9');
+            } else {
+                $tocAside.addClass(expandedClass).show();
+                $mainContent.addClass('l9');
+            }
+            fixPostCardWidth('artDetail', 'prenext-posts');
+        });
+        
+    });
+</script>
+
+    
+
+</main>
+
+
+
+
+    <footer class="page-footer bg-color">
+    
+        <link rel="stylesheet" href="/libs/aplayer/APlayer.min.css">
+<style>
+    .aplayer .aplayer-lrc p {
+        
+        display: none;
+        
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 16px !important;
+    }
+
+    .aplayer .aplayer-lrc p.aplayer-lrc-current {
+        
+        display: none;
+        
+        font-size: 15px;
+        color: #42b983;
+    }
+
+    
+    .aplayer.aplayer-fixed.aplayer-narrow .aplayer-body {
+        left: -66px !important;
+    }
+
+    .aplayer.aplayer-fixed.aplayer-narrow .aplayer-body:hover {
+        left: 0px !important;
+    }
+
+    
+</style>
+<div class="">
+    
+    <div class="row">
+        <meting-js class="col l8 offset-l2 m10 offset-m1 s12"
+                   server="netease"
+                   type="playlist"
+                   id="503838841"
+                   fixed='true'
+                   autoplay='false'
+                   theme='#42b983'
+                   loop='all'
+                   order='random'
+                   preload='auto'
+                   volume='0.7'
+                   list-folded='true'
+        >
+        </meting-js>
+    </div>
+</div>
+
+<script src="/libs/aplayer/APlayer.min.js"></script>
+<script src="/libs/aplayer/Meting.min.js"></script>
+
+    
+
+    <div class="container row center-align"
+         style="margin-bottom: 0px !important;">
+        <div class="col s12 m8 l8 copy-right">
+            Copyright&nbsp;&copy;
+            
+                <span id="year">2019-2024</span>
+            
+            <a href="/about" target="_blank">zoloy</a>
+            |&nbsp;Powered by&nbsp;<a href="https://hexo.io/" target="_blank">Hexo</a>
+            |&nbsp;Theme&nbsp;<a href="https://github.com/blinkfox/hexo-theme-matery" target="_blank">Matery</a>
+            
+            <br>
+            
+                &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
+                        class="white-color">316.9k</span>
+            
+            
+            
+                
+            
+            
+                <span id="busuanzi_container_site_pv">
+                &nbsp;|&nbsp;<i class="far fa-eye"></i>&nbsp;总访问量:&nbsp;
+                    <span id="busuanzi_value_site_pv" class="white-color"></span>
+            </span>
+            
+            
+                <span id="busuanzi_container_site_uv">
+                &nbsp;|&nbsp;<i class="fas fa-users"></i>&nbsp;总访问人数:&nbsp;
+                    <span id="busuanzi_value_site_uv" class="white-color"></span>
+            </span>
+            
+            <br>
+
+            <!-- 运行天数提醒. -->
+            
+            <br>
+            
+        </div>
+        <div class="col s12 m4 l4 social-link social-statis">
+    <a href="https://github.com/z0l0y" class="tooltipped" target="_blank" data-tooltip="访问我的GitHub" data-position="top" data-delay="50">
+        <i class="fab fa-github"></i>
+    </a>
+
+
+
+    <a href="mailto:zloy0709@outlook.com" class="tooltipped" target="_blank" data-tooltip="邮件联系我" data-position="top" data-delay="50">
+        <i class="fas fa-envelope-open"></i>
+    </a>
+
+
+
+
+
+
+
+    <a href="tencent://AddContact/?fromId=50&fromSubId=1&subcmd=all&uin=807250972" class="tooltipped" target="_blank" data-tooltip="QQ联系我: 807250972" data-position="top" data-delay="50">
+        <i class="fab fa-qq"></i>
+    </a>
+
+
+
+    <a href="https://weibo.com/u/7908622014" class="tooltipped" target="_blank" data-tooltip="关注我的微博: https://weibo.com/u/7908622014" data-position="top" data-delay="50">
+        <i class="fab fa-weibo"></i>
+    </a>
+
+
+
+
+
+</div>
+    </div>
+</footer>
+
+<div class="progress-bar"></div>
+
+
+    <!-- 搜索遮罩框 -->
+<div id="searchModal" class="modal">
+    <div class="modal-content">
+        <div class="search-header">
+            <span class="title"><i class="fas fa-search"></i>&nbsp;&nbsp;搜索</span>
+            <input type="search" id="searchInput" name="s" placeholder="请输入搜索的关键字"
+                   class="search-input">
+        </div>
+        <div id="searchResult"></div>
+    </div>
+</div>
+
+<script type="text/javascript">
+$(function () {
+    var searchFunc = function (path, search_id, content_id) {
+        'use strict';
+        $.ajax({
+            url: path,
+            dataType: "xml",
+            success: function (xmlResponse) {
+                // get the contents from search data
+                var datas = $("entry", xmlResponse).map(function () {
+                    return {
+                        title: $("title", this).text(),
+                        content: $("content", this).text(),
+                        url: $("url", this).text()
+                    };
+                }).get();
+                var $input = document.getElementById(search_id);
+                var $resultContent = document.getElementById(content_id);
+                $input.addEventListener('input', function () {
+                    var str = '<ul class=\"search-result-list\">';
+                    var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                    $resultContent.innerHTML = "";
+                    if (this.value.trim().length <= 0) {
+                        return;
+                    }
+                    // perform local searching
+                    datas.forEach(function (data) {
+                        var isMatch = true;
+                        var data_title = data.title.trim().toLowerCase();
+                        var data_content = data.content.trim().replace(/<[^>]+>/g, "").toLowerCase();
+                        var data_url = data.url;
+                        data_url = data_url.indexOf('/') === 0 ? data.url : '/' + data_url;
+                        var index_title = -1;
+                        var index_content = -1;
+                        var first_occur = -1;
+                        // only match artiles with not empty titles and contents
+                        if (data_title !== '' && data_content !== '') {
+                            keywords.forEach(function (keyword, i) {
+                                index_title = data_title.indexOf(keyword);
+                                index_content = data_content.indexOf(keyword);
+                                if (index_title < 0 && index_content < 0) {
+                                    isMatch = false;
+                                } else {
+                                    if (index_content < 0) {
+                                        index_content = 0;
+                                    }
+                                    if (i === 0) {
+                                        first_occur = index_content;
+                                    }
+                                }
+                            });
+                        }
+                        // show search results
+                        if (isMatch) {
+                            str += "<li><a href='" + data_url + "' class='search-result-title'>" + data_title + "</a>";
+                            var content = data.content.trim().replace(/<[^>]+>/g, "");
+                            if (first_occur >= 0) {
+                                // cut out 100 characters
+                                var start = first_occur - 20;
+                                var end = first_occur + 80;
+                                if (start < 0) {
+                                    start = 0;
+                                }
+                                if (start === 0) {
+                                    end = 100;
+                                }
+                                if (end > content.length) {
+                                    end = content.length;
+                                }
+                                var match_content = content.substr(start, end);
+                                // highlight all keywords
+                                keywords.forEach(function (keyword) {
+                                    var regS = new RegExp(keyword, "gi");
+                                    match_content = match_content.replace(regS, "<em class=\"search-keyword\">" + keyword + "</em>");
+                                });
+
+                                str += "<p class=\"search-result\">" + match_content + "...</p>"
+                            }
+                            str += "</li>";
+                        }
+                    });
+                    str += "</ul>";
+                    $resultContent.innerHTML = str;
+                });
+            }
+        });
+    };
+
+    searchFunc('/search.xml', 'searchInput', 'searchResult');
+});
+</script>
+
+    <!-- 白天和黑夜主题 -->
+<div class="stars-con">
+    <div id="stars"></div>
+    <div id="stars2"></div>
+    <div id="stars3"></div>  
+</div>
+
+<script>
+    function switchNightMode() {
+        $('<div class="Cuteen_DarkSky"><div class="Cuteen_DarkPlanet"></div></div>').appendTo($('body')),
+        setTimeout(function () {
+            $('body').hasClass('DarkMode') 
+            ? ($('body').removeClass('DarkMode'), localStorage.setItem('isDark', '0'), $('#sum-moon-icon').removeClass("fa-sun").addClass('fa-moon')) 
+            : ($('body').addClass('DarkMode'), localStorage.setItem('isDark', '1'), $('#sum-moon-icon').addClass("fa-sun").removeClass('fa-moon')),
+            
+            setTimeout(function () {
+            $('.Cuteen_DarkSky').fadeOut(1e3, function () {
+                $(this).remove()
+            })
+            }, 2e3)
+        })
+    }
+</script>
+
+    <!-- 回到顶部按钮 -->
+<div id="backTop" class="top-scroll">
+    <a class="btn-floating btn-large waves-effect waves-light" href="#!">
+        <i class="fas fa-arrow-up"></i>
+    </a>
+</div>
+
+
+    <script src="/libs/materialize/materialize.min.js"></script>
+    <script src="/libs/masonry/masonry.pkgd.min.js"></script>
+    <script src="/libs/aos/aos.js"></script>
+    <script src="/libs/scrollprogress/scrollProgress.min.js"></script>
+    <script src="/libs/lightGallery/js/lightgallery-all.min.js"></script>
+    <script src="/js/matery.js"></script>
+
+    
+
+    
+    
+    
+        
+        <script type="text/javascript">
+            // 只在桌面版网页启用特效
+            var windowWidth = $(window).width();
+            if (windowWidth > 768) {
+                document.write('<script type="text/javascript" src="/libs/others/sakura.js"><\/script>');
+            }
+        </script>
+    
+
+    <!-- 雪花特效 -->
+    
+
+    <!-- 鼠标星星特效 -->
+    
+
+     
+        <script src="https://ssl.captcha.qq.com/TCaptcha.js"></script>
+        <script src="/libs/others/TencentCaptcha.js"></script>
+        <button id="TencentCaptcha" data-appid="xxxxxxxxxx" data-cbfn="callback" type="button" hidden></button>
+    
+
+    <!-- Baidu Analytics -->
+
+    <!-- Baidu Push -->
+
+<script>
+    (function () {
+        var bp = document.createElement('script');
+        var curProtocol = window.location.protocol.split(':')[0];
+        if (curProtocol === 'https') {
+            bp.src = 'https://zz.bdstatic.com/linksubmit/push.js';
+        } else {
+            bp.src = 'http://push.zhanzhang.baidu.com/push.js';
+        }
+        var s = document.getElementsByTagName("script")[0];
+        s.parentNode.insertBefore(bp, s);
+    })();
+</script>
+
+    
+    
+    <script async src="/libs/others/busuanzi.pure.mini.js"></script>
+    
+
+    
+
+    
+
+    <!--腾讯兔小巢-->
+    
+    
+
+    
+
+    
+
+    
+    <script src="/libs/instantpage/instantpage.js" type="module"></script>
+    
+
+</body>
+
+</html>
