@@ -4,9 +4,9 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="keywords" content="MySQL为什么有时候会选错索引？, zoloy">
-    <meta name="description" content="前面我们介绍过索引，你已经知道了在MySQL中一张表其实是可以支持多个索引的。但是，你写SQL语句的时候，并没有主动指定使用哪个索引。也就是说，使用哪个索引是由MySQL来确定的。
-不知道你有没有碰到过这种情况，一条本来可以执行得很快的语句">
+    <meta name="keywords" content="go语句及其执行规则（下）, zoloy">
+    <meta name="description" content="在上一篇文章中，我们讲到了 goroutine 在操作系统的并发编程体系，以及在 Go 语言并发编程模型中的地位和作用等一系列内容，今天我们继续来聊一聊这个话题。
+知识扩展问题 1：怎样才能让主 goroutine 等待其他 gorouti">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="renderer" content="webkit|ie-stand|ie-comp">
@@ -18,7 +18,7 @@
     <!-- Global site tag (gtag.js) - Google Analytics -->
 
 
-    <title>MySQL为什么有时候会选错索引？ | zoloy&#39;s blog</title>
+    <title>go语句及其执行规则（下） | zoloy&#39;s blog</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     
 
@@ -291,12 +291,12 @@
 
 
 
-<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/22.jpg')">
+<div class="bg-cover pd-header post-cover" style="background-image: url('/medias/featureimages/16.jpg')">
     <div class="container" style="right: 0px;left: 0px;">
         <div class="row">
             <div class="col s12 m12 l12">
                 <div class="brand">
-                    <h1 class="description center-align post-title">MySQL为什么有时候会选错索引？</h1>
+                    <h1 class="description center-align post-title">go语句及其执行规则（下）</h1>
                 </div>
             </div>
         </div>
@@ -320,8 +320,8 @@
                     
                     <div class="article-tag">
                         
-                            <a href="/tags/MySQL/">
-                                <span class="chip bg-color">MySQL</span>
+                            <a href="/tags/Golang/">
+                                <span class="chip bg-color">Golang</span>
                             </a>
                         
                     </div>
@@ -332,8 +332,8 @@
                     <div class="post-cate">
                         <i class="fas fa-bookmark fa-fw icon-category"></i>
                         
-                            <a href="/categories/MySQL/" class="post-category">
-                                MySQL
+                            <a href="/categories/Golang/" class="post-category">
+                                Golang
                             </a>
                         
                     </div>
@@ -345,28 +345,28 @@
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-minus fa-fw"></i>发布日期:&nbsp;&nbsp;
-                    2024-09-10
+                    2024-09-23
                 </div>
                 
 
                 
                 <div class="post-date info-break-policy">
                     <i class="far fa-calendar-check fa-fw"></i>更新日期:&nbsp;&nbsp;
-                    2024-09-11
+                    2024-09-23
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    4.7k
+                    2.9k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    16 分
+                    10 分
                 </div>
                 
 
@@ -389,148 +389,59 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                <p>前面我们介绍过索引，<strong>你已经知道了在MySQL中一张表其实是可以支持多个索引的</strong>。但是，<strong>你写SQL语句的时候，并没有主动指定使用哪个索引。也就是说，使用哪个索引是由MySQL来确定的。</strong></p>
-<p>不知道你有没有碰到过这种情况，一条本来可以执行得很快的语句，<strong>却由于MySQL选错了索引</strong>，而导致执行速度变得很慢？</p>
-<p>我们一起来看一个例子吧。</p>
-<p>我们先建一个简单的表，表里有a、b两个字段，并分别建上索引：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">CREATE TABLE `t` (</span><br><span class="line">  `id` int(11) NOT NULL,</span><br><span class="line">  `a` int(11) DEFAULT NULL,</span><br><span class="line">  `b` int(11) DEFAULT NULL,</span><br><span class="line">  PRIMARY KEY (`id`),</span><br><span class="line">  KEY `a` (`a`),</span><br><span class="line">  KEY `b` (`b`)</span><br><span class="line">) ENGINE=InnoDB；</span><br></pre></td></tr></table></figure>
+                <p>在上一篇文章中，我们讲到了 goroutine 在操作系统的并发编程体系，以及在 Go 语言并发编程模型中的地位和作用等一系列内容，今天我们继续来聊一聊这个话题。</p>
+<h3 id="知识扩展"><a href="#知识扩展" class="headerlink" title="知识扩展"></a>知识扩展</h3><p><strong>问题 1：怎样才能让主 goroutine 等待其他 goroutine？</strong></p>
+<p>我刚才说过，<strong>一旦主 goroutine 中的代码执行完毕，当前的 Go 程序就会结束运行，无论其他的 goroutine 是否已经在运行了。那么，怎样才能做到等其他的 goroutine 运行完毕之后，再让主 goroutine 结束运行呢？</strong></p>
+<p>其实有很多办法可以做到这一点。<strong>其中，最简单粗暴的办法就是让主 goroutine“小睡”一会儿。</strong></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> i := <span class="number">0</span>; i &lt; <span class="number">10</span>; i++ &#123;</span><br><span class="line"><span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">fmt.Println(i)</span><br><span class="line">&#125;()</span><br><span class="line">&#125;</span><br><span class="line">time.Sleep(time.Millisecond * <span class="number">500</span>)</span><br></pre></td></tr></table></figure>
 
-<p>然后，我们往表t中插入10万行记录，取值按整数递增，即：(1,1,1)，(2,2,2)，(3,3,3) 直到(100000,100000,100000)。</p>
-<p>我是用<strong>存储过程</strong>来插入数据的，这里我贴出来方便你复现：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">delimiter ;;</span><br><span class="line">create procedure idata()</span><br><span class="line">begin</span><br><span class="line">  declare i int;</span><br><span class="line">  set i=1;</span><br><span class="line">  while(i&lt;=100000)do</span><br><span class="line">    insert into t values(i, i, i);</span><br><span class="line">    set i=i+1;</span><br><span class="line">  end while;</span><br><span class="line">end;;</span><br><span class="line">delimiter ;</span><br><span class="line">call idata();</span><br></pre></td></tr></table></figure>
+<p>在<code>for</code>语句的后边，我调用了<code>time</code>包的<code>Sleep</code>函数，并把<code>time.Millisecond * 500</code>的结果作为参数值传给了它。<code>time.Sleep</code>函数的功能就是让当前的 goroutine<strong>（在这里就是主 goroutine）暂停运行一段时间，直到到达指定的恢复运行时间</strong>。</p>
+<p>我们可以把一个相对的时间传给该函数，就像我在这里传入的“500 毫秒”那样。<code>time.Sleep</code>函数会在被调用时用当前的绝对时间，再加上相对时间计算出在未来的恢复运行时间。<strong>显然，一旦到达恢复运行时间，当前的 goroutine 就会从“睡眠”中醒来，并开始继续执行后边的代码</strong>。</p>
+<p>这个办法是可行的，只要“睡眠”的时间不要太短就好。不过，问题恰恰就在这里，我们让主 goroutine“睡眠”多长时间才是合适的呢？<strong>如果“睡眠”太短，则很可能不足以让其他的 goroutine 运行完毕，而若“睡眠”太长则纯属浪费时间，这个时间就太难把握了。</strong></p>
+<p>你可能会想到，既然不容易预估时间，那我们就让其他的 goroutine 在运行完毕的时候告诉我们好了。这个思路很好，但怎么做呢？</p>
+<p>你是否想到了通道呢？<strong>我们先创建一个通道，它的长度应该与我们手动启用的 goroutine 的数量一致。在每个手动启用的 goroutine 即将运行完毕的时候，我们都要向该通道发送一个值。</strong></p>
+<p>注意，这些发送表达式应该被放在它们的<code>go</code>函数体的最后面。对应的，我们还需要在<code>main</code>函数的最后从通道接收元素值，接收的次数也应该与手动启用的 goroutine 的数量保持一致。关于这些你可以到 <a target="_blank" rel="noopener" href="https://github.com/crazyjums/go_haolingeek/blob/master/article16/q2/demo39.go">demo39.go</a> 文件中，去查看具体的写法。</p>
+<p>其中有一个细节你需要注意。我在声明通道<code>sign</code>的时候是以<code>chan struct&#123;&#125;</code>作为其类型的。<strong>其中的类型字面量<code>struct&#123;&#125;</code>有些类似于空接口类型<code>interface&#123;&#125;</code>，它代表了既不包含任何字段也不拥有任何方法的空结构体类型。</strong></p>
+<p><strong>注意，<code>struct&#123;&#125;</code>类型值的表示法只有一个，即：<code>struct&#123;&#125;&#123;&#125;</code>。并且，它占用的内存空间是<code>0</code>字节。确切地说，这个值在整个 Go 程序中永远都只会存在一份。虽然我们可以无数次地使用这个值字面量，但是用到的却都是同一个值。</strong></p>
+<p>这是因为 Go 语言在内部将这个值视为单一的实例。可以<strong>想象成它是一个常量，所有的空结构体值在内存中共享同一个地址</strong>。</p>
+<p><strong>当我们仅仅把通道当作传递某种简单信号的介质的时候，用<code>struct&#123;&#125;</code>作为其元素类型是再好不过的了。</strong>顺便说一句，我在讲“结构体及其方法的使用法门”的时候留过一道与此相关的思考题，你可以返回去看一看。</p>
+<p>再说回当下的问题，有没有比使用通道更好的方法？<strong>如果你知道标准库中的代码包<code>sync</code>的话，那么可能会想到<code>sync.WaitGroup</code>类型。没错，这是一个更好的答案。</strong>不过具体的使用方式我在后边讲<code>sync</code>包的时候再说。</p>
+<p><strong>问题 2：怎样让我们启用的多个 goroutine 按照既定的顺序运行？</strong></p>
+<p>在很多时候，当我沿着上面的主问题以及第一个扩展问题一路问下来的时候，应聘者往往会被这第二个扩展问题难住。</p>
+<p>所以基于上一篇主问题中的代码，怎样做到让从<code>0</code>到<code>9</code>这几个整数按照自然数的顺序打印出来？你可能会说，我不用 goroutine 不就可以了嘛。没错，这样是可以，但是如果我不考虑这样做呢。你应该怎么解决这个问题？</p>
+<p>当然了，众多应聘者回答的其他答案也是五花八门的，有的可行，有的不可行，还有的把原来的代码改得面目全非。我下面就来说说我的思路，以及心目中的答案吧。这个答案并不一定是最佳的，也许你在看完之后还可以想到更优的答案。</p>
+<p>首先，<strong>我们需要稍微改造一下<code>for</code>语句中的那个<code>go</code>函数，要让它接受一个<code>int</code>类型的参数，并在调用它的时候把变量<code>i</code>的值传进去。为了不改动这个<code>go</code>函数中的其他代码，我们可以把它的这个参数也命名为<code>i</code>。</strong></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> i := <span class="number">0</span>; i &lt; <span class="number">10</span>; i++ &#123;</span><br><span class="line">    <span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">(i <span class="type">int</span>)</span></span> &#123;</span><br><span class="line">        fmt.Println(i)</span><br><span class="line">    &#125;(i)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>接下来，我们分析一条SQL语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from t where a between 10000 and 20000;</span><br></pre></td></tr></table></figure>
+<p>只有这样，<strong>Go 语言才能保证每个 goroutine 都可以拿到一个唯一的整数。其原因与<code>go</code>函数的执行时机有关。</strong></p>
+<p>我在前面已经讲过了。在<code>go</code>语句被执行时，<strong>我们传给<code>go</code>函数的参数<code>i</code>会先被求值，如此就得到了当次迭代的序号</strong>。<strong>之后，无论<code>go</code>函数会在什么时候执行，这个参数值都不会变。也就是说，<code>go</code>函数中调用的<code>fmt.Println</code>函数打印的一定会是那个当次迭代的序号</strong>。</p>
+<p>然后，我们在着手改造<code>for</code>语句中的<code>go</code>函数。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> i := <span class="type">uint32</span>(<span class="number">0</span>); i &lt; <span class="number">10</span>; i++ &#123;</span><br><span class="line">    <span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">(i <span class="type">uint32</span>)</span></span> &#123;</span><br><span class="line">        fn := <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">            fmt.Println(i)</span><br><span class="line">        &#125;</span><br><span class="line">        trigger(i, fn)</span><br><span class="line">    &#125;(i)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>你一定会说，这个语句还用分析吗，很简单呀，a上有索引，肯定是要使用索引a的。</p>
-<p>你说得没错，图1显示的就是使用explain命令看到的这条语句的执行情况。</p>
-<p><img src="/2024/09/10/MySQL10/image-20240911073643013.png" alt="image-20240911073643013"></p>
-<p>从图1看上去，这条查询语句的执行也确实符合预期，key这个字段值是’a’，表示优化器选择了索引a。</p>
-<p>不过别急，这个案例不会这么简单。在我们已经准备好的包含了10万行数据的表上，我们再做如下操作。</p>
-<p><img src="/2024/09/10/MySQL10/image-20240911073701695.png" alt="image-20240911073701695"></p>
-<p>这里，session A的操作你已经很熟悉了，它就是<strong>开启了一个事务</strong>。随后，session B把数据都删除后，又调用了 idata这个存储过程，插入了10万行数据。</p>
-<p>这时候，session B的查询语句select * from t where a between 10000 and 20000就<strong>不会再选择索引a了</strong>。我们可以通过慢查询日志（slow log）来查看一下具体的执行情况。</p>
-<p>为了说明优化器选择的结果是否正确，我增加了一个对照，即：<strong>使用force index(a)来让优化器强制使用索引a（这部分内容，我还会在这篇文章的后半部分中提到）</strong>。</p>
-<p>下面的三条SQL语句，就是这个实验过程。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">set long_query_time=0;</span><br><span class="line">select * from t where a between 10000 and 20000; /*Q1*/</span><br><span class="line">select * from t force index(a) where a between 10000 and 20000;/*Q2*/</span><br></pre></td></tr></table></figure>
+<p>我在<code>go</code>函数中先声明了一个匿名的函数，并把它赋给了变量<code>fn</code>。这个匿名函数做的事情很简单，只是调用<code>fmt.Println</code>函数以打印<code>go</code>函数的参数<code>i</code>的值。</p>
+<p>在这之后，我调用了一个名叫<code>trigger</code>的函数，并把<code>go</code>函数的参数<code>i</code>和刚刚声明的变量<code>fn</code>作为参数传给了它。注意，<code>for</code>语句声明的局部变量<code>i</code>和<code>go</code>函数的参数<code>i</code>的类型都变了，都由<code>int</code>变为了<code>uint32</code>。至于为什么，我一会儿再说。</p>
+<p>再来说<code>trigger</code>函数。<strong>该函数接受两个参数，一个是<code>uint32</code>类型的参数<code>i</code>, 另一个是<code>func()</code>类型的参数<code>fn</code><strong>。你应该记得，</strong><code>func()</code>代表的是既无参数声明也无结果声明的函数类型</strong>。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">trigger := <span class="function"><span class="keyword">func</span><span class="params">(i <span class="type">uint32</span>, fn <span class="keyword">func</span>()</span></span>) &#123;</span><br><span class="line">    <span class="keyword">for</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> n := atomic.LoadUint32(&amp;count); n == i &#123;</span><br><span class="line">            fn()</span><br><span class="line">            atomic.AddUint32(&amp;count, <span class="number">1</span>)</span><br><span class="line">            <span class="keyword">break</span></span><br><span class="line">        &#125;</span><br><span class="line">        time.Sleep(time.Nanosecond)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<ul>
-<li>第一句，<strong>是将慢查询日志的阈值设置为0，表示这个线程接下来的语句都会被记录入慢查询日志中；</strong></li>
-<li>第二句，Q1是session B原来的查询；</li>
-<li>第三句，Q2是加了**force index(a)**来和session B原来的查询语句执行情况对比。</li>
-</ul>
-<p><img src="/2024/09/10/MySQL10/image-20240911073735882.png" alt="image-20240911073735882"></p>
-<p>可以看到，<strong>Q1扫描了10万行，显然是走了全表扫描，执行时间是40毫秒。Q2扫描了10001行，执行了21毫秒。也就是说，我们在没有使用force index的时候，MySQL用错了索引，导致了更长的执行时间。</strong></p>
-<p>这个例子对应的是我们<strong>平常不断地删除历史数据和新增数据的场景</strong>。这时，MySQL竟然会选错索引，是不是有点奇怪呢？今天，我们就从这个奇怪的结果说起吧。</p>
-<h2 id="优化器的逻辑"><a href="#优化器的逻辑" class="headerlink" title="优化器的逻辑"></a>优化器的逻辑</h2><p>在第一篇文章中，我们就提到过，<strong>选择索引是优化器的工作</strong>。</p>
-<p><strong>而优化器选择索引的目的，是找到一个最优的执行方案，并用最小的代价去执行语句</strong>。在数据库里面，<strong>扫描行数是影响执行代价的因素之一。扫描的行数越少，意味着访问磁盘数据的次数越少，消耗的CPU资源越少</strong>。</p>
-<p>当然，扫描行数并不是唯一的判断标准，<strong>优化器还会结合是否使用临时表、是否排序等因素进行综合判断</strong>。</p>
-<p>我们这个简单的查询语句并没有涉及到临时表和排序，<strong>所以MySQL选错索引肯定是在判断扫描行数的时候出问题了</strong>。</p>
-<p>那么，问题就是：<strong>扫描行数是怎么判断的？</strong></p>
-<p>MySQL在真正开始执行语句之前，<strong>并不能精确地知道满足这个条件的记录有多少条，而只能根据统计信息来估算记录数</strong>。</p>
-<p>这个<strong>统计信息就是索引的“区分度”</strong>。显然，一个索引上不同的值越多，这个索引的区分度就越好。<strong>而一个索引上不同的值的个数，我们称之为“基数”（cardinality）。也就是说，这个基数越大，索引的区分度越好</strong>。</p>
-<p>我们可以<strong>使用show index方法，看到一个索引的基数</strong>。如图4所示，就是表t的show index 的结果 。虽然这个表的每一行的三个字段值都是一样的，但是在统计信息中，这三个索引的基数值并不同，而且<strong>其实都不准确</strong>。</p>
-<p><img src="/2024/09/10/MySQL10/image-20240911074038621.png" alt="image-20240911074038621"></p>
-<p>那么，<strong>MySQL是怎样得到索引的基数的呢？</strong>这里，我给你简单介绍一下<strong>MySQL采样统计</strong>的方法。</p>
-<p>为什么要采样统计呢？<strong>因为把整张表取出来一行行统计，虽然可以得到精确的结果，但是代价太高了，所以只能选择“采样统计”。</strong></p>
-<p><strong>采样统计的时候，InnoDB默认会选择N个数据页，统计这些页面上的不同值，得到一个平均值，然后乘以这个索引的页面数，就得到了这个索引的基数</strong>。</p>
-<p>而数据表是会<strong>持续更新</strong>的，索引统计信息也不会固定不变。所以，当变更的数据行数超过1&#x2F;M的时候，会<strong>自动触发重新做一次索引统计</strong>。</p>
-<p>在MySQL中，有两种存储索引统计的方式，可以通过设置参数innodb_stats_persistent的值来选择：</p>
-<ul>
-<li>设置为on的时候，<strong>表示统计信息会持久化存储。</strong>这时，默认的N是20，M是10。</li>
-<li>设置为off的时候，<strong>表示统计信息只存储在内存中。</strong>这时，默认的N是8，M是16。</li>
-</ul>
-<p>由于是采样统计，<strong>所以不管N是20还是8，这个基数都是很容易不准的。</strong></p>
-<p>但，这还不是全部。</p>
-<p>你可以从上图中看到，这次的索引统计值（cardinality列）虽然不够精确，但大体上还是差不多的，选错索引一定还有别的原因。</p>
-<p>其实索引统计只是一个输入，对于一个具体的语句来说，优化器还要判断，执行这个语句本身要扫描多少行。</p>
-<p>接下来，我们再一起看看优化器预估的，这两个语句的扫描行数是多少。</p>
-<p><img src="/2024/09/10/MySQL10/image-20240911074053831.png" alt="image-20240911074053831"></p>
-<p>rows这个字段表示的是预计扫描行数。</p>
-<p>其中，Q1的结果还是符合预期的，rows的值是104620；但是Q2的rows值是37116，偏差就大了。<strong>而图1中我们用explain命令看到的rows是只有10001行，是这个偏差误导了优化器的判断。</strong></p>
-<p>到这里，<strong>可能你的第一个疑问不是为什么不准，而是优化器为什么放着扫描37000行的执行计划不用，却选择了扫描行数是100000的执行计划呢</strong>？</p>
-<p>这是因为，<strong>如果使用索引a，每次从索引a上拿到一个值，都要回到主键索引上查出整行数据，这个代价优化器也要算进去的</strong>。</p>
-<p>而如果选择扫描10万行，<strong>是直接在主键索引上扫描的，没有额外的代价</strong>。</p>
-<p>优化器会<strong>估算这两个选择的代价，从结果看来，优化器认为直接扫描主键索引更快</strong>。当然，从执行时间看来，这个选择并不是最优的。</p>
-<p>使用普通索引<strong>需要把回表的代价算进去，在图1执行explain的时候，也考虑了这个策略的代价 ，但图1的选择是对的</strong>。也就是说，这个策略并没有问题。</p>
-<p>所以冤有头债有主，MySQL选错索引，<strong>这件事儿还得归咎到没能准确地判断出扫描行数。至于为什么会得到错误的扫描行数</strong>，这个原因就作为课后问题，留给你去分析了。</p>
-<p>既然是统计信息不对，那就修正。<strong>analyze table t 命令，可以用来重新统计索引信息</strong>。我们来看一下执行效果。</p>
-<p><img src="/2024/09/10/MySQL10/image-20240911074130011.png" alt="image-20240911074130011"></p>
-<p>这回对了。</p>
-<p><strong>所以在实践中，如果你发现explain的结果预估的rows值跟实际情况差距比较大，可以采用这个方法来处理。</strong></p>
-<p>其实，如果只是索引统计不准确，<strong>通过analyze命令可以解决很多问题，但是前面我们说了，优化器可不止是看扫描行数。</strong></p>
-<p>依然是基于这个表t，我们看看另外一个语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from t where (a between 1 and 1000)  and (b between 50000 and 100000) order by b limit 1;</span><br></pre></td></tr></table></figure>
+<p><code>trigger</code>函数会不断地获取一个名叫<code>count</code>的变量的值，并判断该值是否与参数<code>i</code>的值相同。如果相同，那么就立即调用<code>fn</code>代表的函数，然后把<code>count</code>变量的值加<code>1</code>，最后显式地退出当前的循环。否则，我们就先让当前的 goroutine“睡眠”一个纳秒再进入下一个迭代。</p>
+<p>注意，<strong>我操作变量<code>count</code>的时候使用的都是原子操作。这是由于<code>trigger</code>函数会被多个 goroutine 并发地调用，所以它用到的非本地变量<code>count</code>，就被多个用户级线程共用了。因此，对它的操作就产生了竞态条件（race condition），破坏了程序的并发安全性。</strong></p>
+<p>所以，<strong>我们总是应该对这样的操作加以保护，在<code>sync/atomic</code>包中声明了很多用于原子操作的函数。</strong></p>
+<p>另外，<strong>由于我选用的原子操作函数对被操作的数值的类型有约束，所以我才对<code>count</code>以及相关的变量和参数的类型进行了统一的变更（由<code>int</code>变为了<code>uint32</code>）。</strong></p>
+<p>纵观<code>count</code>变量、<code>trigger</code>函数以及改造后的<code>for</code>语句和<code>go</code>函数，我要做的是，让<code>count</code>变量成为一个信号，它的值总是下一个可以调用打印函数的<code>go</code>函数的序号。</p>
+<p>这个序号其实就是启用 goroutine 时，那个当次迭代的序号。也正因为如此，<code>go</code>函数实际的执行顺序才会与<code>go</code>语句的执行顺序完全一致。<strong>此外，这里的<code>trigger</code>函数实现了一种自旋（spinning）。除非发现条件已满足，否则它会不断地进行检查。</strong></p>
+<p>最后要说的是，因为我依然想让主 goroutine 最后一个运行完毕，所以还需要加一行代码。不过既然有了<code>trigger</code>函数，我就没有再使用通道。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">trigger(<span class="number">10</span>, <span class="function"><span class="keyword">func</span><span class="params">()</span></span>&#123;&#125;)</span><br></pre></td></tr></table></figure>
 
-<p>从条件上看，这个查询没有符合条件的记录，因此会返回空集合。</p>
-<p>在开始执行这条语句之前，你可以先设想一下，如果你来选择索引，会选择哪一个呢？</p>
-<p>为了便于分析，我们先来看一下a、b这两个索引的结构图。</p>
-<p><img src="/2024/09/10/MySQL10/image-20240911074144966.png" alt="image-20240911074144966"></p>
-<p>如果使用索引a进行查询，<strong>那么就是扫描索引a的前1000个值，然后取到对应的id，再到主键索引上去查出每一行，然后根据字段b来过滤。显然这样需要扫描1000行。</strong></p>
-<p>如果使用索引b进行查询，<strong>那么就是扫描索引b的最后50001个值，与上面的执行过程相同，也是需要回到主键索引上取值再判断，所以需要扫描50001行。</strong></p>
-<p>所以你一定会想，如果使用索引a的话，执行速度明显会快很多。那么，下面我们就来看看到底是不是这么一回事儿。</p>
-<p>图8是执行explain的结果。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; explain select * from t where (a between 1 and 1000) and (b between 50000 and 100000) order by b limit 1;</span><br></pre></td></tr></table></figure>
-
-<p><img src="/2024/09/10/MySQL10/image-20240911074207327.png" alt="image-20240911074207327"></p>
-<p>可以看到，返回结果中key字段显示，这次优化器选择了索引b，而rows字段显示需要扫描的行数是50198。</p>
-<p><strong>从这个结果中，你可以得到两个结论：</strong></p>
-<ol>
-<li><strong>扫描行数的估计值依然不准确；</strong></li>
-<li><strong>这个例子里MySQL又选错了索引。</strong></li>
-</ol>
-<h3 id="索引选择异常和处理"><a href="#索引选择异常和处理" class="headerlink" title="索引选择异常和处理"></a>索引选择异常和处理</h3><p>其实<strong>大多数时候优化器都能找到正确的索引，但偶尔你还是会碰到我们上面举例的这两种情况</strong>：原本可以执行得很快的SQL语句，执行速度却比你预期的慢很多，你应该怎么办呢？</p>
-<p><strong>一种方法是，像我们第一个例子一样，采用force index强行选择一个索引。</strong>MySQL会根据词法解析的结果分析出可能可以使用的索引作为候选项，然后在候选列表中依次判断每个索引需要扫描多少行。<strong>如果force index指定的索引在候选索引列表中，就直接选择这个索引，不再评估其他索引的执行代价。</strong></p>
-<p>我们来看看第二个例子。刚开始分析时，我们认为选择索引a会更好。现在，我们就来看看执行效果：</p>
-<p><img src="/2024/09/10/MySQL10/image-20240911075335025.png" alt="image-20240911075335025"></p>
-<p>可以看到，原本语句需要执行2.23秒，而当你使用force index(a)的时候，只用了0.05秒，<strong>比优化器的选择快了40多倍。</strong></p>
-<p><strong>也就是说，优化器没有选择正确的索引，force index起到了“矫正”的作用。</strong></p>
-<p>不过很多程序员不喜欢使用force index，<strong>一来这么写不优美</strong>，二来<strong>如果索引改了名字，这个语句也得改</strong>，显得很麻烦。而且如果以后<strong>迁移到别的数据库的话，这个语法还可能会不兼容</strong>。</p>
-<p>但其实使用force index最主要的问题还是变更的及时性。<strong>因为选错索引的情况还是比较少出现的，所以开发的时候通常不会先写上force index。而是等到线上出现问题的时候，你才会再去修改SQL语句、加上force index。</strong>但是修改之后还要测试和发布，<strong>对于生产系统来说，这个过程不够敏捷</strong>。</p>
-<p>所以，数据库的问题最好还是在数据库内部来解决。那么，在数据库里面该怎样解决呢？</p>
-<p>既然优化器放弃了使用索引a，说明a还不够合适，所以<strong>第二种方法就是，我们可以考虑修改语句，引导MySQL使用我们期望的索引。</strong>比如，在这个例子里，<strong>显然把“order by b limit 1” 改成 “order by b,a limit 1” ，语义的逻辑是相同的</strong>。</p>
-<p><img src="/2024/09/10/MySQL10/image-20240911075503759.png" alt="image-20240911075503759"></p>
-<p>之前优化器选择使用索引b，<strong>是因为它认为使用索引b可以避免排序（b本身是索引，已经是有序的了，如果选择索引b的话，不需要再做排序，只需要遍历），所以即使扫描行数多，也判定为代价更小。</strong></p>
-<p>现在order by b,a 这种写法，要求按照b,a排序，就意味着使用这两个索引都需要排序。<strong>因此，扫描行数成了影响决策的主要条件，于是此时优化器选了只需要扫描1000行的索引a。</strong></p>
-<p>当然，这种修改并不是通用的优化手段，只是刚好在这个语句里面有limit 1，<strong>因此如果有满足条件的记录， order by b limit 1和order by b,a limit 1 都会返回b是最小的那一行，逻辑上一致，才可以这么做。</strong></p>
-<p>如果你觉得修改语义这件事儿不太好，这里还有一种改法，图11是执行效果。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; select * from  (select * from t where (a between 1 and 1000)  and (b between 50000 and 100000) order by b limit 100)alias limit 1;</span><br></pre></td></tr></table></figure>
-
-<p><img src="/2024/09/10/MySQL10/image-20240911075527162.png" alt="image-20240911075527162"></p>
-<p>在这个例子里，<strong>我们用limit 100让优化器意识到，使用b索引代价是很高的。其实是我们根据数据特征诱导了一下优化器，也不具备通用性。</strong></p>
-<p><strong>第三种方法是，在有些场景下，我们可以新建一个更合适的索引，来提供给优化器做选择，或删掉误用的索引。</strong></p>
-<p>不过，在这个例子中，<strong>我没有找到通过新增索引来改变优化器行为的方法。这种情况其实比较少，尤其是经过DBA索引优化过的库，再碰到这个bug，找到一个更合适的索引一般比较难。</strong></p>
-<p><strong>如果我说还有一个方法是删掉索引b，你可能会觉得好笑。</strong>但实际上我碰到过两次这样的例子，最终是DBA跟业务开发沟通后，<strong>发现这个优化器错误选择的索引其实根本没有必要存在，于是就删掉了这个索引，优化器也就重新选择到了正确的索引。</strong></p>
-<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>今天我们一起聊了聊<strong>索引统计的更新机制，并提到了优化器存在选错索引的可能性</strong>。</p>
-<p>对于<strong>由于索引统计信息不准确导致的问题，你可以用analyze table来解决</strong>。</p>
-<p>而对于其他优化器误判的情况：</p>
-<ul>
-<li><strong>你可以在应用端用force index来强行指定索引</strong></li>
-<li><strong>也可以通过修改语句来引导优化器</strong></li>
-<li><strong>还可以通过增加或者删除索引来绕过这个问题</strong></li>
-</ul>
-<p>你可能会说，今天这篇文章后面的几个例子，怎么都没有展开说明其原理。我要告诉你的是，<strong>今天的话题，我们面对的是MySQL优化器的bug，每一个展开都必须深入到一行行代码去量化，实在不是我们在这里应该做的事情</strong>。</p>
-<p>所以，我把我用过的解决方法跟你分享，希望你在碰到类似情况的时候，能够有一些思路。</p>
-<p>前面我们在构造第一个例子的过程中，通过session A的配合，让session B删除数据后又重新插入了一遍数据，然后就发现explain结果中，rows字段从10001变成37000多。</p>
-<p>而如果没有session A的配合，只是单独执行delete from t 、call idata()、explain这三句话，会看到rows字段其实还是10000左右。你可以自己验证一下这个结果。</p>
-<p>这是什么原因呢？也请你分析一下吧。</p>
-<h3 id="上期问题时间"><a href="#上期问题时间" class="headerlink" title="上期问题时间"></a>上期问题时间</h3><p>我在上一篇文章最后留给你的问题是，如果某次写入使用了change buffer机制，之后主机异常重启，是否会丢失change buffer和数据。</p>
-<p>这个问题的答案是<strong>不会丢失</strong>，虽然是只更新内存，但是在事务提交的时候，<strong>我们把change buffer的操作也记录到redo log里了，所以崩溃恢复的时候，change buffer也能找回来</strong>。</p>
-<p>merge的过程是否会把数据直接写回磁盘，这是个好问题。这里，我再为你分析一下。</p>
-<p>merge的执行流程是这样的：</p>
-<ol>
-<li><strong>从磁盘读入数据页到内存（老版本的数据页）；</strong></li>
-<li><strong>从change buffer里找出这个数据页的change buffer 记录(可能有多个），依次应用，得到新版数据页；</strong></li>
-<li><strong>写redo log。这个redo log包含了数据的变更和change buffer的变更。</strong></li>
-</ol>
-<p>到这里merge过程就结束了。<strong>这时候，数据页和内存中change buffer对应的磁盘位置都还没有修改，属于脏页，之后各自刷回自己的物理数据，就是另外一个过程了。</strong></p>
-<p><strong>merge 操作</strong>通常在<strong>数据操作、读取数据页、后台处理、Buffer Pool 管理、系统事件和显式刷新操作</strong>等情况下触发。主要是<strong>处理 Change Buffer 中的变更记录，并将这些变更合并到相应的数据页</strong>中。</p>
-<p>合并到相应数据页的过程实际上是将<strong>变更应用到内存中的数据页，但在这个阶段，数据页本身并不会立即更新到磁盘，而是保持在内存中，处于脏页的状态，实际的磁盘更新会延迟进行</strong>。</p>
-<p><strong>Checkpoint机制</strong>，具体可以看看这篇文章</p>
-<ul>
-<li><a target="_blank" rel="noopener" href="https://www.cnblogs.com/chenpingzhao/p/5107480.html">【mysql】关于checkpoint机制 - 踏雪无痕SS - 博客园 (cnblogs.com)</a></li>
-</ul>
-<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/mysql-shi-zhan-45-jiang/10-mysql-wei-shi-mo-you-shi-hou-hui-xuan-cuo-suo-yin">10 MySQL为什么有时候会选错索引？ | MySql实战45讲 (gitbook.io)</a></p>
+<p>调用<code>trigger</code>函数完全可以达到相同的效果。由于当所有我手动启用的 goroutine 都运行完毕之后，<code>count</code>的值一定会是<code>10</code>，所以我就把<code>10</code>作为了第一个参数值。又由于我并不想打印这个<code>10</code>，所以我把一个什么都不做的函数作为了第二个参数值。</p>
+<p>总之，通过上述的改造，我使得异步发起的<code>go</code>函数得到了同步地（或者说按照既定顺序地）执行，你也可以动手自己试一试，感受一下。</p>
+<p><strong>总结</strong></p>
+<p>在本篇文章中，我们接着上一篇文章的主问题，讨论了当我们想让运行结果更加可控的时候，应该怎样去做。</p>
+<p><strong>主 goroutine 的运行若过早结束，那么我们的并发程序的功能就很可能无法全部完成。所以我们往往需要通过一些手段去进行干涉，比如调用<code>time.Sleep</code>函数或者使用通道</strong>。我们在后面的文章中还会讨论更高级的手段。</p>
+<p><strong>另外，<code>go</code>函数的实际执行顺序往往与其所属的<code>go</code>语句的执行顺序（或者说 goroutine 的启用顺序）不同，而且默认情况下的执行顺序是不可预知的</strong>。那怎样才能让这两个顺序一致呢？<strong>其实复杂的实现方式有不少，但是可能会把原来的代码改得面目全非。我在这里提供了一种比较简单、清晰的改造方案，供你参考。</strong></p>
+<p>总之，我希望通过上述基础知识以及三个连贯的问题帮你串起一条主线。这应该会让你更快地深入理解 goroutine 及其背后的并发编程模型，从而更加游刃有余地使用<code>go</code>语句。</p>
+<p><strong>思考题</strong></p>
+<p>1.<code>runtime</code>包中提供了哪些与模型三要素 G、P 和 M 相关的函数？（模型三要素内容在上一篇）</p>
+<p>参考文章：<a target="_blank" rel="noopener" href="https://jums.gitbook.io/36-lectures-on-golang/17-go-yu-ju-ji-qi-zhi-hang-gui-ze-xia">17 | go语句及其执行规则（下） | Go语言核心36讲 (gitbook.io)</a></p>
 
                 
             </div>
@@ -557,7 +468,7 @@
                     </i>
                 </span>
                 <span class="reprint-info">
-                    <a href="http://example.com/2024/09/10/MySQL10/">http://example.com/2024/09/10/MySQL10/</a>
+                    <a href="http://example.com/2024/09/23/Golang17/">http://example.com/2024/09/23/Golang17/</a>
                 </span>
             </div>
             <div class="reprint__notice">
@@ -595,8 +506,8 @@
                     
                         <div class="article-tag">
                             
-                                <a href="/tags/MySQL/">
-                                    <span class="chip bg-color">MySQL</span>
+                                <a href="/tags/Golang/">
+                                    <span class="chip bg-color">Golang</span>
                                 </a>
                             
                         </div>
@@ -942,17 +853,18 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
+                <i class="far fa-dot-circle"></i>&nbsp;本篇
+            </div>
             <div class="card">
-                <a href="/2024/09/10/Java22-new-features/">
+                <a href="/2024/09/23/Golang17/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/8.jpg" class="responsive-img" alt="Java9到22的一些新特性">
+                        <img src="/medias/featureimages/16.jpg" class="responsive-img" alt="go语句及其执行规则（下）">
                         
-                        <span class="card-title">Java9到22的一些新特性</span>
+                        <span class="card-title">go语句及其执行规则（下）</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -962,26 +874,27 @@
                         
                     </div>
                     <div class="publish-info">
-                        <span class="publish-date">
-                            <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
-                        </span>
+                            <span class="publish-date">
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-23
+                            </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/Java/" class="post-category">
-                                    Java
+                            <a href="/categories/Golang/" class="post-category">
+                                    Golang
                                 </a>
                             
                             
                         </span>
                     </div>
                 </div>
+
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/Java%E6%96%B0%E7%89%B9%E6%80%A7/">
-                        <span class="chip bg-color">Java新特性</span>
+                    <a href="/tags/Golang/">
+                        <span class="chip bg-color">Golang</span>
                     </a>
                     
                 </div>
@@ -995,13 +908,13 @@
                 下一篇&nbsp;<i class="fas fa-chevron-right"></i>
             </div>
             <div class="card">
-                <a href="/2024/09/10/MySQL09/">
+                <a href="/2024/09/23/Golang16/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/17.jpg" class="responsive-img" alt="普通索引和唯一索引，应该怎么选择？">
+                        <img src="/medias/featureimages/23.jpg" class="responsive-img" alt="go语句及其执行规则（上）">
                         
-                        <span class="card-title">普通索引和唯一索引，应该怎么选择？</span>
+                        <span class="card-title">go语句及其执行规则（上）</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -1012,14 +925,14 @@
                     </div>
                     <div class="publish-info">
                             <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-10
+                                <i class="far fa-clock fa-fw icon-date"></i>2024-09-23
                             </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-bookmark fa-fw icon-category"></i>
                             
-                            <a href="/categories/MySQL/" class="post-category">
-                                    MySQL
+                            <a href="/categories/Golang/" class="post-category">
+                                    Golang
                                 </a>
                             
                             
@@ -1029,8 +942,8 @@
                 
                 <div class="card-action article-tags">
                     
-                    <a href="/tags/MySQL/">
-                        <span class="chip bg-color">MySQL</span>
+                    <a href="/tags/Golang/">
+                        <span class="chip bg-color">Golang</span>
                     </a>
                     
                 </div>
