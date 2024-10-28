@@ -359,14 +359,14 @@
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    2.5k
+                    3.9k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    8 分
+                    13 分
                 </div>
                 
 
@@ -419,6 +419,7 @@
 <p>所以说，<strong>网络接口层主要为网络层提供「链路级别」传输的服务，负责在以太网、WiFi 这样的底层网络上发送原始数据包，工作在网卡这个层次，使用 MAC 地址来标识网络上的设备</strong>。</p>
 <p><strong>网络接口层的传输单位是帧（frame），IP 层的传输单位是包（packet），TCP 层的传输单位是段（segment），HTTP 的传输单位则是消息或报文（message）</strong>。但这些名词并没有什么本质的区分，<strong>可以统称为数据包</strong>。</p>
 <p>这里再补充一些其他的知识:</p>
+<p>这里补充一下什么什么网之间的区别</p>
 <p><strong>只要是有两个设备可以相互传送数据，那么就可以说它们组成了一个计算机网络</strong></p>
 <p><strong>lan是接下层网络的，wan是接上层网络的</strong></p>
 <p>局域网范围很小，理解为一个家庭的网络就可以了</p>
@@ -433,6 +434,29 @@
 <p><strong>我们上网就是上因特网&#x2F;互联网，Internet是一个特殊的广域网，是最大的广域网，使得世界上所有的电脑可以互相通信</strong></p>
 <p>但是以太网和上面的都不同，<strong>以太网是一门技术，比如是以太网的这个技术构成了局域网，A和B之所以可以通信是靠以太网这个技术实现的</strong></p>
 <p>局域网使用的技术是以太网，所以<strong>局域网又可以称为以太网</strong></p>
+<p>接下来再补充一下IP地址和MAC地址的区别</p>
+<p>用邮件来作为类比，<strong>MAC地址就是收件地址，IP地址就是收件人</strong>，如果把网络比作城市的话，<strong>那么网卡就是城市中的建筑，MAC地址就是这栋建筑的物理地址，IP地址就是在这些建筑中的人</strong>。</p>
+<p>但是和实际的写信不同，<strong>在计算机网络中发送消息，我们只用填写内容和对方的IP地址即可，操作系统会根据对方的IP自动查寻ARP表获取对方的MAC地址</strong>，然后再由网卡将这封信发出。</p>
+<p><strong>ARP协议具体就是在不知道对方的MAC地址时先在局域网内发送一包ARP广播报文出去，询问对应IP的MAC地址是什么，只有对应IP的设备才会回复这个请求，所以就会得到对方的MAC地址，把这封信补全再发出去。</strong></p>
+<p>虽然有很多种的电子产品，<strong>但是实际上它们的通信都是由内部的网卡设备所进行的，所以我们可以统一用网卡来表示设备</strong>，每张网卡出厂时都会被写入一个MAC地址，<strong>由6个字节构成，其中三个数表示网络硬件厂商编号，后面三个数表示网卡序列号</strong>，它是全球唯一的。</p>
+<p><strong>MAC地址确定了网卡在网络中的确定位置，但是我们的网卡在接入网络之后想要通信还要配置另外一个地址，也就是IP地址</strong>，但是一般我们的电脑接上网线，或者手机连上路由器之后不用配置IP地址也可以正常使用，<strong>这是因为DHCP协议，自动帮我们配置了，动态分配IP地址给我们</strong>。</p>
+<p>当我们的电脑插上网线或者手机连上WIFI，<strong>操作系统协议栈会自动向外发送一个DHCP请求，路由器接送到这个请求之后会为其动态分配一个IP地址，并通过DHCP回复报文回复回去</strong>。操作系统收到后，<strong>会将这个IP地址配置到网卡上</strong>。</p>
+<p>还有就是交换机与路由器之间的区别</p>
+<p>交换器相当于邮递员，<strong>根据数据包中的目标MAC地址，找到它对应的物理端口</strong>，正如我们前面所看到的，一台交换机有很多个端口，它们都有自己的编号，计算机的网卡通过网线连接到交换机的网口上，<strong>这个端口就是一个确定的物理地址，我们只需要知道某个网卡的MAC地址在哪个端口上就可以将数据包发送给它。</strong></p>
+<p>在交换机中，<strong>有一张端口与MAC地址的映射关系表，称为MAC地址表，我们只需要知道对方MAC地址在哪一个端口上，然后顺着对应的端口发送出去即可，找到的话会直接从关联端口发出，未查到的话会泛洪群发</strong>。</p>
+<p>所以<strong>交换机只会关心MAC地址，不会关心IP地址，MAC地址在TCP&#x2F;IP协议栈中处于第二层数据链路层，所以交换机也被称为二层设备</strong>。</p>
+<p>路由器有两种端口，<strong>分别是LAN口和WAN口，LAN口一般会有多个，用于连接家庭的网络设备，WAN口只有一个，用于连接到Internet因特网上</strong>。</p>
+<p><strong>我们忽略WAN口的话，其实路由器就是交换机，加上WAN口的话，就是网关</strong>。</p>
+<p>所以实际在发送数据包的时候，<strong>还会根据是不是同一个子网采取不同的发送策略</strong>，是同一个子网就<strong>直接发出</strong>，不是同一个子网，<strong>就将目标MAC地址改为网关地址MAC发出，通过网关的路由表来查询，再将目标MAC覆盖为实际目标的MAC地址，源MAC地址改为自己网关的MAC地址</strong>。</p>
+<p>这上面的行为就是路由，<strong>根据目标的IP来判断如何发送</strong>。</p>
+<p><strong>路由器有一个WAN口接入互联网，有多个LAN口接入本地网络，它们就属于两个不同的子网，所以这里就要由路由器担任网关的作用，来路由数据包</strong>。</p>
+<p>简单的说，<strong>路由器是为了局域网之间进行通信，交换机是为了局域网内进行通信</strong>。</p>
+<p>再接下来介绍一下源地址转换和目标地址转换</p>
+<p>我们在前面已经知道了，<strong>数据包如何发送是根据IP来进行路由的，但是我们在内网中可以有相同的IP地址，那么就会导致ARP表混乱</strong>，那么我们是如何解决这个问题的呢？</p>
+<p><strong>源地址转换技术SNAT</strong>（SNAT，Source Network Address Translation）是一种用于解决内网IP地址冲突问题的技术。它<strong>允许多个内网设备使用相同的私有IP地址通过一个公共IP地址与外部网络通信，从而有效地管理IP地址和避免ARP表混乱</strong>。</p>
+<p><strong>本质就是多加一些信息，多加一些标识。</strong></p>
+<p><strong>目标地址转换技术DNAT</strong>（DNAT，Destination Network Address Translation）<strong>主要用于将外部请求转发到内部网络中的特定设备</strong>。</p>
+<p><strong>这个则是有一些端口映射的关系，和Docker有点类似。</strong></p>
 <p>参考文章：<a target="_blank" rel="noopener" href="https://xiaolincoding.com/network/1_base/tcp_ip_model.html#%E6%80%BB%E7%BB%93">2.1 TCP&#x2F;IP 网络模型有哪几层？ | 小林coding (xiaolincoding.com)</a></p>
 
                 
@@ -1133,7 +1157,7 @@
             <br>
             
                 &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
-                        class="white-color">441.6k</span>
+                        class="white-color">443k</span>
             
             
             
