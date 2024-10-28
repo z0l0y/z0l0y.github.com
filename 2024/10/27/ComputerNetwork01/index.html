@@ -359,14 +359,14 @@
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    2.1k
+                    2.5k
                 </div>
                 
 
                 
                 <div class="info-break-policy">
                     <i class="far fa-clock fa-fw"></i>阅读时长:&nbsp;&nbsp;
-                    7 分
+                    8 分
                 </div>
                 
 
@@ -418,6 +418,21 @@
 <p><strong>MAC 头部</strong>是以太网使用的头部，<strong>它包含了接收方和发送方的 MAC 地址等信息</strong>，我们可以通过 ARP 协议获取对方的 MAC 地址。</p>
 <p>所以说，<strong>网络接口层主要为网络层提供「链路级别」传输的服务，负责在以太网、WiFi 这样的底层网络上发送原始数据包，工作在网卡这个层次，使用 MAC 地址来标识网络上的设备</strong>。</p>
 <p><strong>网络接口层的传输单位是帧（frame），IP 层的传输单位是包（packet），TCP 层的传输单位是段（segment），HTTP 的传输单位则是消息或报文（message）</strong>。但这些名词并没有什么本质的区分，<strong>可以统称为数据包</strong>。</p>
+<p>这里再补充一些其他的知识:</p>
+<p><strong>只要是有两个设备可以相互传送数据，那么就可以说它们组成了一个计算机网络</strong></p>
+<p><strong>lan是接下层网络的，wan是接上层网络的</strong></p>
+<p>局域网范围很小，理解为一个家庭的网络就可以了</p>
+<p><img src="/2024/10/27/ComputerNetwork01/image-20241028115635622.png" alt="image-20241028115635622"></p>
+<p><strong>只要是这个网络中所有设备可以相互通信，那么就可以说它们形成了一个计算机网络</strong></p>
+<p>这个有点类似<strong>多叉树</strong>的结构，还有一点就是有点电路连线的味道</p>
+<p><img src="/2024/10/27/ComputerNetwork01/image-20241028115703669.png" alt="image-20241028115703669"></p>
+<p><strong>局域网，广域网，城域网其实就是范围的不同，一般到了小区的这个层面就是城域网了</strong></p>
+<p><strong>交换机的插口比路由器的插口多的多，一般是多个lan口，一个wan口</strong></p>
+<p><strong>城域网由多个局域网组成，广域网由多个城域网组成</strong></p>
+<p>之所以<strong>我们生活中的电脑可以互相通信，这是因为我们的祖先交换器是一样的，可以顺藤摸瓜把数据发送到另外一台电脑上</strong></p>
+<p><strong>我们上网就是上因特网&#x2F;互联网，Internet是一个特殊的广域网，是最大的广域网，使得世界上所有的电脑可以互相通信</strong></p>
+<p>但是以太网和上面的都不同，<strong>以太网是一门技术，比如是以太网的这个技术构成了局域网，A和B之所以可以通信是靠以太网这个技术实现的</strong></p>
+<p>局域网使用的技术是以太网，所以<strong>局域网又可以称为以太网</strong></p>
 <p>参考文章：<a target="_blank" rel="noopener" href="https://xiaolincoding.com/network/1_base/tcp_ip_model.html#%E6%80%BB%E7%BB%93">2.1 TCP&#x2F;IP 网络模型有哪几层？ | 小林coding (xiaolincoding.com)</a></p>
 
                 
@@ -1118,7 +1133,7 @@
             <br>
             
                 &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
-                        class="white-color">441.2k</span>
+                        class="white-color">441.6k</span>
             
             
             
